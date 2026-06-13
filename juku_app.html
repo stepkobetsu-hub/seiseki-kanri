@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>成績管理システム</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #f0f4f8;
+  --card: #ffffff;
+  --primary: #1a56a0;
+  --primary-lt: #e8f0fb;
+  --primary-dk: #103a70;
+  --accent: #f59e0b;
+  --accent-lt: #fef3c7;
+  --success: #10b981;
+  --success-lt: #d1fae5;
+  --danger: #ef4444;
+  --danger-lt: #fee2e2;
+  --warn: #f59e0b;
+  --warn-lt: #fef3c7;
+  --text: #1e293b;
+  --sub: #64748b;
+  --border: #e2e8f0;
+  --radius: 12px;
+  --shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* HEADER */
+header{background:var(--primary);color:#fff;height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+header h1{font-size:.95rem;font-weight:700;letter-spacing:.04em}
+#hdrRight{display:flex;align-items:center;gap:10px;font-size:.8rem}
+.hdrBtn{background:rgba(255,255,255,.2);border:none;color:#fff;padding:4px 12px;border-radius:20px;cursor:pointer;font-size:.78rem}
+.hdrBtn:hover{background:rgba(255,255,255,.35)}
+
+/* PAGE */
+.page{display:none;padding:20px;max-width:960px;margin:0 auto}
+.page.active{display:block}
+#loginPage{display:flex;align-items:center;justify-content:center;min-height:100vh}
+
+/* LOGIN */
+.loginBox{background:var(--card);border-radius:var(--radius);padding:40px 36px;width:100%;max-width:380px;box-shadow:var(--shadow);text-align:center}
+.loginLogo{font-size:2.2rem;margin-bottom:6px}
+.loginSub{font-size:1rem;color:var(--sub);margin-bottom:28px}
+.fld{display:flex;flex-direction:column;gap:4px;margin-bottom:14px;text-align:left}
+.fld label{font-size:.78rem;color:var(--sub)}
+.fld input,.fld select{padding:10px 13px;border:1.5px solid var(--border);border-radius:8px;font-size:.95rem;outline:none;transition:border .2s}
+.fld input:focus,.fld select:focus{border-color:var(--primary)}
+.errMsg{color:var(--danger);font-size:.8rem;margin-bottom:10px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .2s}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-dk)}
+.btn-success{background:var(--success);color:#fff}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-warn{background:var(--warn);color:#fff}
+.btn-outline{background:#fff;border:1.5px solid var(--primary);color:var(--primary)}
+.btn-outline:hover{background:var(--primary-lt)}
+.btn-ghost{background:transparent;border:1.5px solid var(--border);color:var(--sub)}
+.btn-ghost:hover{background:var(--bg)}
+.btn-full{width:100%;justify-content:center;padding:13px}
+.btn-sm{padding:5px 12px;font-size:.78rem}
+
+/* TABS */
+.tabBar{display:flex;gap:4px;margin-bottom:20px;background:var(--card);padding:6px;border-radius:var(--radius);box-shadow:var(--shadow);overflow-x:auto}
+.tabBtn{flex:1;min-width:60px;padding:8px 6px;border:none;background:transparent;border-radius:8px;cursor:pointer;font-size:.8rem;color:var(--sub);font-weight:600;transition:all .2s;white-space:nowrap}
+.tabBtn.on{background:var(--primary);color:#fff}
+.tabBtn:hover:not(.on){background:var(--primary-lt);color:var(--primary)}
+
+/* CARD */
+.card{background:var(--card);border-radius:var(--radius);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+.cardHead{font-size:.92rem;font-weight:700;color:var(--primary);margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--primary-lt);display:flex;align-items:center;gap:6px}
+.cardHead span{margin-left:auto;font-size:.78rem;color:var(--sub);font-weight:400}
+
+/* SCORE INPUT */
+.termRow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.termRow select{padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:.88rem;outline:none}
+.termRow select:focus{border-color:var(--primary)}
+.subGrp{background:var(--primary-lt);border-radius:10px;padding:14px;margin-bottom:10px}
+.subGrpHead{font-size:.75rem;color:var(--primary);font-weight:700;letter-spacing:.06em;margin-bottom:10px}
+.subRow{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.subItem{display:flex;flex-direction:column;gap:3px}
+.subItem label{font-size:.73rem;color:var(--sub)}
+.subItem input{padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:.98rem;text-align:right;background:#fff;outline:none;transition:border .2s}
+.subItem input:focus{border-color:var(--primary)}
+.subItem input.auto{background:var(--accent-lt);font-weight:700}
+.saveRow{display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:14px}
+.saveMsg{font-size:.8rem}
+.saveMsg.ok{color:var(--success)}
+.saveMsg.pending{color:var(--sub)}
+
+/* HISTORY */
+.yrTabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.yrTab{padding:5px 14px;border:1.5px solid var(--border);border-radius:20px;background:#fff;cursor:pointer;font-size:.8rem;transition:all .2s}
+.yrTab.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+.tblWrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+th{background:var(--primary);color:#fff;padding:8px 8px;text-align:center;white-space:nowrap}
+td{padding:7px 8px;text-align:center;border-bottom:1px solid var(--border);white-space:nowrap}
+tr:hover td{background:var(--primary-lt)}
+.noData{text-align:center;color:var(--sub);padding:28px;font-size:.88rem}
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.73rem;font-weight:700}
+.badge-blue{background:var(--primary-lt);color:var(--primary)}
+.badge-green{background:var(--success-lt);color:var(--success)}
+.badge-red{background:var(--danger-lt);color:var(--danger)}
+.badge-warn{background:var(--warn-lt);color:var(--warn)}
+
+/* CHART */
+.chartWrap{position:relative;height:300px}
+.chartCtrls{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.ctrlBtn{padding:4px 12px;border:1.5px solid var(--border);border-radius:20px;background:#fff;cursor:pointer;font-size:.76rem;transition:all .2s}
+.ctrlBtn.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* ADMIN LAYOUT */
+.adminGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:640px){.adminGrid{grid-template-columns:1fr}}
+.listBox{max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px}
+.listRow{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid var(--border);font-size:.83rem}
+.listRow:last-child{border-bottom:none}
+.listRowSub{font-size:.74rem;color:var(--sub)}
+.fldRow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.fldRow input,.fldRow select{padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:.83rem;outline:none}
+.fldRow input:focus,.fldRow select:focus{border-color:var(--primary)}
+
+/* SYNC */
+.syncSect{margin-bottom:16px}
+.syncSect h4{font-size:.82rem;font-weight:700;margin-bottom:8px;padding:6px 10px;border-radius:6px}
+.syncSect.add h4{background:var(--success-lt);color:var(--success)}
+.syncSect.update h4{background:var(--primary-lt);color:var(--primary)}
+.syncSect.pass h4{background:var(--warn-lt);color:var(--warn)}
+.syncSect.deact h4{background:var(--danger-lt);color:var(--danger)}
+.syncItem{font-size:.8rem;padding:5px 10px;border-bottom:1px solid var(--border)}
+.syncItem:last-child{border-bottom:none}
+.syncChanges{font-size:.74rem;color:var(--sub);margin-top:2px}
+.deactOpts{display:flex;gap:10px;margin-top:12px}
+
+/* SPEED BOARD */
+.filterRow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.filterRow select{padding:7px 11px;border:1.5px solid var(--border);border-radius:8px;font-size:.83rem;outline:none}
+.hl{color:var(--primary);font-weight:700}
+.rankBadge{display:inline-block;min-width:28px;padding:1px 6px;border-radius:4px;font-weight:700;font-size:.78rem}
+.rank1{background:#ffd700;color:#7a5c00}
+.rank2{background:#c0c0c0;color:#555}
+.rank3{background:#cd7f32;color:#5a3a00}
+
+/* SYNC LOG */
+.logRow{font-size:.78rem;padding:6px 10px;border-bottom:1px solid var(--border);display:flex;gap:10px}
+.logType{font-weight:700;min-width:60px}
+.logType.追加{color:var(--success)}
+.logType.更新{color:var(--primary)}
+.logType.削除{color:var(--danger)}
+.logType.退塾マーク{color:var(--warn)}
+.logType.エラー{color:var(--danger)}
+
+/* TOAST */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:9px 22px;border-radius:30px;font-size:.85rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9999;white-space:nowrap}
+#toast.show{opacity:1}
+
+/* MODAL */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.modal{background:#fff;border-radius:var(--radius);padding:28px;max-width:560px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.modal h3{font-size:1rem;font-weight:700;margin-bottom:16px;color:var(--primary)}
+.modalFoot{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+
+/* SUMMARY CHIPS */
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chip{padding:6px 14px;border-radius:20px;font-size:.8rem;font-weight:600}
+.chip-blue{background:var(--primary-lt);color:var(--primary)}
+.chip-green{background:var(--success-lt);color:var(--success)}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header id="appHdr" style="display:none">
+  <h1>📚 成績管理システム</h1>
+  <div id="hdrRight">
+    <span id="hdrName"></span>
+    <button class="hdrBtn" onclick="logout()">ログアウト</button>
+  </div>
+</header>
+
+<!-- ===== LOGIN ===== -->
+<div id="loginPage" class="page active" style="display:flex">
+  <div class="loginBox">
+    <img src="data:image/png;base64,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" style="width:320px;margin-bottom:8px">
+    <div class="fld" style="display:none">
+      <label>GAS WebアプリURL</label>
+      <input id="gasUrl" type="text" placeholder="https://script.google.com/macros/s/...">
+    </div>
+    <div class="fld"><label>生徒ID</label><input id="loginId" type="text" placeholder="例: S001"></div>
+    <div class="fld"><label>パスワード</label><input id="loginPw" type="password" placeholder="パスワード"></div>
+    <div class="errMsg" id="loginErr"></div>
+    <button class="btn btn-primary btn-full" onclick="doLogin()">ログイン</button>
+    <button class="btn btn-outline btn-full" style="margin-top:8px" onclick="openAdmin()">🔑 管理者メニュー</button>
+  </div>
+</div>
+
+<!-- ===== STUDENT ===== -->
+<div id="studentPage" class="page">
+  <div class="tabBar">
+    <button class="tabBtn on" onclick="sTabs('input',0)">✏️ 入力</button>
+    <button class="tabBtn" onclick="sTabs('history',1)">📋 履歴</button>
+    <button class="tabBtn" onclick="sTabs('chart',2)">📈 グラフ</button>
+  </div>
+
+  <!-- 入力 -->
+  <div id="sTab_input">
+    <div class="card">
+      <div class="cardHead">🗓️ テスト選択</div>
+      <div class="termRow">
+        <select id="selYear"></select>
+        <select id="selTerm"></select>
+        <button class="btn btn-outline btn-sm" onclick="loadScore()">読み込む</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="cardHead">📝 得点入力 <span id="inputStatus" class="saveMsg pending"></span></div>
+      <div class="subGrp">
+        <div class="subGrpHead">5教科</div>
+        <div class="subRow">
+          <div class="subItem"><label>国語</label><input type="number" id="f_jpn" min="0" max="100" oninput="calcTotal()"></div>
+          <div class="subItem"><label>社会</label><input type="number" id="f_soc" min="0" max="100" oninput="calcTotal()"></div>
+          <div class="subItem"><label>数学</label><input type="number" id="f_math" min="0" max="100" oninput="calcTotal()"></div>
+          <div class="subItem"><label>理科</label><input type="number" id="f_sci" min="0" max="100" oninput="calcTotal()"></div>
+          <div class="subItem"><label>英語</label><input type="number" id="f_eng" min="0" max="100" oninput="calcTotal()"></div>
+          <div class="subItem"><label>5科目合計</label><input type="number" id="f_total5" class="auto" readonly></div>
+          <div class="subItem"><label>5科目順位</label><input type="number" id="f_rank5" min="1"></div>
+        </div>
+      </div>
+      <div class="subGrp">
+        <div class="subGrpHead">副教科（任意）</div>
+        <div class="subRow">
+          <div class="subItem"><label>音楽</label><input type="number" id="f_mus" min="0" max="100" oninput="calcTotal()"></div>
+          <div class="subItem"><label>美術</label><input type="number" id="f_art" min="0" max="100" oninput="calcTotal()"></div>
+          <div class="subItem"><label>保健体育</label><input type="number" id="f_pe" min="0" max="100" oninput="calcTotal()"></div>
+          <div class="subItem"><label>技術家庭</label><input type="number" id="f_tech" min="0" max="100" oninput="calcTotal()"></div>
+          <div class="subItem"><label>9科目合計</label><input type="number" id="f_total9" class="auto" readonly></div>
+          <div class="subItem"><label>9科目順位</label><input type="number" id="f_rank9" min="1"></div>
+        </div>
+      </div>
+      <div class="saveRow">
+        <button class="btn btn-primary" onclick="saveScore()">💾 保存する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 履歴 -->
+  <div id="sTab_history" style="display:none">
+    <div class="card">
+      <div class="cardHead">📋 成績履歴</div>
+      <div class="yrTabs" id="histYrTabs"></div>
+      <div class="tblWrap">
+        <table>
+          <thead><tr>
+            <th>年度</th><th>回次</th>
+            <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
+            <th>5科計</th><th>5位</th>
+            <th>音</th><th>美</th><th>体</th><th>技</th>
+            <th>9科計</th><th>9位</th><th>操作</th>
+          </tr></thead>
+          <tbody id="histBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- グラフ -->
+  <div id="sTab_chart" style="display:none">
+    <div class="card">
+      <div class="cardHead">📈 得点推移</div>
+      <div class="chartCtrls" id="chartCtrls"></div>
+      <div class="chartWrap"><canvas id="scoreChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ADMIN ===== -->
+<div id="adminPage" class="page">
+  <div class="tabBar">
+    <button class="tabBtn on" onclick="aTabs('speed',0)">⚡ 速報</button>
+    <button class="tabBtn" onclick="aTabs('students',1)">👥 生徒</button>
+    <button class="tabBtn" onclick="aTabs('schools',2)">🏫 学校</button>
+    <button class="tabBtn" onclick="aTabs('sync',3)">🔄 同期</button>
+    <button class="tabBtn" onclick="aTabs('settings',4)">⚙️ 設定</button>
+    <button class="tabBtn" onclick="logout()">← 戻る</button>
+  </div>
+
+  <!-- 速報 -->
+  <div id="aTab_speed">
+    <div class="card">
+      <div class="cardHead">⚡ 成績速報</div>
+      <div class="filterRow">
+        <select id="spYear" onchange="loadSpeed()"></select>
+        <select id="spTerm" onchange="loadSpeed()"></select>
+        <select id="spCampus" onchange="loadSpeed()">
+          <option value="">全校舎</option>
+          <option>神領</option>
+          <option>大手</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="loadSpeed()">🔄 更新</button>
+      </div>
+      <div class="tblWrap">
+        <table>
+          <thead><tr>
+            <th>氏名</th><th>校舎</th><th>学年</th><th>中学校</th>
+            <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
+            <th>5科計</th><th>5位</th><th>音</th><th>美</th><th>体</th><th>技</th><th>9科計</th><th>9位</th>
+            <th>更新</th>
+          </tr></thead>
+          <tbody id="spBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="cardHead">📊 5科目合計分布</div>
+      <div class="chartWrap"><canvas id="adminChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- 生徒一覧 -->
+  <div id="aTab_students" style="display:none">
+    <div class="card">
+      <div class="cardHead">👥 登録生徒一覧 <span id="studentCount"></span></div>
+      <div class="filterRow">
+        <select id="stuGrade" onchange="renderStudents()">
+          <option value="">全学年</option>
+          <option value="中1,中１">中1</option>
+          <option value="中2,中２">中2</option>
+          <option value="中3,中３">中3</option>
+        </select>
+        <select id="stuCampus" onchange="renderStudents()">
+          <option value="">全校舎</option><option>神領</option><option>大手</option>
+        </select>
+      </div>
+      <div class="listBox" id="stuList"></div>
+    </div>
+  </div>
+
+  <!-- 学校管理 -->
+  <div id="aTab_schools" style="display:none">
+    <div class="adminGrid">
+      <div class="card">
+        <div class="cardHead">🏫 学校の登録</div>
+        <div class="fldRow">
+          <input type="text" id="newSchoolName" placeholder="学校名">
+          <input type="number" id="newSchoolTerms" placeholder="年間テスト回数" min="1" max="10">
+        </div>
+        <button class="btn btn-success btn-sm" onclick="addSchool()">＋ 追加</button>
+      </div>
+      <div class="card">
+        <div class="cardHead">登録済み学校</div>
+        <div class="listBox" id="schoolListBox"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 同期 -->
+  <div id="aTab_sync">
+    <div class="card">
+      <div class="cardHead">🔄 生徒マスタ同期</div>
+      <p style="font-size:.83rem;color:var(--sub);margin-bottom:14px">
+        元スプレッドシート（☆生徒マスタ）から差分を確認して適用します。<br>
+        毎日午前2時に自動同期されますが、手動でも実行できます。
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="runSync()">🔍 差分を確認する</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadSyncLog()">📋 同期ログを見る</button>
+      </div>
+    </div>
+    <div id="syncResult" style="display:none"></div>
+    <div id="syncLogWrap" style="display:none">
+      <div class="card">
+        <div class="cardHead">📋 同期ログ（直近50件）</div>
+        <div id="syncLogList"></div>
+      </div>
+    </div>
+  </div>
+  <!-- 設定 -->
+  <div id="aTab_settings" style="display:none;padding-top:4px">
+    <div class="card" style="max-width:420px;margin:0 auto">
+      <div class="cardHead">⚙️ 管理者パスワード変更</div>
+      <div class="fld"><label>現在のパスワード</label><input type="password" id="curPass" placeholder="現在のパスワード"></div>
+      <div class="fld"><label>新しいパスワード</label><input type="password" id="newPass" placeholder="新しいパスワード（4文字以上）"></div>
+      <div class="fld"><label>新しいパスワード（確認）</label><input type="password" id="newPass2" placeholder="もう一度入力"></div>
+      <div class="errMsg" id="passErr" style="min-height:18px"></div>
+      <button class="btn btn-primary" onclick="changeAdminPass()" style="width:100%;margin-top:4px">🔑 パスワードを変更する</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="syncModal">
+  <div class="modal">
+    <h3>🔄 同期プレビュー</h3>
+    <div id="syncModalBody"></div>
+    <div class="modalFoot">
+      <button class="btn btn-ghost btn-sm" onclick="closeSyncModal()">キャンセル</button>
+      <button class="btn btn-warn btn-sm" onclick="applySync(false)">退塾マークのみ（削除しない）で適用</button>
+      <button class="btn btn-primary btn-sm" onclick="applySync(true)">退塾者を削除して適用</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ===================================================
+// STATE
+// ===================================================
+let GAS = localStorage.getItem('gasUrl') || 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
+let me = null;            // ログイン中生徒
+let myScores = [];        // 生徒の成績
+let schools = [];         // 学校マスタ
+let students = [];        // 生徒一覧
+let pendingSync = null;   // 同期プレビューデータ
+let scoreChartInst = null;
+let adminChartInst = null;
+// 4月始まりの年度計算（1〜3月は前年度扱い）
+function getNendo(date) {
+  const d = date || new Date();
+  return d.getMonth() < 3 ? d.getFullYear() - 1 : d.getFullYear();
+}
+const NOW_YEAR = getNendo();
+
+// ===================================================
+// API
+// ===================================================
+async function api(params) {
+  if (!GAS) { toast('⚠️ GAS URLを入力してください'); throw new Error('No GAS URL'); }
+  const res = await fetch(GAS, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(params),
+    redirect: 'follow'
+  });
+  const json = await res.json();
+  if (!json.success && json.error) console.error('[GAS Error]', json.error);
+  return json;
+}
+
+// ===================================================
+// LOGIN / LOGOUT
+// ===================================================
+document.getElementById('gasUrl').value = GAS;
+document.getElementById('gasUrl').addEventListener('input', e => {
+  GAS = e.target.value.trim();
+  localStorage.setItem('gasUrl', GAS);
+});
+
+async function doLogin() {
+  const id = document.getElementById('loginId').value.trim();
+  const pw = document.getElementById('loginPw').value;
+  document.getElementById('loginErr').textContent = '';
+  try {
+    const r = await api({ action: 'login', studentId: id, password: pw });
+    if (r.success) {
+      me = r.student;
+      setHeader(me.name + '（' + me.grade + '）');
+      showPage('studentPage');
+      await initStudent();
+    } else {
+      document.getElementById('loginErr').textContent = r.error;
+    }
+  } catch { document.getElementById('loginErr').textContent = 'サーバーに接続できません'; }
+}
+
+function openAdmin() {
+  const saved = localStorage.getItem('adminPass') || 'admin1234';
+  const pw = prompt('管理者パスワードを入力してください');
+  if (pw !== saved) { alert('パスワードが違います'); return; }
+  setHeader('管理者');
+  showPage('adminPage');
+  aTabs('speed', 0);
+  initAdmin();
+}
+
+function logout() {
+  me = null; myScores = [];
+  document.getElementById('appHdr').style.display = 'none';
+  showPage('loginPage');
+}
+
+function setHeader(name) {
+  document.getElementById('appHdr').style.display = 'flex';
+  document.getElementById('hdrName').textContent = name;
+}
+
+// ===================================================
+// PAGE / TAB
+// ===================================================
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => { p.classList.remove('active'); p.style.display = 'none'; });
+  const pg = document.getElementById(id);
+  pg.classList.add('active');
+  pg.style.display = id === 'loginPage' ? 'flex' : 'block';
+}
+
+function sTabs(name, idx) {
+  ['input','history','chart'].forEach(t => document.getElementById('sTab_' + t).style.display = 'none');
+  document.getElementById('sTab_' + name).style.display = 'block';
+  document.querySelectorAll('#studentPage .tabBtn').forEach((b, i) => b.classList.toggle('on', i === idx));
+  if (name === 'history') renderHistory();
+  if (name === 'chart') renderChart();
+}
+
+function aTabs(name, idx) {
+  ['speed','students','schools','sync','settings'].forEach(t => {
+    const el = document.getElementById('aTab_' + t);
+    if (el) el.style.display = 'none';
+  });
+  const el = document.getElementById('aTab_' + name);
+  if (el) el.style.display = name === 'settings' ? 'block' : 'block';
+  document.querySelectorAll('#adminPage .tabBtn').forEach((b, i) => b.classList.toggle('on', i === idx));
+  if (name === 'speed') loadSpeed();
+  if (name === 'students') loadStudents();
+  if (name === 'schools') loadSchools();
+}
+
+function changeAdminPass() {
+  const cur = document.getElementById('curPass').value;
+  const np = document.getElementById('newPass').value;
+  const np2 = document.getElementById('newPass2').value;
+  const errEl = document.getElementById('passErr');
+  const saved = localStorage.getItem('adminPass') || 'admin1234';
+
+  if (cur !== saved) { errEl.textContent = '現在のパスワードが違います'; return; }
+  if (np.length < 4) { errEl.textContent = '新しいパスワードは4文字以上にしてください'; return; }
+  if (np !== np2) { errEl.textContent = 'パスワードが一致しません'; return; }
+
+  localStorage.setItem('adminPass', np);
+  errEl.textContent = '';
+  document.getElementById('curPass').value = '';
+  document.getElementById('newPass').value = '';
+  document.getElementById('newPass2').value = '';
+  toast('✅ パスワードを変更しました');
+}
+
+// ===================================================
+// STUDENT INIT
+// ===================================================
+async function initStudent() {
+  const r = await api({ action: 'getSchools' });
+  schools = r.schools || [];
+  const sc = schools.find(s => s.name === me.school);
+  const terms = sc ? sc.termCount : 4;
+
+  const ysel = document.getElementById('selYear');
+  ysel.innerHTML = '';
+  for (let y = NOW_YEAR; y >= NOW_YEAR - 2; y--) ysel.innerHTML += `<option value="${y}">${y}年度</option>`;
+
+  const tsel = document.getElementById('selTerm');
+  tsel.innerHTML = '';
+  for (let t = 1; t <= terms; t++) tsel.innerHTML += `<option value="${t}">第${t}回</option>`;
+
+  const sr = await api({ action: 'getStudentScores', studentId: me.id });
+  myScores = sr.scores || [];
+  sTabs('input', 0);
+}
+
+// ===================================================
+// SCORE INPUT
+// ===================================================
+function calcTotal() {
+  const g = id => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
+  const v5 = ['f_jpn','f_soc','f_math','f_sci','f_eng'].map(g).filter(x => x !== null);
+  const v4 = ['f_mus','f_art','f_pe','f_tech'].map(g).filter(x => x !== null);
+  document.getElementById('f_total5').value = v5.length ? v5.reduce((a,b)=>a+b,0) : '';
+  const all = [...v5, ...v4];
+  document.getElementById('f_total9').value = all.length ? all.reduce((a,b)=>a+b,0) : '';
+}
+
+function loadScore() {
+  const yr = document.getElementById('selYear').value;
+  const tm = document.getElementById('selTerm').value;
+  const sc = myScores.find(s => String(s.year) === yr && String(s.term) === tm);
+  const flds = ['jpn','soc','math','sci','eng','total5','rank5','mus','art','pe','tech','total9','rank9'];
+  flds.forEach(f => { document.getElementById('f_' + f).value = (sc && sc[f] !== '') ? sc[f] : ''; });
+  const st = document.getElementById('inputStatus');
+  st.textContent = sc ? '✅ 保存済みデータを表示中' : '（まだデータがありません）';
+  st.className = 'saveMsg ' + (sc ? 'ok' : 'pending');
+}
+
+async function saveScore() {
+  const yr = document.getElementById('selYear').value;
+  const tm = document.getElementById('selTerm').value;
+  const g = id => { const v = document.getElementById(id).value; return v === '' ? '' : Number(v); };
+  const r = await api({
+    action: 'saveScore', studentId: me.id, name: me.name, campus: me.campus,
+    grade: me.grade, school: me.school, year: yr, term: tm,
+    jpn: g('f_jpn'), soc: g('f_soc'), math: g('f_math'), sci: g('f_sci'), eng: g('f_eng'),
+    total5: g('f_total5'), rank5: g('f_rank5'),
+    mus: g('f_mus'), art: g('f_art'), pe: g('f_pe'), tech: g('f_tech'),
+    total9: g('f_total9'), rank9: g('f_rank9')
+  });
+  if (r.success) {
+    toast('✅ ' + r.message);
+    const sr = await api({ action: 'getStudentScores', studentId: me.id });
+    myScores = sr.scores || [];
+    document.getElementById('inputStatus').textContent = '✅ 保存しました';
+    document.getElementById('inputStatus').className = 'saveMsg ok';
+  } else toast('❌ ' + r.error);
+}
+
+// ===================================================
+// HISTORY
+// ===================================================
+function renderHistory() {
+  const yrs = [...new Set(myScores.map(s => s.year))].sort((a,b) => b - a);
+  const yrTabsEl = document.getElementById('histYrTabs');
+  yrTabsEl.innerHTML = '';
+  if (!yrs.length) { document.getElementById('histBody').innerHTML = '<tr><td colspan="16" class="noData">データがありません</td></tr>'; return; }
+
+  let selYr = yrs[0];
+  const render = () => {
+    const rows = myScores.filter(s => String(s.year) === String(selYr)).sort((a,b) => a.term - b.term);
+    document.getElementById('histBody').innerHTML = rows.map(s => `<tr>
+      <td><span class="badge badge-blue">${s.year}年度</span></td>
+      <td>第${s.term}回</td>
+      <td>${d(s.jpn)}</td><td>${d(s.soc)}</td><td>${d(s.math)}</td><td>${d(s.sci)}</td><td>${d(s.eng)}</td>
+      <td><strong>${d(s.total5)}</strong></td><td>${s.rank5 ? s.rank5+'位' : '-'}</td>
+      <td>${d(s.mus)}</td><td>${d(s.art)}</td><td>${d(s.pe)}</td><td>${d(s.tech)}</td>
+      <td><strong>${d(s.total9)}</strong></td><td>${s.rank9 ? s.rank9+'位' : '-'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="jumpEdit('${s.year}','${s.term}')">編集</button></td>
+    </tr>`).join('') || '<tr><td colspan="16" class="noData">この年度のデータがありません</td></tr>';
+  };
+  yrs.forEach(y => {
+    const b = document.createElement('button');
+    b.className = 'yrTab' + (y === selYr ? ' on' : '');
+    b.textContent = y + '年度';
+    b.onclick = () => { selYr = y; document.querySelectorAll('.yrTab').forEach(x => x.classList.remove('on')); b.classList.add('on'); render(); };
+    yrTabsEl.appendChild(b);
+  });
+  render();
+}
+
+function d(v) { return (v !== '' && v != null) ? v : '-'; }
+
+function jumpEdit(yr, tm) {
+  sTabs('input', 0);
+  document.getElementById('selYear').value = yr;
+  document.getElementById('selTerm').value = tm;
+  loadScore();
+}
+
+// ===================================================
+// CHART
+// ===================================================
+const SUBS = [
+  { key:'jpn', label:'国語', color:'#6366f1' },
+  { key:'soc', label:'社会', color:'#f59e0b' },
+  { key:'math', label:'数学', color:'#10b981' },
+  { key:'sci', label:'理科', color:'#3b82f6' },
+  { key:'eng', label:'英語', color:'#ef4444' },
+  { key:'total5', label:'5科合計', color:'#8b5cf6' },
+];
+let activeSubs = new Set(['total5']);
+
+function renderChart() {
+  document.getElementById('chartCtrls').innerHTML = SUBS.map(s =>
+    `<button class="ctrlBtn ${activeSubs.has(s.key)?'on':''}" onclick="toggleSub('${s.key}')">${s.label}</button>`
+  ).join('');
+  buildStudentChart();
+}
+function toggleSub(k) { activeSubs.has(k) ? activeSubs.delete(k) : activeSubs.add(k); renderChart(); }
+
+function buildStudentChart() {
+  const sorted = [...myScores].sort((a,b) => a.year !== b.year ? a.year - b.year : a.term - b.term);
+  const labels = sorted.map(s => `${s.year}年\n第${s.term}回`);
+  const datasets = SUBS.filter(s => activeSubs.has(s.key)).map(s => ({
+    label: s.label,
+    data: sorted.map(sc => sc[s.key] !== '' ? Number(sc[s.key]) : null),
+    borderColor: s.color, backgroundColor: s.color + '22',
+    tension: 0.35, spanGaps: true, pointRadius: 5
+  }));
+  const ctx = document.getElementById('scoreChart').getContext('2d');
+  if (scoreChartInst) scoreChartInst.destroy();
+  scoreChartInst = new Chart(ctx, {
+    type: 'line', data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { min: 0, title: { display: true, text: '点数' } } }
+    }
+  });
+}
+
+// ===================================================
+// ADMIN: SPEED
+// ===================================================
+async function initAdmin() {
+  const r = await api({ action: 'getSchools' });
+  schools = r.schools || [];
+  // 年度・回次セレクタ
+  const maxTerms = schools.length ? Math.max(...schools.map(s => s.termCount)) : 5;
+  const ysel = document.getElementById('spYear');
+  ysel.innerHTML = '';
+  for (let y = NOW_YEAR; y >= NOW_YEAR - 2; y--) ysel.innerHTML += `<option value="${y}">${y}年度</option>`;
+  const tsel = document.getElementById('spTerm');
+  tsel.innerHTML = '<option value="">全回次</option>';
+  for (let t = 1; t <= maxTerms; t++) tsel.innerHTML += `<option value="${t}">第${t}回</option>`;
+}
+
+async function loadSpeed() {
+  const yr = document.getElementById('spYear').value;
+  const tm = document.getElementById('spTerm').value;
+  const cp = document.getElementById('spCampus').value;
+  const r = await api({ action: 'getAllScores', year: yr, term: tm, campus: cp });
+  const scores = r.scores || [];
+
+  document.getElementById('spBody').innerHTML = scores
+    .sort((a,b) => (b.total5||0) - (a.total5||0))
+    .map((s, i) => {
+      const rnk = i + 1;
+      const rnkBadge = rnk <= 3 ? `<span class="rankBadge rank${rnk}">${rnk}位</span>` : `${rnk}位`;
+      return `<tr>
+        <td><strong>${s.name}</strong></td><td>${s.campus||''}</td><td>${s.grade||''}</td><td>${s.school||''}</td>
+        <td>${d(s.jpn)}</td><td>${d(s.soc)}</td><td>${d(s.math)}</td><td>${d(s.sci)}</td><td>${d(s.eng)}</td>
+        <td class="hl">${d(s.total5)}</td><td>${s.rank5 ? s.rank5+'位' : '-'}</td>
+        <td>${d(s.mus)}</td><td>${d(s.art)}</td><td>${d(s.pe)}</td><td>${d(s.tech)}</td>
+        <td class="hl">${d(s.total9)}</td><td>${s.rank9 ? s.rank9+'位' : '-'}</td>
+        <td style="font-size:.7rem;color:var(--sub)">${s.updatedAt||''}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="18" class="noData">データがありません</td></tr>';
+
+  buildAdminChart(scores);
+}
+
+function buildAdminChart(scores) {
+  const ctx = document.getElementById('adminChart').getContext('2d');
+  if (adminChartInst) adminChartInst.destroy();
+  const sorted = [...scores].filter(s => s.total5 !== '').sort((a,b) => b.total5 - a.total5);
+  adminChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(s => s.name),
+      datasets: [{ label: '5科目合計', data: sorted.map(s => s.total5),
+        backgroundColor: sorted.map((_, i) => i === 0 ? '#ffd700' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : '#1a56a066'),
+        borderWidth: 0 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { min: 0, max: 500 } }
+    }
+  });
+}
+
+// ===================================================
+// ADMIN: STUDENTS
+// ===================================================
+async function loadStudents() {
+  document.getElementById('stuList').innerHTML = '<div class="noData">読み込み中...</div>';
+  document.getElementById('studentCount').textContent = '';
+  const r = await api({ action: 'getStudents' });
+  students = r.students || [];
+  renderStudents();
+}
+
+function renderStudents() {
+  const gf = document.getElementById('stuGrade').value;
+  const cf = document.getElementById('stuCampus').value;
+  const filtered = students.filter(s => {
+    const gradeMatch = !gf || gf.split(',').includes(s.grade);
+    const campusMatch = !cf || s.campus === cf;
+    return gradeMatch && campusMatch;
+  });
+  document.getElementById('studentCount').textContent = `${filtered.length}名`;
+  document.getElementById('stuList').innerHTML = filtered.map(s => {
+    const f = String(s.flag).trim();
+    const flagBadge = f === '1' ? '<span class="badge badge-green">在籍</span>' :
+                      f === '0' ? '<span class="badge badge-warn">保留</span>' :
+                      '<span class="badge badge-red">退塾</span>';
+    return `<div class="listRow">
+      <div>
+        <strong>${s.name}</strong>（${s.id}）${flagBadge}
+        <div class="listRowSub">${s.campus} / ${s.grade} / ${s.school}</div>
+      </div>
+    </div>`;
+  }).join('') || '<div class="noData">該当する生徒がいません</div>';
+}
+
+// ===================================================
+// ADMIN: SCHOOLS
+// ===================================================
+async function loadSchools() {
+  const r = await api({ action: 'getSchools' });
+  schools = r.schools || [];
+  document.getElementById('schoolListBox').innerHTML = schools.map(s => `
+    <div class="listRow">
+      <div>
+        <strong>${s.name}</strong>
+        <div class="listRowSub">年間${s.termCount}回</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input type="number" value="${s.termCount}" min="1" max="10" style="width:52px;padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:.8rem" id="tc_${s.name}">
+        <button class="btn btn-outline btn-sm" onclick="updateSchool('${s.name}')">更新</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteSchool('${s.name}')">削除</button>
+      </div>
+    </div>
+  `).join('') || '<div class="noData">登録なし</div>';
+}
+
+async function addSchool() {
+  const name = document.getElementById('newSchoolName').value.trim();
+  const cnt = document.getElementById('newSchoolTerms').value;
+  if (!name || !cnt) { toast('学校名と回数を入力してください'); return; }
+  const r = await api({ action: 'addSchool', name, termCount: cnt });
+  if (r.success) { toast('✅ 追加しました'); loadSchools(); document.getElementById('newSchoolName').value = ''; document.getElementById('newSchoolTerms').value = ''; }
+  else toast('❌ ' + r.error);
+}
+
+async function updateSchool(name) {
+  const cnt = document.getElementById('tc_' + name).value;
+  const r = await api({ action: 'updateSchool', name, termCount: cnt });
+  if (r.success) { toast('✅ 更新しました'); loadSchools(); }
+  else toast('❌ ' + r.error);
+}
+
+async function deleteSchool(name) {
+  if (!confirm(`「${name}」を削除しますか？`)) return;
+  const r = await api({ action: 'deleteSchool', name });
+  if (r.success) { toast('✅ 削除しました'); loadSchools(); }
+  else toast('❌ ' + r.error);
+}
+
+// ===================================================
+// ADMIN: SYNC
+// ===================================================
+async function runSync() {
+  toast('⏳ 差分を確認中...');
+  const r = await api({ action: 'syncStudents' });
+  if (!r.success) { toast('❌ ' + r.error); return; }
+
+  pendingSync = r.preview;
+  const { toAdd, toUpdate, passChanged, toDeactivate } = r.preview;
+  const total = toAdd.length + toUpdate.length + toDeactivate.length;
+
+  if (total === 0 && passChanged.length === 0) {
+    toast('✅ 差分なし：すでに最新の状態です');
+    return;
+  }
+
+  let html = `<div class="chips">
+    <span class="chip chip-green">追加 ${toAdd.length}名</span>
+    <span class="chip chip-blue">更新 ${toUpdate.length}名</span>
+    <span class="chip chip-blue" style="background:var(--warn-lt);color:var(--warn)">パスワード変更 ${passChanged.length}名</span>
+    <span class="chip" style="background:var(--danger-lt);color:var(--danger)">削除候補 ${toDeactivate.length}名</span>
+  </div>`;
+
+  if (toAdd.length) html += sect('add', `新規追加 ${toAdd.length}名`, toAdd.map(s =>
+    `<div class="syncItem"><strong>${s.name}</strong>（${s.id}）${s.campus} / ${s.grade} / ${s.school}</div>`).join(''));
+
+  if (toUpdate.length) html += sect('update', `情報更新 ${toUpdate.length}名`, toUpdate.map(s =>
+    `<div class="syncItem"><strong>${s.name}</strong>（${s.id}）<div class="syncChanges">${(s.changes||[]).join(' / ')}</div></div>`).join(''));
+
+  if (passChanged.length) html += sect('pass', `パスワード変更あり ${passChanged.length}名`, passChanged.map(s =>
+    `<div class="syncItem"><strong>${s.name}</strong>（${s.id}）<div class="syncChanges">旧: ${s.oldPass} → 新: ${s.newPass}</div></div>`).join(''));
+
+  if (toDeactivate.length) html += sect('deact', `マスタから消えた生徒 ${toDeactivate.length}名（削除候補）`, toDeactivate.map(s =>
+    `<div class="syncItem"><strong>${s.name}</strong>（${s.id}）${s.campus} / ${s.grade}</div>`).join(''));
+
+  document.getElementById('syncModalBody').innerHTML = html;
+  document.getElementById('syncModal').classList.add('show');
+}
+
+function sect(cls, title, body) {
+  return `<div class="syncSect ${cls}"><h4>${title}</h4>${body}</div>`;
+}
+
+async function applySync(deleteDeact) {
+  closeSyncModal();
+  if (!pendingSync) return;
+  toast('⏳ 適用中...');
+  const r = await api({
+    action: 'applySyncResult',
+    toAdd: pendingSync.toAdd,
+    toUpdate: pendingSync.toUpdate,
+    toDeactivate: pendingSync.toDeactivate,
+    deleteDeactivated: deleteDeact
+  });
+  if (r.success) {
+    toast(`✅ 同期完了（${r.applied}件の変更を適用しました）`);
+    pendingSync = null;
+    loadStudents();
+  } else toast('❌ ' + r.error);
+}
+
+function closeSyncModal() { document.getElementById('syncModal').classList.remove('show'); }
+
+async function loadSyncLog() {
+  const r = await api({ action: 'getSyncLog' });
+  const logs = r.logs || [];
+  const wrap = document.getElementById('syncLogWrap');
+  wrap.style.display = 'block';
+  document.getElementById('syncLogList').innerHTML = logs.map(l =>
+    `<div class="logRow">
+      <span style="color:var(--sub);font-size:.74rem;white-space:nowrap">${l.time}</span>
+      <span class="logType ${l.type}">${l.type}</span>
+      <span>${l.detail}</span>
+    </div>`).join('') || '<div class="noData">ログがありません</div>';
+}
+
+// ===================================================
+// TOAST
+// ===================================================
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
