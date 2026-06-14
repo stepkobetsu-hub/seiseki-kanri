@@ -703,7 +703,7 @@ function sTabs(name, idx) {
   document.getElementById('sTab_' + name).style.display = 'block';
   document.querySelectorAll('#studentPage .tabBtn').forEach((b, i) => b.classList.toggle('on', i === idx));
   if (name === 'history') { renderHistory(); renderReportHistory(); }
-  if (name === 'chart') renderChart();
+  if (name === 'chart') setTimeout(() => renderChart(), 50);
   if (name === 'report') initReportTab();
 }
 
@@ -949,11 +949,13 @@ function buildAvgChart() {
   const sub = SUBS.find(s => s.key === key) || SUBS[0];
   const sorted = sortedScores();
   const labels = scoreLabels(sorted);
-  const myData = sorted.map(s => s[key] !== '' ? Number(s[key]) : null);
-  const avgData = sorted.map(s => s[AVG_KEY[key]] !== '' ? Number(s[AVG_KEY[key]]) : null);
+  const myData = sorted.map(s => s[key] !== '' && s[key] !== null ? Number(s[key]) : null);
+  const avgData = sorted.map(s => s[AVG_KEY[key]] !== '' && s[AVG_KEY[key]] !== null ? Number(s[AVG_KEY[key]]) : null);
   const avgEl = document.getElementById('avgChart');
   if (!avgEl) return;
   if (avgChartInst) { avgChartInst.destroy(); avgChartInst = null; }
+  // データなしチェック
+  if (!sorted.length) return;
   avgChartInst = new Chart(avgEl, {
     type: 'line',
     data: { labels, datasets: [

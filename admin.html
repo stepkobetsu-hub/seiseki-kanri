@@ -892,7 +892,7 @@ async function loadCompare() {
   ]);
   cmpScoreData = (scoreRes.scores || []).filter(s => !year || String(s.year) === String(year)).sort((a,b) => a.year !== b.year ? a.year - b.year : a.term - b.term);
   cmpRpData = (rpRes.data || []).filter(d => !year || String(d.year) === String(year));
-  drawCompareCharts();
+  setTimeout(() => drawCompareCharts(), 50);
   // テーブル
   const len = Math.max(cmpScoreData.length, cmpRpData.length);
   const tbody = document.getElementById('cmpBody');
