@@ -942,20 +942,28 @@ function drawAllCmpCharts() {
 }
 
 // ① 得点推移（複数科目折れ線）
+function cmpScoreLabels() {
+  return cmpScoreData.map(s => s.year+'年 第'+s.term+'回');
+}
 function buildCmpScoreChart() {
-  const labels = cmpScoreData.map(s => s.year+'年第'+s.term+'回');
+  const labels = cmpScoreLabels();
   const datasets = CMP_SUBS.filter(s => cmpActiveSubs.has(s.key)).map(s => ({
     label: s.label,
-    data: cmpScoreData.map(sc => sc[s.key] !== '' ? Number(sc[s.key]) : null),
+    data: cmpScoreData.map(sc => {
+      const v = sc[s.key]; return (v !== '' && v !== null && v !== undefined) ? Number(v) : null;
+    }),
     borderColor: s.color, backgroundColor: 'transparent',
     tension: 0.3, spanGaps: true, pointRadius: 5, borderWidth: 2
   }));
   if (cmpScoreChartInst) cmpScoreChartInst.destroy();
+  if (!cmpScoreData.length) return;
+  const hasTotal5 = cmpActiveSubs.has('total5');
+  const yMax = hasTotal5 ? 500 : 100;
   cmpScoreChartInst = new Chart(document.getElementById('cmpScoreChart'), {
     type: 'line', data: { labels, datasets },
     options: { responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ position:'bottom' } },
-      scales:{ y:{ min:0, title:{ display:true, text:'点数' } } } }
+      scales:{ y:{ min:0, max:yMax, title:{ display:true, text:'点数' } } } }
   });
 }
 
@@ -965,7 +973,7 @@ function buildCmpAvgChart() {
   if (!sel) return;
   const key = sel.value;
   const sub = CMP_SUBS.find(s => s.key === key) || CMP_SUBS[0];
-  const labels = cmpScoreData.map(s => s.year+'年第'+s.term+'回');
+  const labels = cmpScoreLabels();
   const myData = cmpScoreData.map(s => s[key] !== '' ? Number(s[key]) : null);
   const avgData = cmpScoreData.map(s => s[sub.avgKey] !== '' ? Number(s[sub.avgKey]) : null);
   if (cmpAvgChartInst) cmpAvgChartInst.destroy();
@@ -985,24 +993,29 @@ function buildCmpAvgChart() {
 function drawCmpDiffChart() {
   const canvas = document.getElementById('cmpDiffChart');
   if (!canvas || !cmpScoreData.length) return;
-  const labels = cmpScoreData.map(s => s.year+'年第'+s.term+'回');
-  const datasets = CMP_SUBS.filter(s => cmpActiveSubs.has(s.key)).map(s => ({
+  const labels = cmpScoreLabels();
+  const zeroLine = { label:'±0（平均）', data: labels.map(()=>0),
+    borderColor:'#94a3b8', backgroundColor:'transparent',
+    borderDash:[4,4], borderWidth:1, pointRadius:0, spanGaps:true };
+  const diffDatasets = [zeroLine, ...CMP_SUBS.filter(s => cmpActiveSubs.has(s.key)).map(s => ({
     label: s.label,
     data: cmpScoreData.map(sc => {
       const mine = sc[s.key] !== '' ? Number(sc[s.key]) : null;
       const avg = sc[s.avgKey] !== '' ? Number(sc[s.avgKey]) : null;
       return (mine !== null && avg !== null) ? Math.round((mine - avg)*10)/10 : null;
     }),
-    borderColor: s.color, backgroundColor: s.color+'99', spanGaps:true
-  }));
+    borderColor: s.color, backgroundColor: s.color+'22',
+    tension:0.3, spanGaps:true, pointRadius:5, borderWidth:2, fill:false
+  }))];
   if (cmpDiffChartInst) cmpDiffChartInst.destroy();
   cmpDiffChartInst = new Chart(canvas, {
-    type: 'bar', data: { labels, datasets },
+    type: 'line', data: { labels, datasets: diffDatasets },
     options: {
       responsive:true, maintainAspectRatio:false,
       plugins:{
         legend:{ position:'bottom' },
-        tooltip:{ callbacks:{ label: ctx => ctx.dataset.label+': '+(ctx.parsed.y>0?'+':'')+ctx.parsed.y+'点' } }
+        tooltip:{ callbacks:{ label: ctx => ctx.dataset.label==='±0（平均）' ? null :
+          ctx.dataset.label+': '+(ctx.parsed.y>0?'+':'')+ctx.parsed.y+'点' } }
       },
       scales: { y: { title: { display:true, text:'平均との差（点）' },
         ticks: { callback: v => (v>0?'+':'')+v, color:'#64748b' } } }
@@ -1014,7 +1027,7 @@ function drawCmpDiffChart() {
 function buildCmpRankChart() {
   const canvas = document.getElementById('cmpRankChart');
   if (!canvas || !cmpScoreData.length) return;
-  const labels = cmpScoreData.map(s => s.year+'年第'+s.term+'回');
+  const labels = cmpScoreLabels();
   const r5 = cmpScoreData.map(s => s.rank5 !== '' ? Number(s.rank5) : null);
   const r9 = cmpScoreData.map(s => s.rank9 !== '' ? Number(s.rank9) : null);
   if (cmpRankChartInst) cmpRankChartInst.destroy();

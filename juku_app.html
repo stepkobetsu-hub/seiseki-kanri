@@ -844,7 +844,7 @@ const SUBS = [
   { key:'total5', label:'5科合計',color:'#8b5cf6' },
 ];
 const AVG_KEY = { jpn:'avg_jpn', soc:'avg_soc', math:'avg_math', sci:'avg_sci', eng:'avg_eng', total5:'avg_total5' };
-let activeSubs = new Set(['jpn','soc','math','sci','eng']);
+let activeSubs = new Set(['jpn','soc','math','sci','eng','total5']);
 // scoreChartInst2 は上部で宣言済み
 let diffChartInst = null;
 let rankChartInst = null;
@@ -852,8 +852,20 @@ let rankChartInst = null;
 function sortedScores() {
   return [...myScores].sort((a,b) => a.year !== b.year ? a.year - b.year : Number(a.term) - Number(b.term));
 }
+// 入学年度からの経過学年を返す（中1/中2/中3）
+function gradeLabel(sc) {
+  if (!me) return sc.year+'年';
+  const rawGrade = me.grade || '';
+  const normGrade = rawGrade.replace(/１/g,'1').replace(/２/g,'2').replace(/３/g,'3');
+  const gradeNum = normGrade.includes('中1') ? 1 : normGrade.includes('中2') ? 2 : normGrade.includes('中3') ? 3 : 2;
+  const nowYear = NOW_YEAR;
+  const entryYear = nowYear - gradeNum + 1; // 入学年度
+  const diffY = sc.year - entryYear;
+  const g = diffY >= 0 && diffY <= 2 ? '中'+(diffY+1) : sc.year+'年';
+  return g+'\n第'+sc.term+'回';
+}
 function scoreLabels(sorted) {
-  return sorted.map(s => s.year+'年\n第'+s.term+'回');
+  return sorted.map(s => gradeLabel(s));
 }
 
 function renderChart() {
@@ -872,21 +884,33 @@ function toggleSub2(k) { activeSubs.has(k) ? activeSubs.delete(k) : activeSubs.a
 function buildStudentChart() {
   const sorted = sortedScores();
   const labels = scoreLabels(sorted);
-  const datasets = SUBS.filter(s => activeSubs.has(s.key)).map(s => ({
+  const activeSubs5 = SUBS.filter(s => activeSubs.has(s.key));
+  const datasets = activeSubs5.map(s => ({
     label: s.label,
-    data: sorted.map(sc => sc[s.key] !== '' ? Number(sc[s.key]) : null),
+    data: sorted.map(sc => {
+      const v = sc[s.key];
+      return (v !== '' && v !== null && v !== undefined) ? Number(v) : null;
+    }),
     borderColor: s.color, backgroundColor: 'transparent',
     tension: 0.3, spanGaps: true, pointRadius: 5, borderWidth: 2
   }));
   const ctx = document.getElementById('scoreChart');
   if (!ctx) return;
   if (scoreChartInst2) scoreChartInst2.destroy();
+  // データなし
+  if (!sorted.length) {
+    scoreChartInst2 = new Chart(ctx, { type:'line', data:{ labels:['データなし'], datasets:[] }, options:{ responsive:true, maintainAspectRatio:false } });
+    return;
+  }
+  // y軸の上限：5科合計が含まれていれば500、そうでなければ自動
+  const hasTotal5 = activeSubs.has('total5');
+  const yMax = hasTotal5 ? 500 : 100;
   scoreChartInst2 = new Chart(ctx, {
     type: 'line', data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'bottom' } },
-      scales: { y: { min: 0, max: 100, title: { display:true, text:'点数' } } }
+      scales: { y: { min: 0, max: yMax, title: { display:true, text:'点数' } } }
     }
   });
 }
@@ -925,25 +949,32 @@ function buildDiffChart() {
   const sorted = sortedScores();
   const labels = scoreLabels(sorted);
   const diffSubs = SUBS.filter(s => activeSubs.has(s.key));
-  const datasets = diffSubs.map(s => ({
+  // ゼロ基準線用データ
+  const zeroLine = { label:'±0（平均）', data: sorted.map(() => 0),
+    borderColor:'#94a3b8', backgroundColor:'transparent',
+    borderDash:[4,4], borderWidth:1, pointRadius:0, spanGaps:true };
+  const datasets = [zeroLine, ...diffSubs.map(s => ({
     label: s.label,
     data: sorted.map(sc => {
       const mine = sc[s.key] !== '' ? Number(sc[s.key]) : null;
       const avg = sc[AVG_KEY[s.key]] !== '' ? Number(sc[AVG_KEY[s.key]]) : null;
       return (mine !== null && avg !== null) ? Math.round((mine - avg)*10)/10 : null;
     }),
-    borderColor: s.color, backgroundColor: s.color+'99', spanGaps: true
-  }));
+    borderColor: s.color, backgroundColor: s.color+'22',
+    tension:0.3, spanGaps:true, pointRadius:5, borderWidth:2, fill:false
+  }))];
   if (diffChartInst) diffChartInst.destroy();
   diffChartInst = new Chart(canvas, {
-    type: 'bar', data: { labels, datasets },
+    type: 'line', data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { position:'bottom' },
-        tooltip: { callbacks: { label: ctx => ctx.dataset.label+': '+(ctx.parsed.y>0?'+':'')+ctx.parsed.y+'点' } }
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label === '±0（平均）' ? null :
+          ctx.dataset.label+': '+(ctx.parsed.y>0?'+':'')+ctx.parsed.y+'点' } }
       },
-      scales: { y: { title:{ display:true, text:'平均との差（点）' }, ticks:{ callback: v=>(v>0?'+':'')+v } } }
+      scales: { y: { title:{ display:true, text:'平均との差（点）' },
+        ticks:{ callback: v=>(v>0?'+':'')+v } } }
     }
   });
 }
