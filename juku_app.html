@@ -641,6 +641,7 @@ async function doLogin() {
       sessionStorage.setItem('studentMe', JSON.stringify(me)); // セッション保持
       showPage('studentPage');
       setHeader(me.name + '（' + me.grade + '）');
+      startAutoLogout();
       await initStudent();
     } else {
       errEl.textContent = r.error || 'ログインできません';
@@ -663,6 +664,7 @@ async function doLogin() {
       me = JSON.parse(savedMe);
       showPage('studentPage');
       setHeader(me.name + '（' + me.grade + '）');
+      startAutoLogout();
       initStudent();
     } catch(e) { sessionStorage.removeItem('studentMe'); }
   }
@@ -678,7 +680,26 @@ function openAdmin() {
   initAdmin();
 }
 
+let autoLogoutTimer = null;
+const AUTO_LOGOUT_MIN = 40;
+
+function startAutoLogout() {
+  clearAutoLogout();
+  autoLogoutTimer = setTimeout(() => {
+    alert('⏰ 操作がなかったため、自動的にログアウトしました。');
+    logout();
+  }, AUTO_LOGOUT_MIN * 60 * 1000);
+}
+function clearAutoLogout() {
+  if (autoLogoutTimer) { clearTimeout(autoLogoutTimer); autoLogoutTimer = null; }
+}
+// 操作があるたびにタイマーリセット
+['click','touchstart','keydown'].forEach(ev =>
+  document.addEventListener(ev, () => { if (me) startAutoLogout(); }, { passive: true })
+);
+
 function logout() {
+  clearAutoLogout();
   sessionStorage.removeItem('studentMe');
   me = null; myScores = [];
   document.getElementById('appHdr').style.display = 'none';
@@ -796,6 +817,25 @@ async function saveScore() {
   const yr = document.getElementById('selYear').value;
   const tm = document.getElementById('selTerm').value;
   const g = id => { const el = document.getElementById(id); if(!el) return ''; const v = el.value; return v === '' ? '' : Number(v); };
+
+  // バリデーション：平均点0〜100、5科計0〜500
+  const avgFields = [
+    {id:'f_avg_jpn', max:100, label:'平均 国語'},
+    {id:'f_avg_soc', max:100, label:'平均 社会'},
+    {id:'f_avg_math', max:100, label:'平均 数学'},
+    {id:'f_avg_sci', max:100, label:'平均 理科'},
+    {id:'f_avg_eng', max:100, label:'平均 英語'},
+    {id:'f_avg_total5', max:500, label:'平均 5科計'},
+  ];
+  for (const f of avgFields) {
+    const v = g(f.id);
+    if (v !== '' && (v < 0 || v > f.max)) {
+      toast(`❌ ${f.label}は0〜${f.max}の範囲で入力してください`);
+      document.getElementById(f.id).focus();
+      return;
+    }
+  }
+
   const r = await api({
     action: 'saveScore', studentId: me.id, name: me.name, campus: me.campus,
     grade: me.grade, school: me.school, year: yr, term: tm,
