@@ -113,8 +113,11 @@ tr:hover td{background:var(--primary-lt)}
 /* CHART */
 .chartWrap{position:relative;height:300px}
 .chartCtrls{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-.ctrlBtn{padding:4px 12px;border:1.5px solid var(--border);border-radius:20px;background:#fff;cursor:pointer;font-size:.76rem;transition:all .2s}
-.ctrlBtn.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+.ctrlBtn{padding:6px 14px;border:2px solid #cbd5e1;border-radius:20px;background:#f8fafc;cursor:pointer;font-size:.78rem;font-weight:600;transition:all .2s;color:#64748b;box-shadow:none}
+.ctrlBtn.on{background:var(--primary);color:#fff;border-color:var(--primary);box-shadow:0 2px 6px rgba(26,86,160,.3)}
+.ctrlBtn:hover:not(.on){background:#e8f0fb;border-color:var(--primary);color:var(--primary)}
+/* エラー入力欄 */
+.inputError{border:2px solid #ef4444 !important;background:#fff5f5 !important;}
 
 /* ADMIN LAYOUT */
 .adminGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -302,8 +305,10 @@ tr:hover td{background:var(--primary-lt)}
   <div id="sTab_chart" style="display:none">
     <!-- 科目セレクタ（全グラフ共通） -->
     <div class="card" style="padding:14px 16px">
-      <div style="font-size:.78rem;color:#64748b;margin-bottom:8px;font-weight:600">📌 表示する科目を選択</div>
+      <div style="font-size:.78rem;color:#1e293b;margin-bottom:6px;font-weight:700">📌 表示する科目を選択（ボタンを押すとON/OFF）</div>
+      <div style="font-size:.72rem;color:#64748b;margin-bottom:8px">色が濃い＝表示中　／　薄い＝非表示</div>
       <div id="chartCtrls" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      <div style="font-size:.72rem;color:#94a3b8;margin-top:8px">※ ボタンを押すと下のグラフ①③が即座に切り替わります</div>
     </div>
     <!-- グラフ① 得点推移 -->
     <div class="card">
@@ -818,22 +823,42 @@ async function saveScore() {
   const tm = document.getElementById('selTerm').value;
   const g = id => { const el = document.getElementById(id); if(!el) return ''; const v = el.value; return v === '' ? '' : Number(v); };
 
-  // バリデーション：平均点0〜100、5科計0〜500
-  const avgFields = [
-    {id:'f_avg_jpn', max:100, label:'平均 国語'},
-    {id:'f_avg_soc', max:100, label:'平均 社会'},
-    {id:'f_avg_math', max:100, label:'平均 数学'},
-    {id:'f_avg_sci', max:100, label:'平均 理科'},
-    {id:'f_avg_eng', max:100, label:'平均 英語'},
-    {id:'f_avg_total5', max:500, label:'平均 5科計'},
+  // 全フィールドのエラー表示をリセット
+  document.querySelectorAll('.inputError').forEach(el => el.classList.remove('inputError'));
+
+  // バリデーション定義
+  const allFields = [
+    {id:'f_jpn',  min:0, max:100, label:'国語'},
+    {id:'f_soc',  min:0, max:100, label:'社会'},
+    {id:'f_math', min:0, max:100, label:'数学'},
+    {id:'f_sci',  min:0, max:100, label:'理科'},
+    {id:'f_eng',  min:0, max:100, label:'英語'},
+    {id:'f_mus',  min:0, max:100, label:'音楽'},
+    {id:'f_art',  min:0, max:100, label:'美術'},
+    {id:'f_pe',   min:0, max:100, label:'保健体育'},
+    {id:'f_tech', min:0, max:100, label:'技術家庭'},
+    {id:'f_avg_jpn',    min:0, max:100,  label:'平均 国語'},
+    {id:'f_avg_soc',    min:0, max:100,  label:'平均 社会'},
+    {id:'f_avg_math',   min:0, max:100,  label:'平均 数学'},
+    {id:'f_avg_sci',    min:0, max:100,  label:'平均 理科'},
+    {id:'f_avg_eng',    min:0, max:100,  label:'平均 英語'},
+    {id:'f_avg_total5', min:0, max:500,  label:'平均 5科計'},
   ];
-  for (const f of avgFields) {
+  const errors = [];
+  for (const f of allFields) {
     const v = g(f.id);
-    if (v !== '' && (v < 0 || v > f.max)) {
-      toast(`❌ ${f.label}は0〜${f.max}の範囲で入力してください`);
-      document.getElementById(f.id).focus();
-      return;
+    if (v !== '' && (isNaN(v) || v < f.min || v > f.max)) {
+      const el = document.getElementById(f.id);
+      if (el) el.classList.add('inputError');
+      errors.push(`${f.label}（${f.min}〜${f.max}）`);
     }
+  }
+  if (errors.length) {
+    toast('❌ 入力値が範囲外です：' + errors.join('、'));
+    // 最初のエラー欄にスクロール
+    const firstErr = document.querySelector('.inputError');
+    if (firstErr) firstErr.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
   }
 
   const r = await api({
