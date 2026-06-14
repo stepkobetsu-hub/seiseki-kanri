@@ -772,21 +772,31 @@ function changeAdminPass() {
 // STUDENT INIT
 // ===================================================
 async function initStudent() {
+  // ① セレクタを先に生成（GAS通信前に確実に表示）
+  const ysel = document.getElementById('selYear');
+  const tsel = document.getElementById('selTerm');
+  if (ysel) {
+    ysel.innerHTML = '';
+    for (let y = NOW_YEAR; y >= NOW_YEAR - 2; y--) ysel.innerHTML += `<option value="${y}">${y}年度</option>`;
+  }
+  if (tsel) {
+    tsel.innerHTML = '';
+    for (let t = 1; t <= 5; t++) tsel.innerHTML += `<option value="${t}">第${t}回</option>`; // 仮：5回
+  }
+
+  // ② 学校マスタを取得して回次を正確に設定
   try {
     const r = await api({ action: 'getSchools' });
     schools = r.schools || [];
   } catch(e) { schools = []; }
-  const sc = schools.find(s => s.name === me.school);
-  const terms = sc ? sc.termCount : 5;
+  const sc = schools.find(s => s.name === (me && me.school));
+  const terms = (sc && sc.termCount) ? Number(sc.termCount) : 5;
+  if (tsel) {
+    tsel.innerHTML = '';
+    for (let t = 1; t <= terms; t++) tsel.innerHTML += `<option value="${t}">第${t}回</option>`;
+  }
 
-  const ysel = document.getElementById('selYear');
-  ysel.innerHTML = '';
-  for (let y = NOW_YEAR; y >= NOW_YEAR - 2; y--) ysel.innerHTML += `<option value="${y}">${y}年度</option>`;
-
-  const tsel = document.getElementById('selTerm');
-  tsel.innerHTML = '';
-  for (let t = 1; t <= terms; t++) tsel.innerHTML += `<option value="${t}">第${t}回</option>`;
-
+  // ③ 成績データ取得
   try {
     const sr = await api({ action: 'getStudentScores', studentId: me.id });
     myScores = sr.scores || [];
