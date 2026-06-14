@@ -68,9 +68,9 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:.82rem;font-weight:600;transition:.15s}
-.ctrlBtn{padding:6px 14px;border:2px solid #cbd5e1;border-radius:20px;background:#f8fafc;cursor:pointer;font-size:.78rem;font-weight:600;transition:all .2s;color:#64748b}
-.ctrlBtn.on{background:var(--primary);color:#fff;border-color:var(--primary);box-shadow:0 2px 6px rgba(26,86,160,.3)}
-.ctrlBtn:hover:not(.on){background:#e8f0fb;border-color:var(--primary);color:var(--primary)}
+.ctrlBtn{padding:6px 14px;border:2px solid #e2e8f0;border-radius:20px;background:#f1f5f9;cursor:pointer;font-size:.78rem;font-weight:600;transition:all .18s;color:#b0bec5;opacity:.7}
+.ctrlBtn.on{background:var(--c,var(--primary));color:#fff;border-color:var(--c,var(--primary));box-shadow:0 2px 8px rgba(0,0,0,.18);opacity:1}
+.ctrlBtn:hover:not(.on){opacity:1;border-color:#94a3b8;color:#475569;background:#e8edf3}
 .btn-primary{background:var(--primary);color:#fff}
 .btn-primary:hover{background:var(--primary-dk)}
 .btn-success{background:var(--success);color:#fff}
@@ -270,20 +270,19 @@ tr:hover td{background:#f8fafc}
           </select>
           <select id="cmpYear" onchange="loadCompare()"></select>
         </div>
-        <!-- 科目ボタン -->
-        <div style="font-size:.75rem;color:#1e293b;margin-bottom:4px;font-weight:700">📌 表示科目（ボタンを押すとON/OFF）</div>
-        <div style="font-size:.72rem;color:#64748b;margin-bottom:6px">色が濃い＝表示中　／　薄い＝非表示</div>
-        <div id="cmpSubjCtrls" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-        <div style="font-size:.72rem;color:#94a3b8;margin-top:6px">※ ボタンを押すとグラフ①③が即座に切り替わります</div>
       </div>
       <!-- ① 得点推移 -->
       <div class="card">
-        <div class="cardHead">📈 得点推移（折れ線）</div>
+        <div class="cardHead">① 📈 得点推移（折れ線）</div>
+        <div style="margin-bottom:10px">
+          <div style="font-size:.75rem;color:#64748b;margin-bottom:6px;font-weight:600">▼ 表示する科目（タップでON/OFF）</div>
+          <div id="cmpSubjCtrls" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
         <div style="position:relative;height:280px"><canvas id="cmpScoreChart"></canvas></div>
       </div>
       <!-- ② 得点 vs 平均 -->
       <div class="card">
-        <div class="cardHead">📊 得点 vs 学年平均
+        <div class="cardHead">② 📊 得点 vs 学年平均
           <select id="cmpAvgSubj" onchange="buildCmpAvgChart()" style="font-size:.76rem;padding:3px 6px;border:1px solid #e2e8f0;border-radius:6px;color:#1e293b">
             <option value="jpn">国語</option><option value="soc">社会</option>
             <option value="math">数学</option><option value="sci">理科</option>
@@ -294,17 +293,21 @@ tr:hover td{background:#f8fafc}
       </div>
       <!-- ③ 平均との差 -->
       <div class="card">
-        <div class="cardHead">📉 平均との差（自分－平均）</div>
+        <div class="cardHead">③ 📉 平均との差（自分－平均）</div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:.75rem;color:#64748b;margin-bottom:6px;font-weight:600">▼ 表示する科目（タップでON/OFF）</div>
+          <div id="cmpDiffCtrls" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
         <div style="position:relative;height:260px"><canvas id="cmpDiffChart"></canvas></div>
       </div>
       <!-- ④ 順位推移 -->
       <div class="card">
-        <div class="cardHead">🏅 順位推移</div>
+        <div class="cardHead">④ 🏅 順位推移</div>
         <div style="position:relative;height:240px"><canvas id="cmpRankChart"></canvas></div>
       </div>
       <!-- ⑤ 通知表評定推移 -->
       <div class="card">
-        <div class="cardHead">📒 通知表 評定推移
+        <div class="cardHead">⑤ 📒 通知表 評定推移
           <select id="cmpRpSubj" onchange="buildCmpRpChart()" style="font-size:.76rem;padding:3px 6px;border:1px solid #e2e8f0;border-radius:6px;color:#1e293b">
             <option value="rp_jpn">国語</option><option value="rp_soc">社会</option>
             <option value="rp_math">数学</option><option value="rp_sci">理科</option>
@@ -930,9 +933,18 @@ let cmpRankChartInst = null;
 function renderCmpSubjBtns() {
   const el = document.getElementById('cmpSubjCtrls');
   if (!el) return;
-  el.innerHTML = CMP_SUBS.map(s =>
-    `<button class="ctrlBtn ${cmpActiveSubs.has(s.key)?'on':''}" onclick="toggleCmpSub('${s.key}')">${s.label}</button>`
-  ).join('');
+  el.innerHTML = CMP_SUBS.map(s => {
+    const on = cmpActiveSubs.has(s.key);
+    return `<button class="ctrlBtn ${on?'on':''}" style="--c:${s.color}" onclick="toggleCmpSub('${s.key}')">${s.label}</button>`;
+  }).join('');
+  // グラフ③用ボタン（独立）
+  const el3 = document.getElementById('cmpDiffCtrls');
+  if (el3) {
+    el3.innerHTML = CMP_SUBS.map(s => {
+      const on = cmpActiveSubs.has(s.key);
+      return `<button class="ctrlBtn ${on?'on':''}" style="--c:${s.color}" onclick="toggleCmpSub('${s.key}')">${s.label}</button>`;
+    }).join('');
+  }
 }
 function toggleCmpSub(k) { cmpActiveSubs.has(k) ? cmpActiveSubs.delete(k) : cmpActiveSubs.add(k); drawAllCmpCharts(); }
 
