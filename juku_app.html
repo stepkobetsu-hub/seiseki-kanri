@@ -324,7 +324,11 @@ tr:hover td{background:var(--primary-lt)}
     <!-- グラフ③ 平均との差 -->
     <div class="card">
       <div class="cardHead">📉 平均との差（自分－平均）</div>
-      <div class="chartWrap" style="height:260px"><canvas id="diffChart"></canvas></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px" id="diffCtrls"></div>
+      <div style="font-size:.76rem;color:#64748b;margin-bottom:8px">
+        <label style="cursor:pointer"><input type="checkbox" id="diffShowAvg" onchange="buildDiffChart()"> 平均点の線も重ねて表示</label>
+      </div>
+      <div class="chartWrap" style="height:300px"><canvas id="diffChart"></canvas></div>
     </div>
     <!-- グラフ④ 順位推移 -->
     <div class="card">
@@ -631,6 +635,8 @@ async function doLogin() {
     const r = await api({ action: 'login', studentId: id, password: pw });
     if (r.success) {
       me = r.student;
+      localStorage.setItem('studentId', id); // ID記憶
+      sessionStorage.setItem('studentMe', JSON.stringify(me)); // セッション保持
       showPage('studentPage');
       setHeader(me.name + '（' + me.grade + '）');
       await initStudent();
@@ -641,6 +647,24 @@ async function doLogin() {
     errEl.textContent = 'サーバーに接続できません: ' + e.message;
   }
 }
+
+// ページ読み込み時：ID復元＋セッション継続
+(function() {
+  const savedId = localStorage.getItem('studentId');
+  if (savedId) {
+    const el = document.getElementById('loginId');
+    if (el) el.value = savedId;
+  }
+  const savedMe = sessionStorage.getItem('studentMe');
+  if (savedMe) {
+    try {
+      me = JSON.parse(savedMe);
+      showPage('studentPage');
+      setHeader(me.name + '（' + me.grade + '）');
+      initStudent();
+    } catch(e) { sessionStorage.removeItem('studentMe'); }
+  }
+})();
 
 function openAdmin() {
   const saved = localStorage.getItem('adminPass') || 'admin1234';
@@ -653,6 +677,7 @@ function openAdmin() {
 }
 
 function logout() {
+  sessionStorage.removeItem('studentMe');
   me = null; myScores = [];
   document.getElementById('appHdr').style.display = 'none';
   showPage('loginPage');
@@ -678,7 +703,7 @@ function sTabs(name, idx) {
   document.getElementById('sTab_' + name).style.display = 'block';
   document.querySelectorAll('#studentPage .tabBtn').forEach((b, i) => b.classList.toggle('on', i === idx));
   if (name === 'history') { renderHistory(); renderReportHistory(); }
-  if (name === 'chart') { renderChart(); drawStudentReportChart(); }
+  if (name === 'chart') renderChart();
   if (name === 'report') initReportTab();
 }
 
@@ -877,6 +902,7 @@ function renderChart() {
   buildAvgChart();
   buildDiffChart();
   buildRankChart();
+  drawStudentReportChart();
 }
 function toggleSub2(k) { activeSubs.has(k) ? activeSubs.delete(k) : activeSubs.add(k); renderChart(); }
 
@@ -925,10 +951,10 @@ function buildAvgChart() {
   const labels = scoreLabels(sorted);
   const myData = sorted.map(s => s[key] !== '' ? Number(s[key]) : null);
   const avgData = sorted.map(s => s[AVG_KEY[key]] !== '' ? Number(s[AVG_KEY[key]]) : null);
-  const ctx = document.getElementById('avgChart');
-  if (!ctx) return;
-  if (avgChartInst) avgChartInst.destroy();
-  avgChartInst = new Chart(ctx, {
+  const avgEl = document.getElementById('avgChart');
+  if (!avgEl) return;
+  if (avgChartInst) { avgChartInst.destroy(); avgChartInst = null; }
+  avgChartInst = new Chart(avgEl, {
     type: 'line',
     data: { labels, datasets: [
       { label: '自分（'+sub.label+'）', data: myData, borderColor: sub.color, backgroundColor: sub.color+'22', tension:0.3, spanGaps:true, pointRadius:5, borderWidth:2, fill:true },
@@ -943,38 +969,75 @@ function buildAvgChart() {
 }
 
 // ③ 平均との差（棒グラフ・複数科目）
+let activeDiffSubs = new Set(['jpn','soc','math','sci','eng','total5']);
+
+function renderDiffCtrls() {
+  const el = document.getElementById('diffCtrls');
+  if (!el) return;
+  el.innerHTML = SUBS.map(s =>
+    `<button class="ctrlBtn ${activeDiffSubs.has(s.key)?'on':''}" onclick="toggleDiffSub('${s.key}')">${s.label}</button>`
+  ).join('');
+}
+function toggleDiffSub(k) {
+  activeDiffSubs.has(k) ? activeDiffSubs.delete(k) : activeDiffSubs.add(k);
+  renderDiffCtrls();
+  buildDiffChart();
+}
+
 function buildDiffChart() {
+  renderDiffCtrls();
   const canvas = document.getElementById('diffChart');
   if (!canvas) return;
   const sorted = sortedScores();
   const labels = scoreLabels(sorted);
-  const diffSubs = SUBS.filter(s => activeSubs.has(s.key));
-  // ゼロ基準線用データ
-  const zeroLine = { label:'±0（平均）', data: sorted.map(() => 0),
+  const showAvg = document.getElementById('diffShowAvg') && document.getElementById('diffShowAvg').checked;
+  const diffSubs = SUBS.filter(s => activeDiffSubs.has(s.key));
+
+  // ゼロ基準線
+  const zeroLine = {
+    label:'±0（平均線）', data: sorted.map(() => 0),
     borderColor:'#94a3b8', backgroundColor:'transparent',
-    borderDash:[4,4], borderWidth:1, pointRadius:0, spanGaps:true };
-  const datasets = [zeroLine, ...diffSubs.map(s => ({
-    label: s.label,
+    borderDash:[5,4], borderWidth:1.5, pointRadius:0, spanGaps:true
+  };
+
+  // 差分の折れ線（自分－平均）
+  const diffLines = diffSubs.map(s => ({
+    label: s.label+'（差）',
     data: sorted.map(sc => {
       const mine = sc[s.key] !== '' ? Number(sc[s.key]) : null;
       const avg = sc[AVG_KEY[s.key]] !== '' ? Number(sc[AVG_KEY[s.key]]) : null;
       return (mine !== null && avg !== null) ? Math.round((mine - avg)*10)/10 : null;
     }),
     borderColor: s.color, backgroundColor: s.color+'22',
-    tension:0.3, spanGaps:true, pointRadius:5, borderWidth:2, fill:false
-  }))];
-  if (diffChartInst) diffChartInst.destroy();
+    tension:0.3, spanGaps:true, pointRadius:5, borderWidth:2, fill:false,
+    yAxisID: 'y'
+  }));
+
+  const datasets = [zeroLine, ...diffLines];
+
+  if (diffChartInst) { diffChartInst.destroy(); diffChartInst = null; }
   diffChartInst = new Chart(canvas, {
     type: 'line', data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { position:'bottom' },
-        tooltip: { callbacks: { label: ctx => ctx.dataset.label === '±0（平均）' ? null :
-          ctx.dataset.label+': '+(ctx.parsed.y>0?'+':'')+ctx.parsed.y+'点' } }
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              if (ctx.dataset.label === '±0（平均線）') return null;
+              const v = ctx.parsed.y;
+              return ctx.dataset.label+': '+(v>0?'+':'')+v+'点';
+            }
+          }
+        }
       },
-      scales: { y: { title:{ display:true, text:'平均との差（点）' },
-        ticks:{ callback: v=>(v>0?'+':'')+v } } }
+      scales: {
+        y: {
+          title:{ display:true, text:'平均との差（点）' },
+          ticks:{ callback: v=>(v>0?'+':'')+v }
+        }
+      }
     }
   });
 }
