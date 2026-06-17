@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v3.6</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v3.7</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -932,8 +932,31 @@ function drawSpeedChart(data, subj) {
   // canvas直接クリックイベント（バー・ラベル両対応）
   const canvas = document.getElementById('speedChart');
   canvas.style.cursor = 'pointer';
+  const _sorted = sorted;
+
+  // ホバーで生徒名ポップアップ
+  const tooltip = document.getElementById('barTooltip');
+  canvas.onmousemove = function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const pts = speedChartInst.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+    if (pts.length && tooltip) {
+      const idx = pts[0].index;
+      const name = speedChartInst.data.labels[idx];
+      const subj = document.getElementById('chartSubj')?.value || 'total5';
+      const val  = _sorted[idx] ? (_sorted[idx][subj] || '') : '';
+      tooltip.textContent = '👤 ' + name + '　' + val + '点';
+      tooltip.style.display = 'block';
+      tooltip.style.left = x + 'px';
+      tooltip.style.top  = Math.max(4, pts[0].element.y - 44) + 'px';
+    } else if (tooltip) {
+      tooltip.style.display = 'none';
+    }
+  };
+  canvas.onmouseleave = () => { if (tooltip) tooltip.style.display = 'none'; };
+
   // onclickに直接代入（重複登録を防ぐ）
-  const _sorted = sorted; // クロージャでsortedを固定
+  // _sorted は上で定義済み // クロージャでsortedを固定
   canvas.onclick = function(e) {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
