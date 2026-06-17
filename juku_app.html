@@ -113,9 +113,11 @@ tr:hover td{background:var(--primary-lt)}
 /* CHART */
 .chartWrap{position:relative;height:300px}
 .chartCtrls{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-.ctrlBtn{padding:6px 14px;border:2px solid #e2e8f0;border-radius:20px;background:#f1f5f9;cursor:pointer;font-size:.78rem;font-weight:600;transition:all .18s;color:#b0bec5;box-shadow:none;opacity:.7}
-.ctrlBtn.on{background:var(--c,var(--primary));color:#fff;border-color:var(--c,var(--primary));box-shadow:0 2px 8px rgba(0,0,0,.18);opacity:1}
-.ctrlBtn:hover:not(.on){opacity:1;border-color:#94a3b8;color:#475569;background:#e8edf3}
+.ctrlBtn{padding:5px 13px;border:2px solid #d1d5db;border-radius:20px;background:#fff;cursor:pointer;font-size:.78rem;font-weight:600;transition:all .18s;color:#9ca3af;position:relative}
+.ctrlBtn::after{content:'×';font-size:.65rem;margin-left:3px;color:#d1d5db}
+.ctrlBtn.on{background:var(--c,var(--primary));color:#fff;border-color:var(--c,var(--primary));box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.ctrlBtn.on::after{content:''}
+.ctrlBtn:hover:not(.on){border-color:#94a3b8;color:#475569;background:#f8fafc}
 /* エラー入力欄 */
 .inputError{border:2px solid #ef4444 !important;background:#fff5f5 !important;}
 
