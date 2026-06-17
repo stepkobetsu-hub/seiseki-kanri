@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v2.3</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v2.4</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -571,6 +571,11 @@ function showMain() {
   document.getElementById('mainHeader').style.display = 'flex';
   document.getElementById('mainLayout').style.display = 'flex';
   initYearSelects();
+  // 速報を履歴の起点として登録（更新後も戻れるように）
+  _navHist.length = 0;
+  _navHist.push('speed');
+  _navIdx = 0;
+  _updateNavBtns();
   loadSpeed();
 }
 function logout() {
@@ -603,6 +608,12 @@ let _navSkip = false;
 
 function reloadData() {
   // ページリロードせず現在のタブのデータだけ再取得（履歴を保持）
+  // 履歴が空なら速報を起点として追加
+  if (_navHist.length === 0) {
+    _navHist.push('speed');
+    _navIdx = 0;
+    _updateNavBtns();
+  }
   const cur = _navHist[_navIdx] || 'speed';
   if (cur === 'speed') loadSpeed();
   else if (cur === 'compare') { initCompare(); }
@@ -909,20 +920,24 @@ function drawSpeedChart(data, subj) {
   canvas.onclick = function(e) {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const pts = speedChartInst.getElementsAtEventForMode(e, 'nearest', { intersect: false }, true);
+    // バークリック・ラベルクリック両対応
+    const pts = speedChartInst.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
     let idx = -1;
     if (pts.length) {
       idx = pts[0].index;
     } else {
       const xScale = speedChartInst.scales.x;
-      let minDist = 80;
+      let minDist = 60;
       xScale.ticks.forEach((_, i) => {
         const px = xScale.getPixelForTick(i);
         if (Math.abs(px - x) < minDist) { minDist = Math.abs(px - x); idx = i; }
       });
     }
     if (idx < 0 || idx >= _sorted.length) return;
-    goToCompare(_sorted[idx].studentId);
+    // グラフのラベル（生徒名）で照合して正確に特定
+    const labelName = speedChartInst.data.labels[idx];
+    const student = _sorted.find(s => s.name === labelName) || _sorted[idx];
+    goToCompare(student.studentId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 }
