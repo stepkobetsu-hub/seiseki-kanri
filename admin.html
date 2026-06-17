@@ -171,11 +171,11 @@ tr:hover td{background:#f8fafc}
 
 <!-- ===== HEADER ===== -->
 <header id="mainHeader" style="display:none">
-  <div style="display:flex;align-items:center;gap:6px">
-    <button id="navBackBtn"  onclick="navBack()"    title="戻る" style="padding:4px 11px;font-size:1rem;border:1px solid #e2e8f0;border-radius:8px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s" disabled>◀</button>
-    <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:4px 11px;font-size:1rem;border:1px solid #e2e8f0;border-radius:8px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s" disabled>▶</button>
-    <h1 style="margin:0">⚡ 成績管理システム <span>ADMIN</span></h1>
-  </div>
+  <h1 style="margin:0;display:flex;align-items:center;gap:8px">
+    ⚡ 成績管理システム <span>ADMIN</span>
+    <button id="navBackBtn"  onclick="navBack()"    title="戻る" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>◀</button>
+    <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
+  </h1>
   <div class="hdrRight">
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
@@ -796,11 +796,11 @@ const prevLinePlugin = {
       const nowVal  = nowVals[i];
       const prevVal = prevVals[i];
       if (!prevVal || !nowVal) return;
-      // 今回バーの頂点 → 前回バーの頂点へ点線
+      // 前回バーの頂点 → 今回バーの頂点へ点線（左→右）
       ctx.strokeStyle = nowVal > prevVal ? '#10b981' : nowVal < prevVal ? '#ef4444' : '#94a3b8';
       ctx.beginPath();
-      ctx.moveTo(nowBar.x,  nowBar.y);   // 今回バー頂点
-      ctx.lineTo(prevBar.x, prevBar.y);  // 前回バー頂点
+      ctx.moveTo(prevBar.x, prevBar.y);  // 前回バー頂点（左）
+      ctx.lineTo(nowBar.x,  nowBar.y);   // 今回バー頂点（右）
       ctx.stroke();
     });
     ctx.restore();
