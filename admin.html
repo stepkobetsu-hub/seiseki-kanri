@@ -69,9 +69,11 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:.82rem;font-weight:600;transition:.15s}
-.ctrlBtn{padding:6px 14px;border:2px solid #e8ecf0;border-radius:20px;background:#f8fafc;cursor:pointer;font-size:.78rem;font-weight:600;transition:all .18s;color:#c8d0da;opacity:.6;text-decoration:line-through}
-.ctrlBtn.on{background:var(--c,var(--primary));color:#fff;border-color:var(--c,var(--primary));box-shadow:0 2px 8px rgba(0,0,0,.2);opacity:1;text-decoration:none}
-.ctrlBtn:hover:not(.on){opacity:.9;border-color:#94a3b8;color:#64748b;background:#f1f5f9;text-decoration:none}
+.ctrlBtn{padding:5px 13px;border:2px solid #d1d5db;border-radius:20px;background:#fff;cursor:pointer;font-size:.78rem;font-weight:600;transition:all .18s;color:#9ca3af;position:relative}
+.ctrlBtn::after{content:'✕';font-size:.6rem;margin-left:4px;color:#d1d5db}
+.ctrlBtn.on{background:var(--c,var(--primary));color:#fff;border-color:var(--c,var(--primary));box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.ctrlBtn.on::after{content:''}
+.ctrlBtn:hover:not(.on){border-color:#94a3b8;color:#475569;background:#f8fafc}
 .btn-primary{background:var(--primary);color:#fff}
 .btn-primary:hover{background:var(--primary-dk)}
 .btn-success{background:var(--success);color:#fff}
@@ -784,11 +786,15 @@ const prevLinePlugin = {
   afterDatasetsDraw(chart) {
     if (!showPrevBar || chart.data.datasets.length < 2) return;
     const ctx = chart.ctx;
-    // datasets[0]=前回、datasets[1]=今回（登録順）
-    const prevMeta = chart.getDatasetMeta(0);
-    const nowMeta  = chart.getDatasetMeta(1);
-    const prevVals = chart.data.datasets[0].data;
-    const nowVals  = chart.data.datasets[1].data;
+    // datasets[0]=前回（左）、datasets[1]=今回（右）
+    // labelで確実に特定する
+    const prevDsIdx = chart.data.datasets.findIndex(d => d.label === '前回');
+    const nowDsIdx  = chart.data.datasets.findIndex(d => d.label === '今回');
+    if (prevDsIdx < 0 || nowDsIdx < 0) return;
+    const prevMeta = chart.getDatasetMeta(prevDsIdx);
+    const nowMeta  = chart.getDatasetMeta(nowDsIdx);
+    const prevVals = chart.data.datasets[prevDsIdx].data;
+    const nowVals  = chart.data.datasets[nowDsIdx].data;
     ctx.save();
     ctx.setLineDash([5, 4]);
     ctx.lineWidth = 1.5;
@@ -836,7 +842,6 @@ function drawSpeedChart(data, subj) {
       borderRadius: 2,
       barPercentage: 0.4,
       categoryPercentage: 0.85,
-      order: 2,
       datalabels: {
         display: ctx => (ctx.dataset.data[ctx.dataIndex]||0) > 0,
         anchor: 'end', align: 'top',
@@ -854,7 +859,6 @@ function drawSpeedChart(data, subj) {
     borderRadius: showPrevBar ? 2 : 4,
     barPercentage: showPrevBar ? 0.55 : 0.8,
     categoryPercentage: 0.85,
-    order: 1,
     datalabels: {
       display: true, anchor: 'end', align: 'top',
       font: { size: 10, weight: '600' }, color: '#475569',
