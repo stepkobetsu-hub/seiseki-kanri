@@ -325,13 +325,15 @@ tr:hover td{background:#f8fafc}
         <div class="tblWrap">
           <table>
             <thead><tr>
-              <th colspan="2">テスト</th>
-              <th colspan="9">通知表評定</th>
+              <th colspan="9">テスト成績</th>
+              <th colspan="10">通知表評定</th>
             </tr>
             <tr>
-              <th>年度・回次</th><th>5科計</th>
+              <th>年度・回次</th>
+              <th>国語</th><th>社会</th><th>数学</th><th>理科</th><th>英語</th>
+              <th>5科計</th><th>5科順位</th><th>9科順位</th>
               <th>年度・学期</th><th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
-              <th>音</th><th>美</th><th>体</th>
+              <th>音</th><th>美</th><th>体</th><th>技</th>
             </tr></thead>
             <tbody id="cmpBody"></tbody>
           </table>
@@ -937,17 +939,23 @@ async function loadCompare() {
   // テーブル
   const len = Math.max(cmpScoreData.length, cmpRpData.length);
   const tbody = document.getElementById('cmpBody');
-  if (!len) { tbody.innerHTML = '<tr><td colspan="11" class="noData">データなし</td></tr>'; return; }
+  if (!len) { tbody.innerHTML = '<tr><td colspan="19" class="noData">データなし</td></tr>'; return; }
   tbody.innerHTML = Array.from({length: len}, (_, i) => {
     const sc = cmpScoreData[i] || {};
     const rp = cmpRpData[i] || {};
+    const scLabel = sc.year ? (!year ? sc.year+'年度 第'+sc.term+'回' : '第'+sc.term+'回') : '-';
+    const rpLabel = rp.year ? (!year ? rp.year+'年度 '+rp.semester : rp.semester) : '-';
+    const td = (v, bold) => `<td${bold?' style="font-weight:700;color:var(--primary)"':''}>${v!==''&&v!=null ? v : '-'}</td>`;
     return `<tr>
-      <td>${sc.year ? sc.year+'年 第'+sc.term+'回' : '-'}</td>
-      <td style="font-weight:700;color:var(--primary)">${sc.total5||'-'}</td>
-      <td>${rp.year ? rp.year+'年 '+rp.semester : '-'}</td>
+      <td>${scLabel}</td>
+      ${td(sc.jpn)}${td(sc.soc)}${td(sc.math)}${td(sc.sci)}${td(sc.eng)}
+      ${td(sc.total5,true)}
+      ${td(sc.rank5)}${td(sc.rank9)}
+      <td>${rpLabel}</td>
       <td>${rpRating(rp.rp_jpn)}</td><td>${rpRating(rp.rp_soc)}</td><td>${rpRating(rp.rp_math)}</td>
       <td>${rpRating(rp.rp_sci)}</td><td>${rpRating(rp.rp_eng)}</td>
       <td>${rpRating(rp.rp_mus)}</td><td>${rpRating(rp.rp_art)}</td><td>${rpRating(rp.rp_pe)}</td>
+      <td>${rpRating(rp.rp_tech)}</td>
     </tr>`;
   }).join('');
 }
@@ -1074,10 +1082,19 @@ function drawCmpDiffChart() {
       plugins:{
         legend:{ position:'bottom' },
         tooltip:{ callbacks:{ label: ctx => ctx.dataset.label==='±0（平均）' ? null :
-          ctx.dataset.label+': '+(ctx.parsed.y>0?'+':'')+ctx.parsed.y+'点' } }
+          ctx.dataset.label+': '+(ctx.parsed.y>0?'+':'')+ctx.parsed.y+'点' } },
+        datalabels:{
+          display: ctx => ctx.dataset.label !== '±0（平均）' && ctx.dataset.data[ctx.dataIndex] !== null,
+          align: ctx => ctx.parsed.y >= 0 ? 'top' : 'bottom',
+          anchor: ctx => ctx.parsed.y >= 0 ? 'end' : 'start',
+          font:{ size:10, weight:'600' },
+          color: ctx => ctx.dataset.borderColor,
+          formatter: v => v !== null ? (v > 0 ? '+'+v : v) : ''
+        }
       },
       scales: { y: { title: { display:true, text:'平均との差（点）' },
-        ticks: { callback: v => (v>0?'+':'')+v, color:'#64748b' } } }
+        ticks: { callback: v => (v>0?'+':'')+v, color:'#64748b' } } },
+      layout:{ padding:{ top:16 } }
     }
   });
 }
