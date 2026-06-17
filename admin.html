@@ -893,24 +893,21 @@ function drawSpeedChart(data, subj) {
   canvas.addEventListener('click', function(e) {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    // Chart.jsのgetElementsAtEventForMode でバー判定
-    const pts = speedChartInst.getElementsAtEventForMode(e, 'index', { intersect: true }, true);
+    // intersect:false でバー・ラベルどちらでも拾う
+    const pts = speedChartInst.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
     let idx = -1;
     if (pts.length) {
       idx = pts[0].index;
     } else {
-      // X軸ラベルエリア（グラフ下部）クリック判定
+      // X軸ラベルクリック：tick座標で最近傍を探す
       const xScale = speedChartInst.scales.x;
-      let minDist = 60;
+      let minDist = 80;
       xScale.ticks.forEach((_, i) => {
-        const dist = Math.abs(xScale.getPixelForTick(i) - x);
-        if (dist < minDist) { minDist = dist; idx = i; }
+        const px = xScale.getPixelForTick(i);
+        if (Math.abs(px - x) < minDist) { minDist = Math.abs(px - x); idx = i; }
       });
     }
-    console.log('[クリック] idx=', idx, 'sorted.length=', sorted.length);
     if (idx < 0 || idx >= sorted.length) return;
-    console.log('[クリック] 生徒:', sorted[idx].name, 'ID:', sorted[idx].studentId);
     goToCompare(sorted[idx].studentId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, { once: false });
