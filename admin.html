@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v3.0</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v3.1</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -617,13 +617,20 @@ function reloadData() {
   // キャッシュクリア
   _cache.students = null;
   _cache.allScores = null;
-  // 現在のタブを再読込
-  const cur = (_navIdx >= 0 && _navHist[_navIdx]) ? _navHist[_navIdx] : 'speed';
-  if (cur === 'speed') loadSpeed();
-  else if (cur === 'compare') initCompare();
-  else if (cur === 'students') loadStudents();
-  else if (cur === 'schools') loadSchools();
-  else if (cur === 'report') initAdminReportTab();
+  // 現在表示中のタブを判定して再読込（_navHistを使わない）
+  const visibleTab = TABS.find(t => {
+    const el = document.getElementById('aTab_' + t);
+    return el && el.style.display !== 'none';
+  }) || 'speed';
+  if (visibleTab === 'speed') loadSpeed();
+  else if (visibleTab === 'compare') {
+    const sid = document.getElementById('cmpStudent').value;
+    if (sid) loadCompare(sid);
+    else initCompare();
+  }
+  else if (visibleTab === 'students') loadStudents();
+  else if (visibleTab === 'schools') loadSchools();
+  else if (visibleTab === 'report') initAdminReportTab();
   else loadSpeed();
 }
 
@@ -910,7 +917,7 @@ function drawSpeedChart(data, subj) {
       layout: { padding: { top: 28 } },
       plugins: {
         legend: { display: showPrevBar, position: 'top' },
-        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y + '点' } },
+        tooltip: { callbacks: { label: ctx => ctx.parsed ? ctx.dataset.label + ': ' + ctx.parsed.y + '点' : '' } },
         datalabels: {}
       },
       scales: {
