@@ -889,17 +889,16 @@ function drawSpeedChart(data, subj) {
   // canvas直接クリックイベント（バー・ラベル両対応）
   const canvas = document.getElementById('speedChart');
   canvas.style.cursor = 'pointer';
-  canvas.onclick = null; // 既存イベント削除
-  canvas.addEventListener('click', function(e) {
+  // onclickに直接代入（重複登録を防ぐ）
+  const _sorted = sorted; // クロージャでsortedを固定
+  canvas.onclick = function(e) {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
-    // intersect:false でバー・ラベルどちらでも拾う
-    const pts = speedChartInst.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+    const pts = speedChartInst.getElementsAtEventForMode(e, 'nearest', { intersect: false }, true);
     let idx = -1;
     if (pts.length) {
       idx = pts[0].index;
     } else {
-      // X軸ラベルクリック：tick座標で最近傍を探す
       const xScale = speedChartInst.scales.x;
       let minDist = 80;
       xScale.ticks.forEach((_, i) => {
@@ -907,10 +906,10 @@ function drawSpeedChart(data, subj) {
         if (Math.abs(px - x) < minDist) { minDist = Math.abs(px - x); idx = i; }
       });
     }
-    if (idx < 0 || idx >= sorted.length) return;
-    goToCompare(sorted[idx].studentId);
+    if (idx < 0 || idx >= _sorted.length) return;
+    goToCompare(_sorted[idx].studentId);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, { once: false });
+  };
 }
 
 // ===== 生徒 =====
@@ -1230,7 +1229,17 @@ function toggleCmpSub(k) { cmpActiveSubs.has(k) ? cmpActiveSubs.delete(k) : cmpA
 
 function drawCompareCharts() { renderCmpSubjBtns(); drawAllCmpCharts(); }
 
+function destroyChart(canvasId) {
+  const existing = Chart.getChart(canvasId);
+  if (existing) existing.destroy();
+}
+
 function drawAllCmpCharts() {
+  destroyChart('cmpScoreChart');
+  destroyChart('cmpAvgChart');
+  destroyChart('cmpDiffChart');
+  destroyChart('cmpRankChart');
+  destroyChart('cmpRpChart');
   buildCmpScoreChart();
   buildCmpAvgChart();
   drawCmpDiffChart();
