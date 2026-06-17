@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v2.7</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v2.8</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -530,8 +530,7 @@ let allReports = [];
 let pendingSync = null;
 let speedChartInst = null;
 // キャッシュ（GAS呼び出し削減）
-let _cache = { students: null, allScores: null, allScoresTime: 0 };
-const CACHE_TTL = 5 * 60 * 1000; // 5分
+let _cache = { students: null, allScores: null };
 let cmpScoreChartInst = null;
 let cmpRpChartInst = null;
 let cmpDiffChartInst = null;
@@ -615,21 +614,17 @@ function navToSpeed() {
 }
 
 function reloadData() {
-  // キャッシュをクリアして最新データを取得
+  // キャッシュクリア
   _cache.students = null;
   _cache.allScores = null;
-  _cache.allScoresTime = 0;
-  if (_navHist.length === 0) {
-    _navHist.push('speed');
-    _navIdx = 0;
-    _updateNavBtns();
-  }
-  const cur = _navHist[_navIdx] || 'speed';
+  // 現在のタブを再読込
+  const cur = (_navIdx >= 0 && _navHist[_navIdx]) ? _navHist[_navIdx] : 'speed';
   if (cur === 'speed') loadSpeed();
-  else if (cur === 'compare') { initCompare(); }
+  else if (cur === 'compare') initCompare();
   else if (cur === 'students') loadStudents();
   else if (cur === 'schools') loadSchools();
   else if (cur === 'report') initAdminReportTab();
+  else loadSpeed();
 }
 
 function _updateNavBtns() {
@@ -720,26 +715,17 @@ async function loadSpeed() {
   const term = document.getElementById('spTerm').value;
   const campus = document.getElementById('spCampus').value;
   const grade = document.getElementById('spGrade').value;
-  // 全データキャッシュ（5分間有効）
-  const now = Date.now();
-  if (!_cache.allScores || now - _cache.allScoresTime > CACHE_TTL) {
+
+  // 全データ取得（前回比較用）
+  if (!_cache.allScores) {
     const rAll = await api({ action: 'getAllScores' });
     _cache.allScores = rAll.scores || [];
-    _cache.allScoresTime = now;
   }
   window._allScoresFull = _cache.allScores;
 
-  // 今回データはフィルタして取得（キャッシュから絞り込み）
-  allScores = window._allScoresFull.filter(s => {
-    if (year && String(s.year) !== String(year)) return false;
-    if (term && String(s.term) !== String(term)) return false;
-    if (campus && s.campus !== campus) return false;
-    if (grade) {
-      const normalize = g => (g||'').replace(/１/g,'1').replace(/２/g,'2').replace(/３/g,'3');
-      if (normalize(s.grade) !== normalize(grade)) return false;
-    }
-    return true;
-  });
+  // 今回データ（GASでフィルタ）
+  const r = await api({ action: 'getAllScores', year, term, campus, grade });
+  allScores = r.scores || [];
   const badge = document.getElementById('speedCount');
   badge.textContent = allScores.length + '名';
 
@@ -1087,11 +1073,15 @@ async function goToCompare(studentId) {
   if (campusSel) campusSel.value = '';
   if (gradeSel)  gradeSel.value  = '';
 
-  // セレクタを直接構築（filterCmpStudentsを使わない＝prevで上書きされない）
+  // セレクタを直接構築
   if (stuSel) {
     stuSel.innerHTML = '<option value="">生徒を選択</option>' +
-      students.map(s => `<option value="${s.id}">${s.name}（${s.grade}）</option>`).join('');
+      students.map(s => `<option value="${String(s.id)}">${s.name}（${s.grade}）</option>`).join('');
+    // 数値・文字列両方で試す
     stuSel.value = String(studentId);
+    if (!stuSel.value || stuSel.value !== String(studentId)) {
+      stuSel.value = Number(studentId);
+    }
   }
   if (yearSel) yearSel.value = '';
 
