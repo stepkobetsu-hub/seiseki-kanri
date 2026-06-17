@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v2.9</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v3.0</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -1058,34 +1058,12 @@ async function goToCompare(studentId) {
     _updateNavBtns();
   }
 
-  // 生徒データ取得（キャッシュ使用）
-  if (!_cache.students) {
-    const r = await api({ action: 'getStudents' });
-    _cache.students = r.students || [];
-  }
-  students = _cache.students;
-
-  // フィルタをリセットしてセレクタを全生徒で再構築
-  const campusSel = document.getElementById('cmpCampus');
-  const gradeSel  = document.getElementById('cmpGrade');
-  const yearSel   = document.getElementById('cmpYear');
-  const stuSel    = document.getElementById('cmpStudent');
-  if (campusSel) campusSel.value = '';
-  if (gradeSel)  gradeSel.value  = '';
-
-  // セレクタを直接構築
-  if (stuSel) {
-    stuSel.innerHTML = '<option value="">生徒を選択</option>' +
-      students.map(s => `<option value="${String(s.id)}">${s.name}（${s.grade}）</option>`).join('');
-    // 数値・文字列両方で試す
-    stuSel.value = String(studentId);
-    if (!stuSel.value || stuSel.value !== String(studentId)) {
-      stuSel.value = Number(studentId);
-    }
-  }
+  // 年度を全期間に
+  const yearSel = document.getElementById('cmpYear');
   if (yearSel) yearSel.value = '';
 
-  await loadCompare();
+  // studentIdを直接loadCompareに渡す（セレクタの上書き問題を回避）
+  await loadCompare(studentId);
 }
 
 // ===== 学校 =====
@@ -1228,9 +1206,14 @@ function filterCmpStudents() {
     `<option value="${s.id}">${s.name}（${s.grade}）</option>`).join('');
   if (prev) sel.value = prev;
 }
-async function loadCompare() {
-  const sid = document.getElementById('cmpStudent').value;
+async function loadCompare(overrideSid) {
+  const sid = overrideSid ? String(overrideSid) : document.getElementById('cmpStudent').value;
   const year = document.getElementById('cmpYear').value;
+  // セレクタも合わせて更新
+  if (overrideSid) {
+    const sel = document.getElementById('cmpStudent');
+    if (sel) sel.value = String(overrideSid);
+  }
   if (!sid) return;
   const [scoreRes, rpRes] = await Promise.all([
     api({ action: 'getStudentScores', studentId: sid }),
