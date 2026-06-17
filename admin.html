@@ -617,9 +617,13 @@ async function loadSpeed() {
   const term = document.getElementById('spTerm').value;
   const campus = document.getElementById('spCampus').value;
   const grade = document.getElementById('spGrade').value;
-  const r = await api({ action: 'getAllScores', year, term, campus, grade });
+  // 今回データ＋前回比較用に年度全体データを並行取得
+  const [r, rAll] = await Promise.all([
+    api({ action: 'getAllScores', year, term, campus, grade }),
+    api({ action: 'getAllScores', year, campus, grade })  // 同年度全回次
+  ]);
   allScores = r.scores || [];
-  window._allScoresFull = allScores; // 前回比較用にフルデータを保持
+  window._allScoresFull = rAll.scores || []; // 前回比較用（全回次）
   const badge = document.getElementById('speedCount');
   badge.textContent = allScores.length + '名';
 
@@ -683,7 +687,7 @@ function redrawSpeedChart() {
 }
 
 function drawSpeedChart(data) {
-  const sorted = [...data].filter(s => Number(s.total5) > 0)
+  let sorted = [...data].filter(s => Number(s.total5) > 0)
     .sort((a,b) => Number(a.total5) - Number(b.total5));
   const labels = sorted.map(s => s.name);
   const vals   = sorted.map(s => Number(s.total5) || 0);
@@ -714,8 +718,11 @@ function drawSpeedChart(data) {
       const prevScores = (window._allScoresFull || []).filter(p =>
         String(p.studentId) === String(s.studentId) &&
         (Number(p.year) < curYear || (Number(p.year) === curYear && Number(p.term) < curTerm))
-      ).sort((a,b) => b.year !== a.year ? b.year - a.year : b.term - a.term);
-      return prevScores.length ? Number(prevScores[0].total5) || 0 : 0;
+      ).sort((a,b) => {
+        if (Number(b.year) !== Number(a.year)) return Number(b.year) - Number(a.year);
+        return Number(b.term) - Number(a.term);
+      });
+      return prevScores.length ? (Number(prevScores[0].total5) || 0) : 0;
     });
 
     datasets.push({
@@ -752,9 +759,29 @@ function drawSpeedChart(data) {
       scales: {
         x: { ticks: { color: '#64748b', font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.06)' } },
         y: { min: 0, max: 500, ticks: { color: '#64748b' }, grid: { color: 'rgba(0,0,0,0.06)' } }
+      },
+      onClick: (evt, elements, chart) => {
+        // X軸ラベルクリックでも反応するよう座標から判定
+        const points = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, true);
+        const idx = points.length ? points[0].index : (() => {
+          const xScale = chart.scales.x;
+          const x = evt.x;
+          let closest = -1, minDist = Infinity;
+          xScale.ticks.forEach((_, i) => {
+            const px = xScale.getPixelForTick(i);
+            if (Math.abs(px - x) < minDist) { minDist = Math.abs(px - x); closest = i; }
+          });
+          return minDist < 40 ? closest : -1;
+        })();
+        if (idx < 0) return;
+        const name = chart.data.labels[idx];
+        const student = sorted.find(s => s.name === name);
+        if (student) goToCompare(student.studentId);
       }
     }
   });
+  // X軸ラベルにカーソルポインターを表示
+  document.getElementById('speedChart').style.cursor = 'pointer';
 }
 
 // ===== 生徒 =====
