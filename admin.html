@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v2.5</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v2.7</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -529,6 +529,9 @@ let allScores = [];
 let allReports = [];
 let pendingSync = null;
 let speedChartInst = null;
+// キャッシュ（GAS呼び出し削減）
+let _cache = { students: null, allScores: null, allScoresTime: 0 };
+const CACHE_TTL = 5 * 60 * 1000; // 5分
 let cmpScoreChartInst = null;
 let cmpRpChartInst = null;
 let cmpDiffChartInst = null;
@@ -612,8 +615,10 @@ function navToSpeed() {
 }
 
 function reloadData() {
-  // ページリロードせず現在のタブのデータだけ再取得（履歴を保持）
-  // 履歴が空なら速報を起点として追加
+  // キャッシュをクリアして最新データを取得
+  _cache.students = null;
+  _cache.allScores = null;
+  _cache.allScoresTime = 0;
   if (_navHist.length === 0) {
     _navHist.push('speed');
     _navIdx = 0;
@@ -715,14 +720,26 @@ async function loadSpeed() {
   const term = document.getElementById('spTerm').value;
   const campus = document.getElementById('spCampus').value;
   const grade = document.getElementById('spGrade').value;
-  // 今回データ＋前回比較用に全年度データを並行取得
-  const [r, rAll] = await Promise.all([
-    api({ action: 'getAllScores', year, term, campus, grade }),
-    api({ action: 'getAllScores' })  // フィルタなし・全生徒・全年度（前回比較用）
-  ]);
-  allScores = r.scores || [];
-  window._allScoresFull = rAll.scores || []; // 前回比較用（全生徒・全年度・全回次）
-  console.log('[速報] 今回:', allScores.length, '件 / 前回用全データ:', window._allScoresFull.length, '件');
+  // 全データキャッシュ（5分間有効）
+  const now = Date.now();
+  if (!_cache.allScores || now - _cache.allScoresTime > CACHE_TTL) {
+    const rAll = await api({ action: 'getAllScores' });
+    _cache.allScores = rAll.scores || [];
+    _cache.allScoresTime = now;
+  }
+  window._allScoresFull = _cache.allScores;
+
+  // 今回データはフィルタして取得（キャッシュから絞り込み）
+  allScores = window._allScoresFull.filter(s => {
+    if (year && String(s.year) !== String(year)) return false;
+    if (term && String(s.term) !== String(term)) return false;
+    if (campus && s.campus !== campus) return false;
+    if (grade) {
+      const normalize = g => (g||'').replace(/１/g,'1').replace(/２/g,'2').replace(/３/g,'3');
+      if (normalize(s.grade) !== normalize(grade)) return false;
+    }
+    return true;
+  });
   const badge = document.getElementById('speedCount');
   badge.textContent = allScores.length + '名';
 
@@ -1037,8 +1054,7 @@ function filterStudents() {
 async function goToCompare(studentId) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  // aNavではinitCompareが呼ばれるので、その後に生徒を設定する
-  // aNavを直接呼ばず、タブ切り替えだけ行う
+  // タブ切り替え
   TABS.forEach(t => {
     const tab = document.getElementById('aTab_' + t);
     if (tab) tab.style.display = 'none';
@@ -1056,19 +1072,28 @@ async function goToCompare(studentId) {
     _updateNavBtns();
   }
 
-  // initCompareを1回だけ呼ぶ（生徒リスト構築）
-  await initCompare();
+  // 生徒データ取得（キャッシュ使用）
+  if (!_cache.students) {
+    const r = await api({ action: 'getStudents' });
+    _cache.students = r.students || [];
+  }
+  students = _cache.students;
 
-  // フィルタリセット・生徒選択・年度設定
+  // フィルタをリセットしてセレクタを全生徒で再構築
   const campusSel = document.getElementById('cmpCampus');
   const gradeSel  = document.getElementById('cmpGrade');
   const yearSel   = document.getElementById('cmpYear');
   const stuSel    = document.getElementById('cmpStudent');
   if (campusSel) campusSel.value = '';
   if (gradeSel)  gradeSel.value  = '';
-  filterCmpStudents();
+
+  // セレクタを直接構築（filterCmpStudentsを使わない＝prevで上書きされない）
+  if (stuSel) {
+    stuSel.innerHTML = '<option value="">生徒を選択</option>' +
+      students.map(s => `<option value="${s.id}">${s.name}（${s.grade}）</option>`).join('');
+    stuSel.value = String(studentId);
+  }
   if (yearSel) yearSel.value = '';
-  if (stuSel) stuSel.value = String(studentId);
 
   await loadCompare();
 }
@@ -1190,8 +1215,11 @@ function drawReportChart() {
 
 // ===== 成績×通知表 比較 =====
 async function initCompare() {
-  const r = await api({ action: 'getStudents' });
-  students = r.students || [];
+  if (!_cache.students) {
+    const r = await api({ action: 'getStudents' });
+    _cache.students = r.students || [];
+  }
+  students = _cache.students;
   filterCmpStudents();
 }
 function filterCmpStudents() {
