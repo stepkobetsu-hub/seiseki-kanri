@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v3.2</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v3.3</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -1036,19 +1036,18 @@ function filterStudents() {
   const box = document.getElementById('stuList');
   if (!list.length) { box.innerHTML = '<div class="noData">該当なし</div>'; return; }
   box.innerHTML = list.map(s => `
-    <div class="listRow">
+    <div class="listRow" onclick="goToCompare('${s.id}')" style="cursor:pointer">
       <div style="flex:1">
         <strong>${s.name}</strong>（${s.id}）
         <div class="listRowSub">${s.campus} ／ ${s.grade} ／ ${s.school||'-'} ／ ${s.flag==='' || s.flag===null ? '⚠退塾' : '在籍'}</div>
       </div>
+      <div style="color:#94a3b8;font-size:.8rem">📊→</div>
     </div>`).join('');
 }
 
-// 生徒一覧→成績×通知表へジャンプ
+// 成績×通知表へジャンプ
 async function goToCompare(studentId) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
-
-  // タブ切り替え
   TABS.forEach(t => {
     const tab = document.getElementById('aTab_' + t);
     if (tab) tab.style.display = 'none';
@@ -1057,20 +1056,14 @@ async function goToCompare(studentId) {
   document.querySelectorAll('.sideItem').forEach(s => s.classList.remove('on'));
   const compareBtn = [...document.querySelectorAll('.sideItem')].find(el => el.getAttribute('onclick')?.includes('compare'));
   if (compareBtn) compareBtn.classList.add('on');
-
-  // 履歴に追加
   if (_navHist[_navHist.length - 1] !== 'compare') {
     _navHist.splice(_navIdx + 1);
     _navHist.push('compare');
     _navIdx = _navHist.length - 1;
     _updateNavBtns();
   }
-
-  // 年度を全期間に
   const yearSel = document.getElementById('cmpYear');
   if (yearSel) yearSel.value = '';
-
-  // studentIdを直接loadCompareに渡す（セレクタの上書き問題を回避）
   await loadCompare(studentId);
 }
 
@@ -1214,12 +1207,23 @@ function filterCmpStudents() {
 async function loadCompare(overrideSid) {
   const sid = overrideSid ? String(overrideSid) : document.getElementById('cmpStudent').value;
   const year = document.getElementById('cmpYear').value;
-  // セレクタも合わせて更新
-  if (overrideSid) {
-    const sel = document.getElementById('cmpStudent');
-    if (sel) sel.value = String(overrideSid);
-  }
   if (!sid) return;
+  // セレクタを更新（表示用）
+  const sel = document.getElementById('cmpStudent');
+  if (sel && overrideSid) {
+    // セレクタに該当オプションがなければ追加
+    let found = false;
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === String(overrideSid)) { found = true; break; }
+    }
+    if (!found) {
+      const opt = document.createElement('option');
+      opt.value = String(overrideSid);
+      opt.text = '（ID:' + overrideSid + '）';
+      sel.appendChild(opt);
+    }
+    sel.value = String(overrideSid);
+  }
   const [scoreRes, rpRes] = await Promise.all([
     api({ action: 'getStudentScores', studentId: sid }),
     api({ action: 'getReports', studentId: sid })
