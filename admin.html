@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v3.1</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v3.2</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -573,12 +573,12 @@ function showMain() {
   document.getElementById('mainHeader').style.display = 'flex';
   document.getElementById('mainLayout').style.display = 'flex';
   initYearSelects();
-  // 速報を履歴の起点として登録（更新後も戻れるように）
   _navHist.length = 0;
   _navHist.push('speed');
   _navIdx = 0;
   _updateNavBtns();
-  loadSpeed();
+  // 画面を先に表示してからデータ取得（体感速度改善）
+  setTimeout(() => loadSpeed(), 50);
 }
 function logout() {
   sessionStorage.removeItem('adminLoggedIn');
@@ -614,10 +614,8 @@ function navToSpeed() {
 }
 
 function reloadData() {
-  // キャッシュクリア
   _cache.students = null;
   _cache.allScores = null;
-  // 現在表示中のタブを判定して再読込（_navHistを使わない）
   const visibleTab = TABS.find(t => {
     const el = document.getElementById('aTab_' + t);
     return el && el.style.display !== 'none';
@@ -625,8 +623,7 @@ function reloadData() {
   if (visibleTab === 'speed') loadSpeed();
   else if (visibleTab === 'compare') {
     const sid = document.getElementById('cmpStudent').value;
-    if (sid) loadCompare(sid);
-    else initCompare();
+    if (sid) loadCompare(sid); else initCompare();
   }
   else if (visibleTab === 'students') loadStudents();
   else if (visibleTab === 'schools') loadSchools();
@@ -952,8 +949,7 @@ function drawSpeedChart(data, subj) {
     // グラフのラベル（生徒名）で照合して正確に特定
     const labelName = speedChartInst.data.labels[idx];
     const student = _sorted.find(s => s.name === labelName) || _sorted[idx];
-    goToCompare(student.studentId);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // リンク無効化
   };
 }
 
@@ -1034,12 +1030,11 @@ function filterStudents() {
   const box = document.getElementById('stuList');
   if (!list.length) { box.innerHTML = '<div class="noData">該当なし</div>'; return; }
   box.innerHTML = list.map(s => `
-    <div class="listRow" onclick="goToCompare('${s.id}')" style="cursor:pointer" title="${s.name}の成績を見る">
+    <div class="listRow">
       <div style="flex:1">
         <strong>${s.name}</strong>（${s.id}）
         <div class="listRowSub">${s.campus} ／ ${s.grade} ／ ${s.school||'-'} ／ ${s.flag==='' || s.flag===null ? '⚠退塾' : '在籍'}</div>
       </div>
-      <div style="color:#94a3b8;font-size:.8rem;padding-left:8px">📊 →</div>
     </div>`).join('');
 }
 
