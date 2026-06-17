@@ -710,11 +710,13 @@ function redrawSpeedChart() {
 }
 
 // 前回データを生徒IDから探す（年度またぎ対応）
-function getPrevScore(s) {
+function getPrevScore(s, subj) {
   const curYear = Number(s.year), curTerm = Number(s.term);
+  const key = subj || document.getElementById('chartSubj')?.value || 'total5';
   const hist = (window._allScoresFull || [])
-    .filter(p => String(p.studentId) === String(s.studentId) && Number(p.total5) > 0 &&
-      (Number(p.year) < curYear || (Number(p.year) === curYear && Number(p.term) < curTerm)))
+    .filter(p => String(p.studentId) === String(s.studentId) &&
+      (Number(p.year) < curYear || (Number(p.year) === curYear && Number(p.term) < curTerm)) &&
+      Number(p[key]) > 0)  // 選択科目に値があるレコードのみ
     .sort((a,b) => Number(b.year) !== Number(a.year) ? Number(b.year)-Number(a.year) : Number(b.term)-Number(a.term));
   return hist.length ? hist[0] : null;
 }
@@ -725,25 +727,25 @@ const prevLinePlugin = {
   afterDatasetsDraw(chart) {
     if (!showPrevBar || chart.data.datasets.length < 2) return;
     const ctx = chart.ctx;
-    const nowDs  = chart.getDatasetMeta(0);
-    const prevDs = chart.getDatasetMeta(1);
+    // datasets[0]=今回(order:1), datasets[1]=前回(order:2)
+    // getDatasetMetaのindex は登録順なので0=今回,1=前回
+    const nowMeta  = chart.getDatasetMeta(0);
+    const prevMeta = chart.getDatasetMeta(1);
+    const nowVals  = chart.data.datasets[0].data;
+    const prevVals = chart.data.datasets[1].data;
     ctx.save();
-    ctx.setLineDash([4, 4]);
-    ctx.lineWidth = 1.2;
-    nowDs.data.forEach((nowBar, i) => {
-      const prevBar = prevDs.data[i];
-      const prevVal = chart.data.datasets[1].data[i];
-      const nowVal  = chart.data.datasets[0].data[i];
+    ctx.setLineDash([5, 4]);
+    ctx.lineWidth = 1.5;
+    nowMeta.data.forEach((nowBar, i) => {
+      const prevBar = prevMeta.data[i];
+      const nowVal  = nowVals[i];
+      const prevVal = prevVals[i];
       if (!prevVal || !nowVal) return;
-      const nowTop  = nowBar.y;
-      const prevTop = prevBar.y;
-      const nowX    = nowBar.x;
-      const prevX   = prevBar.x;
-      // 上昇=青、下降=赤、横ばい=グレー
-      ctx.strokeStyle = nowVal > prevVal ? '#1a56a0' : nowVal < prevVal ? '#ef4444' : '#94a3b8';
+      // 今回バーの頂点 → 前回バーの頂点へ点線
+      ctx.strokeStyle = nowVal > prevVal ? '#10b981' : nowVal < prevVal ? '#ef4444' : '#94a3b8';
       ctx.beginPath();
-      ctx.moveTo(prevX, prevTop);
-      ctx.lineTo(nowX, nowTop);
+      ctx.moveTo(nowBar.x,  nowBar.y);   // 今回バー頂点
+      ctx.lineTo(prevBar.x, prevBar.y);  // 前回バー頂点
       ctx.stroke();
     });
     ctx.restore();
@@ -778,7 +780,7 @@ function drawSpeedChart(data, subj) {
   }];
 
   if (showPrevBar) {
-    const prevVals = sorted.map(s => { const p = getPrevScore(s); return p ? Number(p[subj])||0 : 0; });
+    const prevVals = sorted.map(s => { const p = getPrevScore(s, subj); return p ? Number(p[subj])||0 : 0; });
     datasets.push({
       label: '前回',
       data: prevVals,
@@ -816,25 +818,25 @@ function drawSpeedChart(data, subj) {
         y: { min: 0, max: yMax, ticks: { color: '#64748b' }, grid: { color: 'rgba(0,0,0,0.06)' } }
       },
       onClick: (evt, elements, chart) => {
-        // バークリック＋ラベルクリック両対応
         let idx = -1;
         if (elements.length) {
+          // バーをクリック
           idx = elements[0].index;
         } else {
+          // X軸ラベルをクリック（nativeEvent座標で判定）
+          const native = evt.native || evt;
+          const rect   = chart.canvas.getBoundingClientRect();
+          const x = native.clientX - rect.left;
           const xScale = chart.scales.x;
-          let minDist = 40;
+          let minDist = 50;
           xScale.ticks.forEach((_, i) => {
-            const dist = Math.abs(xScale.getPixelForTick(i) - evt.x);
+            const dist = Math.abs(xScale.getPixelForTick(i) - x);
             if (dist < minDist) { minDist = dist; idx = i; }
           });
         }
-        if (idx < 0) return;
-        const student = sorted[idx];
-        if (student) {
-          goToCompare(student.studentId);
-          // ページ最上部にスクロール
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+        if (idx < 0 || idx >= sorted.length) return;
+        goToCompare(sorted[idx].studentId);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }
   });
