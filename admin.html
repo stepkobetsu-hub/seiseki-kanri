@@ -69,9 +69,9 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:.82rem;font-weight:600;transition:.15s}
-.ctrlBtn{padding:6px 14px;border:2px solid #e2e8f0;border-radius:20px;background:#f1f5f9;cursor:pointer;font-size:.78rem;font-weight:600;transition:all .18s;color:#b0bec5;opacity:.7}
-.ctrlBtn.on{background:var(--c,var(--primary));color:#fff;border-color:var(--c,var(--primary));box-shadow:0 2px 8px rgba(0,0,0,.18);opacity:1}
-.ctrlBtn:hover:not(.on){opacity:1;border-color:#94a3b8;color:#475569;background:#e8edf3}
+.ctrlBtn{padding:6px 14px;border:2px solid #e8ecf0;border-radius:20px;background:#f8fafc;cursor:pointer;font-size:.78rem;font-weight:600;transition:all .18s;color:#c8d0da;opacity:.6;text-decoration:line-through}
+.ctrlBtn.on{background:var(--c,var(--primary));color:#fff;border-color:var(--c,var(--primary));box-shadow:0 2px 8px rgba(0,0,0,.2);opacity:1;text-decoration:none}
+.ctrlBtn:hover:not(.on){opacity:.9;border-color:#94a3b8;color:#64748b;background:#f1f5f9;text-decoration:none}
 .btn-primary{background:var(--primary);color:#fff}
 .btn-primary:hover{background:var(--primary-dk)}
 .btn-success{background:var(--success);color:#fff}
@@ -171,10 +171,12 @@ tr:hover td{background:#f8fafc}
 
 <!-- ===== HEADER ===== -->
 <header id="mainHeader" style="display:none">
-  <h1>⚡ 成績管理システム <span>ADMIN</span></h1>
+  <div style="display:flex;align-items:center;gap:6px">
+    <button id="navBackBtn"  onclick="navBack()"    title="戻る" style="padding:4px 11px;font-size:1rem;border:1px solid #e2e8f0;border-radius:8px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s" disabled>◀</button>
+    <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:4px 11px;font-size:1rem;border:1px solid #e2e8f0;border-radius:8px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s" disabled>▶</button>
+    <h1 style="margin:0">⚡ 成績管理システム <span>ADMIN</span></h1>
+  </div>
   <div class="hdrRight">
-    <button class="hdrBtn" onclick="history.back()"  title="戻る"  style="padding:4px 10px;font-size:1rem">◀</button>
-    <button class="hdrBtn" onclick="history.forward()" title="進む" style="padding:4px 10px;font-size:1rem">▶</button>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -586,6 +588,48 @@ function logout() {
 
 // ===== NAV =====
 const TABS = ['speed','compare','students','schools','report','sync','settings'];
+// タブ履歴管理
+const _navHist = [];
+let _navIdx = -1;
+let _navSkip = false;
+
+function _updateNavBtns() {
+  const back = document.getElementById('navBackBtn');
+  const fwd  = document.getElementById('navFwdBtn');
+  if (back) {
+    back.disabled = _navIdx <= 0;
+    back.style.color  = _navIdx <= 0  ? '#c8d0da' : '#1a56a0';
+    back.style.background = _navIdx <= 0 ? '#f8fafc' : '#e8f0fb';
+  }
+  if (fwd) {
+    fwd.disabled = _navIdx >= _navHist.length - 1;
+    fwd.style.color  = _navIdx >= _navHist.length - 1 ? '#c8d0da' : '#1a56a0';
+    fwd.style.background = _navIdx >= _navHist.length - 1 ? '#f8fafc' : '#e8f0fb';
+  }
+}
+
+function navBack() {
+  if (_navIdx <= 0) return;
+  _navIdx--;
+  _navSkip = true;
+  const name = _navHist[_navIdx];
+  const el = [...document.querySelectorAll('.sideItem')].find(e => e.getAttribute('onclick')?.includes("'"+name+"'"));
+  if (el) aNav(name, el);
+  _navSkip = false;
+  _updateNavBtns();
+}
+
+function navForward() {
+  if (_navIdx >= _navHist.length - 1) return;
+  _navIdx++;
+  _navSkip = true;
+  const name = _navHist[_navIdx];
+  const el = [...document.querySelectorAll('.sideItem')].find(e => e.getAttribute('onclick')?.includes("'"+name+"'"));
+  if (el) aNav(name, el);
+  _navSkip = false;
+  _updateNavBtns();
+}
+
 function aNav(name, el) {
   TABS.forEach(t => {
     const tab = document.getElementById('aTab_' + t);
@@ -599,6 +643,15 @@ function aNav(name, el) {
   if (name === 'schools') loadSchools();
   if (name === 'report') initAdminReportTab();
   if (name === 'compare') initCompare();
+  // 履歴に追加
+  if (!_navSkip) {
+    _navHist.splice(_navIdx + 1);
+    if (_navHist[_navHist.length - 1] !== name) {
+      _navHist.push(name);
+      _navIdx = _navHist.length - 1;
+    }
+    _updateNavBtns();
+  }
 }
 
 // ===== YEAR SELECTS =====
