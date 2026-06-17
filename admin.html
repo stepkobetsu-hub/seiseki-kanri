@@ -818,30 +818,37 @@ function drawSpeedChart(data, subj) {
         x: { ticks: { color: '#64748b', font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.06)' } },
         y: { min: 0, max: yMax, ticks: { color: '#64748b' }, grid: { color: 'rgba(0,0,0,0.06)' } }
       },
-      onClick: (evt, elements, chart) => {
-        let idx = -1;
-        if (elements.length) {
-          // バーをクリック
-          idx = elements[0].index;
-        } else {
-          // X軸ラベルをクリック（nativeEvent座標で判定）
-          const native = evt.native || evt;
-          const rect   = chart.canvas.getBoundingClientRect();
-          const x = native.clientX - rect.left;
-          const xScale = chart.scales.x;
-          let minDist = 50;
-          xScale.ticks.forEach((_, i) => {
-            const dist = Math.abs(xScale.getPixelForTick(i) - x);
-            if (dist < minDist) { minDist = dist; idx = i; }
-          });
-        }
-        if (idx < 0 || idx >= sorted.length) return;
-        goToCompare(sorted[idx].studentId);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
+      onClick: () => {}  // クリックはcanvas直接イベントで処理
     }
   });
-  document.getElementById('speedChart').style.cursor = 'pointer';
+  // canvas直接クリックイベント（バー・ラベル両対応）
+  const canvas = document.getElementById('speedChart');
+  canvas.style.cursor = 'pointer';
+  canvas.onclick = null; // 既存イベント削除
+  canvas.addEventListener('click', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    // Chart.jsのgetElementsAtEventForMode でバー判定
+    const pts = speedChartInst.getElementsAtEventForMode(e, 'index', { intersect: true }, true);
+    let idx = -1;
+    if (pts.length) {
+      idx = pts[0].index;
+    } else {
+      // X軸ラベルエリア（グラフ下部）クリック判定
+      const xScale = speedChartInst.scales.x;
+      let minDist = 60;
+      xScale.ticks.forEach((_, i) => {
+        const dist = Math.abs(xScale.getPixelForTick(i) - x);
+        if (dist < minDist) { minDist = dist; idx = i; }
+      });
+    }
+    console.log('[クリック] idx=', idx, 'sorted.length=', sorted.length);
+    if (idx < 0 || idx >= sorted.length) return;
+    console.log('[クリック] 生徒:', sorted[idx].name, 'ID:', sorted[idx].studentId);
+    goToCompare(sorted[idx].studentId);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, { once: false });
 }
 
 // ===== 生徒 =====
