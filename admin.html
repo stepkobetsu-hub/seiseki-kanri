@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v3.5</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v3.1s</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -577,8 +577,7 @@ function showMain() {
   _navHist.push('speed');
   _navIdx = 0;
   _updateNavBtns();
-  // 画面を先に表示してからデータ取得（体感速度改善）
-  setTimeout(() => loadSpeed(), 50);
+  loadSpeed();
 }
 function logout() {
   sessionStorage.removeItem('adminLoggedIn');
@@ -720,10 +719,22 @@ async function loadSpeed() {
   const campus = document.getElementById('spCampus').value;
   const grade = document.getElementById('spGrade').value;
 
-  // 今回データのみ取得（シンプル・高速）
-  const r = await api({ action: 'getAllScores', year, term, campus, grade });
-  allScores = r.scores || [];
-  window._allScoresFull = allScores;
+  // 全データを1回だけ取得しキャッシュ（以降はキャッシュから絞り込み）
+  if (!_cache.allScores) {
+    const rAll = await api({ action: 'getAllScores' });
+    _cache.allScores = rAll.scores || [];
+  }
+  window._allScoresFull = _cache.allScores;
+
+  // キャッシュから絞り込み（GAS呼び出しなし）
+  const normalize = g => (g||'').replace(/１/g,'1').replace(/２/g,'2').replace(/３/g,'3');
+  allScores = _cache.allScores.filter(s => {
+    if (year   && String(s.year) !== String(year)) return false;
+    if (term   && String(s.term) !== String(term)) return false;
+    if (campus && s.campus !== campus) return false;
+    if (grade  && normalize(s.grade) !== normalize(grade)) return false;
+    return true;
+  });
   const badge = document.getElementById('speedCount');
   badge.textContent = allScores.length + '名';
 
