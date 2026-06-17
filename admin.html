@@ -629,10 +629,10 @@ async function loadSpeed() {
   // 今回データ＋前回比較用に全年度データを並行取得
   const [r, rAll] = await Promise.all([
     api({ action: 'getAllScores', year, term, campus, grade }),
-    api({ action: 'getAllScores', campus, grade })  // 年度縛りなし・全回次
+    api({ action: 'getAllScores' })  // フィルタなし・全生徒・全年度（前回比較用）
   ]);
   allScores = r.scores || [];
-  window._allScoresFull = rAll.scores || []; // 前回比較用（全年度全回次）
+  window._allScoresFull = rAll.scores || []; // 前回比較用（全生徒・全年度・全回次）
   const badge = document.getElementById('speedCount');
   badge.textContent = allScores.length + '名';
 
