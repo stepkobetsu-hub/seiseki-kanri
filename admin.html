@@ -176,11 +176,11 @@ tr:hover td{background:#f8fafc}
   <h1 style="margin:0;display:flex;align-items:center;gap:8px">
     ⚡ 成績管理システム <span>ADMIN</span>
     <button id="navBackBtn"  onclick="navBack()"    title="戻る" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>◀</button>
-    <button onclick="location.reload()" title="更新" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#64748b;transition:all .15s;font-weight:400">🔄</button>
+    <button onclick="reloadData()" title="更新" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#64748b;transition:all .15s;font-weight:400">🔄</button>
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v2.2</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v2.3</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -353,6 +353,10 @@ tr:hover td{background:#f8fafc}
       <!-- ④ 順位推移 -->
       <div class="card">
         <div class="cardHead">④ 🏅 順位推移</div>
+        <div style="margin-bottom:8px;display:flex;gap:8px">
+          <button id="rankBtn5" class="ctrlBtn on" style="--c:#8b5cf6" onclick="toggleRank('rank5')">5科目順位</button>
+          <button id="rankBtn9" class="ctrlBtn on" style="--c:#f59e0b" onclick="toggleRank('rank9')">9科目順位</button>
+        </div>
         <div style="position:relative;height:240px"><canvas id="cmpRankChart"></canvas></div>
       </div>
       <!-- ⑤ 通知表評定推移 -->
@@ -596,6 +600,16 @@ const TABS = ['speed','compare','students','schools','report','sync','settings']
 const _navHist = [];
 let _navIdx = -1;
 let _navSkip = false;
+
+function reloadData() {
+  // ページリロードせず現在のタブのデータだけ再取得（履歴を保持）
+  const cur = _navHist[_navIdx] || 'speed';
+  if (cur === 'speed') loadSpeed();
+  else if (cur === 'compare') { initCompare(); }
+  else if (cur === 'students') loadStudents();
+  else if (cur === 'schools') loadSchools();
+  else if (cur === 'report') initAdminReportTab();
+}
 
 function _updateNavBtns() {
   const back = document.getElementById('navBackBtn');
@@ -1367,19 +1381,30 @@ function drawCmpDiffChart() {
 }
 
 // ④ 順位推移
+let activeRank = new Set(['rank5','rank9']);
+function toggleRank(k) {
+  activeRank.has(k) ? activeRank.delete(k) : activeRank.add(k);
+  document.getElementById('rankBtn5').classList.toggle('on', activeRank.has('rank5'));
+  document.getElementById('rankBtn9').classList.toggle('on', activeRank.has('rank9'));
+  buildCmpRankChart();
+}
 function buildCmpRankChart() {
   const canvas = document.getElementById('cmpRankChart');
   if (!canvas || !cmpScoreData.length) return;
   const labels = cmpScoreLabels();
-  const r5 = cmpScoreData.map(s => s.rank5 !== '' ? Number(s.rank5) : null);
-  const r9 = cmpScoreData.map(s => s.rank9 !== '' ? Number(s.rank9) : null);
+  const datasets = [];
+  if (activeRank.has('rank5')) {
+    const r5 = cmpScoreData.map(s => s.rank5 !== '' ? Number(s.rank5) : null);
+    datasets.push({ label:'5科目順位', data:r5, borderColor:'#8b5cf6', backgroundColor:'#8b5cf622', tension:0.3, spanGaps:true, pointRadius:5, borderWidth:2, fill:true });
+  }
+  if (activeRank.has('rank9')) {
+    const r9 = cmpScoreData.map(s => s.rank9 !== '' ? Number(s.rank9) : null);
+    datasets.push({ label:'9科目順位', data:r9, borderColor:'#f59e0b', backgroundColor:'#f59e0b22', tension:0.3, spanGaps:true, pointRadius:5, borderWidth:2, fill:false });
+  }
   if (cmpRankChartInst) cmpRankChartInst.destroy();
   cmpRankChartInst = new Chart(canvas, {
     type: 'line',
-    data: { labels, datasets: [
-      { label:'5科目順位', data:r5, borderColor:'#8b5cf6', backgroundColor:'#8b5cf622', tension:0.3, spanGaps:true, pointRadius:5, borderWidth:2, fill:true },
-      { label:'9科目順位', data:r9, borderColor:'#f59e0b', backgroundColor:'#f59e0b22', tension:0.3, spanGaps:true, pointRadius:5, borderWidth:2, fill:false }
-    ]},
+    data: { labels, datasets },
     options: { responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{ position:'bottom' } },
       scales:{ y:{ reverse:true, min:1, title:{ display:true, text:'順位（上位ほど上）' }, ticks:{ stepSize:1 } } } }
