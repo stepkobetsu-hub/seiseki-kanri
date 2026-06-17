@@ -173,6 +173,8 @@ tr:hover td{background:#f8fafc}
 <header id="mainHeader" style="display:none">
   <h1>⚡ 成績管理システム <span>ADMIN</span></h1>
   <div class="hdrRight">
+    <button class="hdrBtn" onclick="history.back()"  title="戻る"  style="padding:4px 10px;font-size:1rem">◀</button>
+    <button class="hdrBtn" onclick="history.forward()" title="進む" style="padding:4px 10px;font-size:1rem">▶</button>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -728,12 +730,11 @@ const prevLinePlugin = {
   afterDatasetsDraw(chart) {
     if (!showPrevBar || chart.data.datasets.length < 2) return;
     const ctx = chart.ctx;
-    // datasets[0]=今回(order:1), datasets[1]=前回(order:2)
-    // getDatasetMetaのindex は登録順なので0=今回,1=前回
-    const nowMeta  = chart.getDatasetMeta(0);
-    const prevMeta = chart.getDatasetMeta(1);
-    const nowVals  = chart.data.datasets[0].data;
-    const prevVals = chart.data.datasets[1].data;
+    // datasets[0]=前回、datasets[1]=今回（登録順）
+    const prevMeta = chart.getDatasetMeta(0);
+    const nowMeta  = chart.getDatasetMeta(1);
+    const prevVals = chart.data.datasets[0].data;
+    const nowVals  = chart.data.datasets[1].data;
     ctx.save();
     ctx.setLineDash([5, 4]);
     ctx.lineWidth = 1.5;
@@ -765,7 +766,34 @@ function drawSpeedChart(data, subj) {
   const getColor = v => ratio(v) >= 0.8 ? '#10b981' : ratio(v) >= 0.6 ? '#1a56a0' : ratio(v) >= 0.4 ? '#f59e0b' : '#ef4444';
   const colors = vals.map(getColor);
 
-  const datasets = [{
+  // 前回データ計算（表示非表示関係なく先に計算）
+  const prevVals = sorted.map(s => { const p = getPrevScore(s, subj); return p ? Number(p[subj])||0 : 0; });
+
+  const datasets = [];
+
+  if (showPrevBar) {
+    // 前回を左（先）に追加
+    datasets.push({
+      label: '前回',
+      data: prevVals,
+      backgroundColor: prevVals.map(v => v > 0 ? '#94a3b8' : 'transparent'),
+      borderColor:     prevVals.map(v => v > 0 ? '#64748b' : 'transparent'),
+      borderWidth: 1,
+      borderRadius: 2,
+      barPercentage: 0.4,
+      categoryPercentage: 0.85,
+      order: 2,
+      datalabels: {
+        display: ctx => (ctx.dataset.data[ctx.dataIndex]||0) > 0,
+        anchor: 'end', align: 'top',
+        font: { size: 9 }, color: '#94a3b8',
+        formatter: v => v > 0 ? v : ''
+      }
+    });
+  }
+
+  // 今回を右（後）に追加
+  datasets.push({
     label: '今回',
     data: vals,
     backgroundColor: colors,
@@ -778,28 +806,7 @@ function drawSpeedChart(data, subj) {
       font: { size: 10, weight: '600' }, color: '#475569',
       formatter: v => v > 0 ? v : ''
     }
-  }];
-
-  if (showPrevBar) {
-    const prevVals = sorted.map(s => { const p = getPrevScore(s, subj); return p ? Number(p[subj])||0 : 0; });
-    datasets.push({
-      label: '前回',
-      data: prevVals,
-      backgroundColor: prevVals.map((v,i) => v > 0 ? getColor(v)+'66' : 'transparent'),
-      borderColor:     prevVals.map((v,i) => v > 0 ? getColor(v) : 'transparent'),
-      borderWidth: 1,
-      borderRadius: 2,
-      barPercentage: 0.35,
-      categoryPercentage: 0.85,
-      order: 2,
-      datalabels: {
-        display: ctx => (ctx.dataset.data[ctx.dataIndex]||0) > 0,
-        anchor: 'end', align: 'top',
-        font: { size: 9 }, color: '#94a3b8',
-        formatter: v => v > 0 ? v : ''
-      }
-    });
-  }
+  });
 
   if (speedChartInst) speedChartInst.destroy();
   speedChartInst = new Chart(document.getElementById('speedChart'), {
