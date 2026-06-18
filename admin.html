@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v4.9</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.0</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -304,18 +304,19 @@ tr:hover td{background:#f8fafc}
       <!-- データ一覧 -->
       <div class="card">
         <div class="cardHead">📋 データ一覧</div>
-        <div class="tblWrap">
-          <table>
+        <div class="tblWrap" style="overflow-x:auto">
+          <table style="font-size:.72rem;border-collapse:collapse;width:100%">
             <thead><tr>
-              <th colspan="9">テスト成績</th>
-              <th colspan="10">通知表評定</th>
+              <th colspan="10" style="background:#eef2ff;padding:4px">テスト成績</th>
+              <th colspan="12" style="background:#fef9ee;padding:4px">通知表評定</th>
             </tr>
-            <tr>
-              <th>年度・回次</th>
-              <th>国語</th><th>社会</th><th>数学</th><th>理科</th><th>英語</th>
-              <th>5科計</th><th>5科順位</th><th>9科順位</th>
-              <th>年度・学期</th><th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
-              <th>音</th><th>美</th><th>体</th><th>技</th>
+            <tr style="white-space:nowrap">
+              <th style="padding:4px 3px">年度・回次</th>
+              <th style="padding:4px 3px">国</th><th style="padding:4px 3px">社</th><th style="padding:4px 3px">数</th><th style="padding:4px 3px">理</th><th style="padding:4px 3px">英</th>
+              <th style="padding:4px 3px">5科計</th><th style="padding:4px 3px">5位</th><th style="padding:4px 3px">9科計</th><th style="padding:4px 3px">9位</th>
+              <th style="padding:4px 3px">年度・学期</th><th style="padding:4px 3px">国</th><th style="padding:4px 3px">社</th><th style="padding:4px 3px">数</th><th style="padding:4px 3px">理</th><th style="padding:4px 3px">英</th>
+              <th style="padding:4px 3px">音</th><th style="padding:4px 3px">美</th><th style="padding:4px 3px">体</th><th style="padding:4px 3px">技</th>
+              <th style="padding:4px 3px">5計</th><th style="padding:4px 3px">9計</th>
             </tr></thead>
             <tbody id="cmpBody"></tbody>
           </table>
@@ -1288,23 +1289,26 @@ async function loadCompare(overrideSid) {
   // テーブル
   const len = Math.max(cmpScoreData.length, cmpRpData.length);
   const tbody = document.getElementById('cmpBody');
-  if (!len) { tbody.innerHTML = '<tr><td colspan="19" class="noData">データなし</td></tr>'; return; }
+  if (!len) { tbody.innerHTML = '<tr><td colspan="22" class="noData">データなし</td></tr>'; return; }
   tbody.innerHTML = Array.from({length: len}, (_, i) => {
     const sc = cmpScoreData[i] || {};
     const rp = cmpRpData[i] || {};
     const scLabel = sc.year ? (!year ? sc.year+'年度 第'+sc.term+'回' : '第'+sc.term+'回') : '-';
     const rpLabel = rp.year ? (!year ? rp.year+'年度 '+rp.semester : rp.semester) : '-';
-    const td = (v, bold) => `<td${bold?' style="font-weight:700;color:var(--primary)"':''}>${v!==''&&v!=null ? v : '-'}</td>`;
-    return `<tr>
-      <td>${scLabel}</td>
+    const td = (v, bold) => `<td style="padding:3px 4px;text-align:center${bold?';font-weight:700;color:var(--primary)':''}">${v!==''&&v!=null ? v : '-'}</td>`;
+    const tdR = v => `<td style="padding:3px 4px;text-align:center">${rpRating(v)}</td>`;
+    // 通知表5科計・9科計を計算
+    const rp5 = [rp.rp_jpn,rp.rp_soc,rp.rp_math,rp.rp_sci,rp.rp_eng].every(v=>v!==''&&v!=null) ? [rp.rp_jpn,rp.rp_soc,rp.rp_math,rp.rp_sci,rp.rp_eng].reduce((a,b)=>a+Number(b),0) : '';
+    const rp9 = [rp.rp_jpn,rp.rp_soc,rp.rp_math,rp.rp_sci,rp.rp_eng,rp.rp_mus,rp.rp_art,rp.rp_pe,rp.rp_tech].every(v=>v!==''&&v!=null) ? [rp.rp_jpn,rp.rp_soc,rp.rp_math,rp.rp_sci,rp.rp_eng,rp.rp_mus,rp.rp_art,rp.rp_pe,rp.rp_tech].reduce((a,b)=>a+Number(b),0) : '';
+    return `<tr style="font-size:.72rem">
+      <td style="padding:3px 4px;white-space:nowrap">${scLabel}</td>
       ${td(sc.jpn)}${td(sc.soc)}${td(sc.math)}${td(sc.sci)}${td(sc.eng)}
-      ${td(sc.total5,true)}
-      ${td(sc.rank5)}${td(sc.rank9)}
-      <td>${rpLabel}</td>
-      <td>${rpRating(rp.rp_jpn)}</td><td>${rpRating(rp.rp_soc)}</td><td>${rpRating(rp.rp_math)}</td>
-      <td>${rpRating(rp.rp_sci)}</td><td>${rpRating(rp.rp_eng)}</td>
-      <td>${rpRating(rp.rp_mus)}</td><td>${rpRating(rp.rp_art)}</td><td>${rpRating(rp.rp_pe)}</td>
-      <td>${rpRating(rp.rp_tech)}</td>
+      ${td(sc.total5,true)}${td(sc.rank5)}${td(sc.total9)}${td(sc.rank9)}
+      <td style="padding:3px 4px;white-space:nowrap">${rpLabel}</td>
+      ${tdR(rp.rp_jpn)}${tdR(rp.rp_soc)}${tdR(rp.rp_math)}${tdR(rp.rp_sci)}${tdR(rp.rp_eng)}
+      ${tdR(rp.rp_mus)}${tdR(rp.rp_art)}${tdR(rp.rp_pe)}${tdR(rp.rp_tech)}
+      <td style="padding:3px 4px;text-align:center;font-weight:700">${rp5!=='' ? rp5 : '-'}</td>
+      <td style="padding:3px 4px;text-align:center;font-weight:700">${rp9!=='' ? rp9 : '-'}</td>
     </tr>`;
   }).join('');
 }
