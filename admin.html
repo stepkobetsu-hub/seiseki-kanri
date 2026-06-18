@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v4.4</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v4.5</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -771,7 +771,7 @@ async function loadSpeed() {
   tbody.innerHTML = allScores.map(s => {
     const termLabel = s.year && s.term ? String(s.year).slice(2) + '年度' + '第' + s.term + '回' : '-';
     return `<tr>
-      <td style="text-align:left;font-weight:600">${s.name}</td>
+      <td style="text-align:left;font-weight:600;cursor:pointer;color:var(--primary)" onclick="goToCompare('${s.studentId}')" title="成績を見る">${s.name}</td>
       <td style="font-size:.78rem;color:#64748b;white-space:nowrap">${termLabel}</td>
       <td>${s.grade}</td><td>${s.campus}</td>
       <td>${s.jpn||'-'}</td><td>${s.soc||'-'}</td><td>${s.math||'-'}</td>
@@ -782,6 +782,10 @@ async function loadSpeed() {
       <td>${s.total9||'-'}</td><td>${s.rank9||'-'}</td>
     </tr>`;
   }).join('');
+  // studentsが未ロードなら非同期で取得（成績×通知表で名前が出るように）
+  if (!students || students.length === 0) {
+    api({ action: 'getStudents' }).then(r => { students = r.students || []; });
+  }
 }
 
 let showPrevBar = false;
