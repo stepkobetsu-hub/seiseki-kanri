@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v4.8</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v4.9</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -528,6 +528,11 @@ let students = [];
 let allScores = [];
 let allReports = [];
 let pendingSync = null;
+// タブ履歴管理（グローバル宣言）
+let _navHist = [];
+let _navIdx = -1;
+let _navSkip = false;
+
 let speedChartInst = null;
 // キャッシュ（GAS呼び出し削減）
 let _cache = { students: null, allScores: null };
@@ -604,10 +609,6 @@ function logout() {
 
 // ===== NAV =====
 const TABS = ['speed','compare','students','schools','report','sync','settings'];
-// タブ履歴管理
-const _navHist = [];
-let _navIdx = -1;
-let _navSkip = false;
 
 function navToSpeed() {
   const speedBtn = [...document.querySelectorAll('.sideItem')].find(el => el.getAttribute('onclick')?.includes("'speed'"));
