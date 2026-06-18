@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v3.8</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v3.9</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -577,11 +577,14 @@ function showMain() {
   _navHist.push('speed');
   _navIdx = 0;
   _updateNavBtns();
-  // students と allScores を並行プリロード（画面表示を先に、データは裏で取得）
-  Promise.all([
-    api({ action: 'getStudents' }).then(r => { students = r.students || []; }),
-    api({ action: 'getAllScores' }).then(r => { _cache.allScores = r.scores || []; })
-  ]).then(() => loadSpeed());
+  // students と allScores を並行取得してからloadSpeed
+  (async () => {
+    await Promise.all([
+      api({ action: 'getStudents' }).then(r => { students = r.students || []; }),
+      api({ action: 'getAllScores' }).then(r => { _cache.allScores = r.scores || []; })
+    ]);
+    loadSpeed();
+  })();
 }
 function logout() {
   sessionStorage.removeItem('adminLoggedIn');
