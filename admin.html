@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v4.3</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v4.4</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -561,7 +561,7 @@ function doAdminLogin() {
   const pw = document.getElementById('adminPwIn').value;
   const saved = localStorage.getItem('adminPass') || 'admin1234';
   if (pw === saved) {
-    localStorage.setItem('adminLoggedIn', '1');
+    sessionStorage.setItem('adminLoggedIn', '1');
     localStorage.setItem('adminPwInput', pw); // パスワード記憶
     showMain();
   } else {
@@ -577,17 +577,10 @@ function showMain() {
   _navHist.push('speed');
   _navIdx = 0;
   _updateNavBtns();
-  // students と allScores を並行取得してからloadSpeed
-  (async () => {
-    await Promise.all([
-      api({ action: 'getStudents' }).then(r => { students = r.students || []; }),
-      api({ action: 'getAllScores' }).then(r => { _cache.allScores = r.scores || []; })
-    ]);
-    loadSpeed();
-  })();
+  loadSpeed();
 }
 function logout() {
-  localStorage.removeItem('adminLoggedIn');
+  sessionStorage.removeItem('adminLoggedIn');
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('mainHeader').style.display = 'none';
   document.getElementById('mainLayout').style.display = 'none';
@@ -602,7 +595,7 @@ function logout() {
     if (el) el.value = savedPw;
   }
   // セッションが生きていれば自動ログイン
-  if (localStorage.getItem('adminLoggedIn') === '1') {
+  if (sessionStorage.getItem('adminLoggedIn') === '1') {
     showMain();
   }
 })();
@@ -1236,10 +1229,8 @@ function drawReportChart() {
 
 // ===== 成績×通知表 比較 =====
 async function initCompare() {
-  if (!students || students.length === 0) {
-    const r = await api({ action: 'getStudents' });
-    students = r.students || [];
-  }
+  const r = await api({ action: 'getStudents' });
+  students = r.students || [];
   filterCmpStudents();
 }
 function filterCmpStudents() {
