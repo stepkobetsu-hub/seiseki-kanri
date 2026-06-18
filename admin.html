@@ -107,7 +107,7 @@ tr:hover td{background:#f8fafc}
 
 /* CHART */
 .chartWrap{position:relative;height:340px;margin-top:8px}
-.chartWrapLg{height:460px;margin-top:8px;overflow-x:auto;overflow-y:hidden}
+.chartWrapLg{position:relative;height:460px;margin-top:8px}
 
 /* STAT CARDS */
 .statGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:18px}
@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v4.2</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v4.3</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -925,11 +925,9 @@ function drawSpeedChart(data, subj) {
   });
 
   if (speedChartInst) speedChartInst.destroy();
-  // 生徒数に応じてcanvas幅を設定（1人あたり最低30px）
   const chartCanvas = document.getElementById('speedChart');
-  const minWidth = Math.max(sorted.length * 30, chartCanvas.parentElement.clientWidth);
-  chartCanvas.style.width = minWidth + 'px';
-  chartCanvas.style.minWidth = minWidth + 'px';
+  chartCanvas.style.width = '';
+  chartCanvas.style.minWidth = '';
   speedChartInst = new Chart(chartCanvas, {
     type: 'bar',
     plugins: [prevLinePlugin],
@@ -943,7 +941,7 @@ function drawSpeedChart(data, subj) {
         datalabels: {}
       },
       scales: {
-        x: { ticks: { color: '#64748b', font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.06)' } },
+        x: { ticks: { color: '#64748b', font: { size: 9 }, maxRotation: 90, minRotation: 45 }, grid: { color: 'rgba(0,0,0,0.06)' } },
         y: { min: 0, max: yMax, ticks: { color: '#64748b' }, grid: { color: 'rgba(0,0,0,0.06)' } }
       },
       onClick: () => {}  // クリックはcanvas直接イベントで処理
