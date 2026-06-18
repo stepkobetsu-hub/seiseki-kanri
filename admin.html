@@ -107,7 +107,7 @@ tr:hover td{background:#f8fafc}
 
 /* CHART */
 .chartWrap{position:relative;height:340px;margin-top:8px}
-.chartWrapLg{position:relative;height:460px;margin-top:8px}
+.chartWrapLg{height:460px;margin-top:8px;overflow-x:auto;overflow-y:hidden;cursor:grab}
 
 /* STAT CARDS */
 .statGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:18px}
@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v4.6</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v4.7</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -264,7 +264,7 @@ tr:hover td{background:#f8fafc}
             <button id="prevToggleBtn" onclick="togglePrevBar()" class="btn btn-outline btn-sm" style="font-size:.74rem;padding:4px 10px">📊 前回を表示</button>
           </div>
         </div>
-        <div class="chartWrapLg"><canvas id="speedChart"></canvas></div>
+        <div class="chartWrapLg" id="speedChartWrap"><canvas id="speedChart"></canvas></div>
       </div>
       <div class="card">
         <div class="cardHead">📋 生徒別一覧</div>
@@ -923,14 +923,18 @@ function drawSpeedChart(data, subj) {
 
   if (speedChartInst) speedChartInst.destroy();
   const chartCanvas = document.getElementById('speedChart');
-  chartCanvas.style.width = '';
-  chartCanvas.style.minWidth = '';
+  const wrap = document.getElementById('speedChartWrap');
+  const barW = showPrevBar ? 50 : 30; // 1人あたりの幅
+  const canvasW = Math.max(sorted.length * barW, wrap ? wrap.clientWidth : 800);
+  chartCanvas.style.width = canvasW + 'px';
+  chartCanvas.style.minWidth = canvasW + 'px';
+  chartCanvas.style.height = '460px';
   speedChartInst = new Chart(chartCanvas, {
     type: 'bar',
     plugins: [prevLinePlugin],
     data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false,
+      responsive: false, maintainAspectRatio: false,
       layout: { padding: { top: 28 } },
       plugins: {
         legend: { display: showPrevBar, position: 'top' },
