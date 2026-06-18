@@ -107,7 +107,7 @@ tr:hover td{background:#f8fafc}
 
 /* CHART */
 .chartWrap{position:relative;height:340px;margin-top:8px}
-.chartWrapLg{height:460px;margin-top:8px;overflow-x:auto;overflow-y:hidden;cursor:grab}
+.chartWrapLg{position:relative;height:460px;margin-top:8px}
 
 /* STAT CARDS */
 .statGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:18px}
@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v4.7</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v4.8</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -264,7 +264,7 @@ tr:hover td{background:#f8fafc}
             <button id="prevToggleBtn" onclick="togglePrevBar()" class="btn btn-outline btn-sm" style="font-size:.74rem;padding:4px 10px">📊 前回を表示</button>
           </div>
         </div>
-        <div class="chartWrapLg" id="speedChartWrap"><canvas id="speedChart"></canvas></div>
+        <div class="chartWrapLg"><canvas id="speedChart"></canvas></div>
       </div>
       <div class="card">
         <div class="cardHead">📋 生徒別一覧</div>
@@ -562,6 +562,7 @@ function doAdminLogin() {
   const saved = localStorage.getItem('adminPass') || 'admin1234';
   if (pw === saved) {
     sessionStorage.setItem('adminLoggedIn', '1');
+  localStorage.setItem('adminLoggedIn', '1');
     localStorage.setItem('adminPwInput', pw); // パスワード記憶
     showMain();
   } else {
@@ -581,6 +582,7 @@ function showMain() {
 }
 function logout() {
   sessionStorage.removeItem('adminLoggedIn');
+  localStorage.removeItem('adminLoggedIn');
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('mainHeader').style.display = 'none';
   document.getElementById('mainLayout').style.display = 'none';
@@ -595,7 +597,7 @@ function logout() {
     if (el) el.value = savedPw;
   }
   // セッションが生きていれば自動ログイン
-  if (sessionStorage.getItem('adminLoggedIn') === '1') {
+  if (sessionStorage.getItem('adminLoggedIn') === '1' || localStorage.getItem('adminLoggedIn') === '1') {
     showMain();
   }
 })();
@@ -923,18 +925,14 @@ function drawSpeedChart(data, subj) {
 
   if (speedChartInst) speedChartInst.destroy();
   const chartCanvas = document.getElementById('speedChart');
-  const wrap = document.getElementById('speedChartWrap');
-  const barW = showPrevBar ? 50 : 30; // 1人あたりの幅
-  const canvasW = Math.max(sorted.length * barW, wrap ? wrap.clientWidth : 800);
-  chartCanvas.style.width = canvasW + 'px';
-  chartCanvas.style.minWidth = canvasW + 'px';
-  chartCanvas.style.height = '460px';
+  chartCanvas.style.width = '';
+  chartCanvas.style.minWidth = '';
   speedChartInst = new Chart(chartCanvas, {
     type: 'bar',
     plugins: [prevLinePlugin],
     data: { labels, datasets },
     options: {
-      responsive: false, maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       layout: { padding: { top: 28 } },
       plugins: {
         legend: { display: showPrevBar, position: 'top' },
