@@ -107,7 +107,7 @@ tr:hover td{background:#f8fafc}
 
 /* CHART */
 .chartWrap{position:relative;height:340px;margin-top:8px}
-.chartWrapLg{position:relative;height:460px;margin-top:8px}
+.chartWrapLg{position:relative;height:460px;margin-top:8px;overflow-x:auto}
 
 /* STAT CARDS */
 .statGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:18px}
@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v3.9</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v4.0</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -268,10 +268,10 @@ tr:hover td{background:#f8fafc}
       </div>
       <div class="card">
         <div class="cardHead">📋 生徒別一覧</div>
-        <div class="tblWrap">
-          <table>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+          <table style="min-width:700px">
             <thead><tr>
-              <th>氏名</th><th>学年</th><th>校舎</th>
+              <th style="min-width:100px">氏名</th><th>回次</th><th>学年</th><th>校舎</th>
               <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
               <th>5科計</th><th>5位</th>
               <th>音</th><th>美</th><th>体</th><th>技</th>
@@ -775,9 +775,11 @@ async function loadSpeed() {
   // テーブル
   const tbody = document.getElementById('speedBody');
   if (!allScores.length) { tbody.innerHTML = '<tr><td colspan="16" class="noData">データなし</td></tr>'; return; }
-  tbody.innerHTML = allScores.map(s => `
-    <tr>
+  tbody.innerHTML = allScores.map(s => {
+    const termLabel = s.year && s.term ? String(s.year).slice(2) + '年度' + '第' + s.term + '回' : '-';
+    return `<tr>
       <td style="text-align:left;font-weight:600">${s.name}</td>
+      <td style="font-size:.78rem;color:#64748b;white-space:nowrap">${termLabel}</td>
       <td>${s.grade}</td><td>${s.campus}</td>
       <td>${s.jpn||'-'}</td><td>${s.soc||'-'}</td><td>${s.math||'-'}</td>
       <td>${s.sci||'-'}</td><td>${s.eng||'-'}</td>
@@ -785,7 +787,8 @@ async function loadSpeed() {
       <td>${s.rank5||'-'}</td>
       <td>${s.mus||'-'}</td><td>${s.art||'-'}</td><td>${s.pe||'-'}</td><td>${s.tech||'-'}</td>
       <td>${s.total9||'-'}</td><td>${s.rank9||'-'}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 let showPrevBar = false;
