@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.1</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.2</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -302,6 +302,15 @@ tr:hover td{background:#f8fafc}
           <select id="cmpYear" onchange="loadCompare()"></select>
         </div>
       </div>
+      <!-- 志望校 -->
+      <div id="cmpWishCard" class="card" style="display:none;background:linear-gradient(135deg,#eef2ff,#fef9ee);border:1px solid #e2e8f0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span style="font-size:.9rem;font-weight:700;color:#1e293b">🏫 志望校</span>
+          <span id="cmpWishDate" style="font-size:.68rem;color:#94a3b8"></span>
+        </div>
+        <div id="cmpWishBody" style="font-size:.8rem;color:#475569;line-height:2"></div>
+      </div>
+
       <!-- データ一覧 -->
       <div class="card">
         <div class="cardHead">📋 データ一覧</div>
@@ -1322,6 +1331,26 @@ async function loadCompare(overrideSid) {
   const sid = overrideSid ? String(overrideSid) : document.getElementById('cmpStudent').value;
   const year = document.getElementById('cmpYear').value;
   if (!sid) return;
+  // 志望校を取得して表示
+  const wishCard = document.getElementById('cmpWishCard');
+  const wishBody = document.getElementById('cmpWishBody');
+  const wishDate = document.getElementById('cmpWishDate');
+  if (wishCard) wishCard.style.display = 'none';
+  api({ action: 'getWish', studentId: sid }).then(wr => {
+    const w = wr.wish;
+    if (!w || !wishCard) return;
+    const lines = [];
+    if (w.pub1name) lines.push('<span style="color:#6366f1;font-weight:600">公立1</span> ' + w.pub1name + (w.pub1dept ? '／' + w.pub1dept : ''));
+    if (w.pub2name) lines.push('<span style="color:#6366f1;font-weight:600">公立2</span> ' + w.pub2name + (w.pub2dept ? '／' + w.pub2dept : ''));
+    if (w.pub3name) lines.push('<span style="color:#6366f1;font-weight:600">公立3</span> ' + w.pub3name + (w.pub3dept ? '／' + w.pub3dept : ''));
+    if (w.pri1name) lines.push('<span style="color:#f59e0b;font-weight:600">私立1</span> ' + w.pri1name + (w.pri1dept ? '／' + w.pri1dept : ''));
+    if (w.pri2name) lines.push('<span style="color:#f59e0b;font-weight:600">私立2</span> ' + w.pri2name + (w.pri2dept ? '／' + w.pri2dept : ''));
+    if (w.pri3name) lines.push('<span style="color:#f59e0b;font-weight:600">私立3</span> ' + w.pri3name + (w.pri3dept ? '／' + w.pri3dept : ''));
+    if (lines.length === 0) return;
+    wishBody.innerHTML = lines.join('&emsp;');
+    if (wishDate && w.updatedAt) wishDate.textContent = '更新: ' + w.updatedAt.slice(0,10);
+    wishCard.style.display = 'block';
+  });
   // セレクタを更新（表示用）
   const sel = document.getElementById('cmpStudent');
   if (sel && overrideSid) {
