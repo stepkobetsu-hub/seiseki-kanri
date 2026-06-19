@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.2</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.3</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -1166,6 +1166,12 @@ async function goToCompare(studentId) {
 }
 
 // ===== 志望校 =====
+async function saveWishResult(studentId, key, value) {
+  await api({ action: 'saveWishResult', studentId, key, value });
+  // セレクタの色を更新
+  event.target.style.color = value==='合格' ? '#10b981' : value==='不合格' ? '#ef4444' : '#94a3b8';
+}
+
 async function loadAllWishes() {
   const campus = document.getElementById('wishCampus').value;
   const grade  = document.getElementById('wishGrade').value;
@@ -1340,14 +1346,20 @@ async function loadCompare(overrideSid) {
     const w = wr.wish;
     if (!w || !wishCard) return;
     const lines = [];
-    if (w.pub1name) lines.push('<span style="color:#6366f1;font-weight:600">公立1</span> ' + w.pub1name + (w.pub1dept ? '／' + w.pub1dept : ''));
-    if (w.pub2name) lines.push('<span style="color:#6366f1;font-weight:600">公立2</span> ' + w.pub2name + (w.pub2dept ? '／' + w.pub2dept : ''));
-    if (w.pub3name) lines.push('<span style="color:#6366f1;font-weight:600">公立3</span> ' + w.pub3name + (w.pub3dept ? '／' + w.pub3dept : ''));
-    if (w.pri1name) lines.push('<span style="color:#f59e0b;font-weight:600">私立1</span> ' + w.pri1name + (w.pri1dept ? '／' + w.pri1dept : ''));
-    if (w.pri2name) lines.push('<span style="color:#f59e0b;font-weight:600">私立2</span> ' + w.pri2name + (w.pri2dept ? '／' + w.pri2dept : ''));
-    if (w.pri3name) lines.push('<span style="color:#f59e0b;font-weight:600">私立3</span> ' + w.pri3name + (w.pri3dept ? '／' + w.pri3dept : ''));
+    const resultSel = (key, val) => `<select onchange="saveWishResult('${sid}','${key}',this.value)" style="font-size:.7rem;padding:1px 4px;border:1px solid #e2e8f0;border-radius:4px;margin-left:4px;color:${val==='合格'?'#10b981':val==='不合格'?'#ef4444':'#94a3b8'}">
+      <option value="-" ${(!val||val==='-')?'selected':''}>-</option>
+      <option value="合格" ${val==='合格'?'selected':''} style="color:#10b981">合格</option>
+      <option value="不合格" ${val==='不合格'?'selected':''} style="color:#ef4444">不合格</option>
+    </select>`;
+    const r = w.results || {};
+    if (w.pub1name) lines.push('<span style="color:#6366f1;font-weight:600">公立1</span> ' + w.pub1name + (w.pub1dept?'／'+w.pub1dept:'') + resultSel('pub1', r.pub1));
+    if (w.pub2name) lines.push('<span style="color:#6366f1;font-weight:600">公立2</span> ' + w.pub2name + (w.pub2dept?'／'+w.pub2dept:'') + resultSel('pub2', r.pub2));
+    if (w.pub3name) lines.push('<span style="color:#6366f1;font-weight:600">公立3</span> ' + w.pub3name + (w.pub3dept?'／'+w.pub3dept:'') + resultSel('pub3', r.pub3));
+    if (w.pri1name) lines.push('<span style="color:#f59e0b;font-weight:600">私立1</span> ' + w.pri1name + (w.pri1dept?'／'+w.pri1dept:'') + resultSel('pri1', r.pri1));
+    if (w.pri2name) lines.push('<span style="color:#f59e0b;font-weight:600">私立2</span> ' + w.pri2name + (w.pri2dept?'／'+w.pri2dept:'') + resultSel('pri2', r.pri2));
+    if (w.pri3name) lines.push('<span style="color:#f59e0b;font-weight:600">私立3</span> ' + w.pri3name + (w.pri3dept?'／'+w.pri3dept:'') + resultSel('pri3', r.pri3));
     if (lines.length === 0) return;
-    wishBody.innerHTML = lines.join('&emsp;');
+    wishBody.innerHTML = lines.join('<br>');
     if (wishDate && w.updatedAt) wishDate.textContent = '更新: ' + w.updatedAt.slice(0,10);
     wishCard.style.display = 'block';
   });
