@@ -847,7 +847,18 @@ async function initStudent() {
     const wr = await api({ action: 'getWish', studentId: me.id });
     if (wr.wish) renderWishSummary(wr.wish);
   } catch(e) {}
+  // 最新のデータがある回次を自動選択して読み込む
+  if (myScores.length > 0) {
+    const latest = myScores.reduce((a, b) =>
+      (Number(b.year) > Number(a.year) || (Number(b.year) === Number(a.year) && Number(b.term) > Number(a.term))) ? b : a
+    );
+    const ysel2 = document.getElementById('selYear');
+    const tsel2 = document.getElementById('selTerm');
+    if (ysel2) ysel2.value = latest.year;
+    if (tsel2) tsel2.value = latest.term;
+  }
   sTabs('input', 0);
+  loadScore(); // 自動的に読み込む
 }
 
 // ===================================================
