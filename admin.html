@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.0</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.1</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -214,6 +214,7 @@ tr:hover td{background:#f8fafc}
     <div class="sideItem" onclick="aNav('schools',this)"><span class="ico">🏫</span> 学校</div>
     <div class="sideItem" onclick="aNav('report',this)"><span class="ico">📒</span> 通知表</div>
     <div class="sideSection">システム</div>
+    <div class="sideItem" onclick="aNav('wish',this)"><span class="ico">🏫</span> 志望校</div>
     <div class="sideItem" onclick="aNav('sync',this)"><span class="ico">🔄</span> 同期</div>
     <div class="sideItem" onclick="aNav('settings',this)"><span class="ico">⚙️</span> 設定</div>
   </nav>
@@ -472,6 +473,38 @@ tr:hover td{background:#f8fafc}
       </div>
     </div>
 
+    <!-- 志望校 -->
+    <div id="aTab_wish" style="display:none">
+      <div class="card">
+        <div class="cardHead">🏫 志望校一覧
+          <div style="display:flex;gap:6px;margin-left:auto">
+            <select id="wishCampus" onchange="loadAllWishes()" style="font-size:.76rem;padding:3px 6px;border:1px solid #e2e8f0;border-radius:6px">
+              <option value="">全校舎</option><option>神領</option><option>大手</option>
+            </select>
+            <select id="wishGrade" onchange="loadAllWishes()" style="font-size:.76rem;padding:3px 6px;border:1px solid #e2e8f0;border-radius:6px">
+              <option value="">全学年</option><option>中1</option><option>中2</option><option>中3</option>
+            </select>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="font-size:.78rem;width:100%;border-collapse:collapse">
+            <thead><tr style="background:#f1f5f9">
+              <th style="padding:6px 8px;text-align:left">氏名</th>
+              <th style="padding:6px 8px">学年</th>
+              <th style="padding:6px 4px;background:#eef2ff" colspan="2">公立1</th>
+              <th style="padding:6px 4px;background:#eef2ff" colspan="2">公立2</th>
+              <th style="padding:6px 4px;background:#eef2ff" colspan="2">公立3</th>
+              <th style="padding:6px 4px;background:#fef9ee" colspan="2">私立1</th>
+              <th style="padding:6px 4px;background:#fef9ee" colspan="2">私立2</th>
+              <th style="padding:6px 4px;background:#fef9ee" colspan="2">私立3</th>
+              <th style="padding:6px 8px">更新日</th>
+            </tr></thead>
+            <tbody id="wishBody"><tr><td colspan="15" class="noData">データなし</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- 同期 -->
     <div id="aTab_sync" style="display:none">
       <div class="card">
@@ -609,7 +642,7 @@ function logout() {
 })();
 
 // ===== NAV =====
-const TABS = ['speed','compare','students','schools','report','sync','settings'];
+const TABS = ['speed','compare','students','schools','report','wish','sync','settings'];
 
 function navToSpeed() {
   const speedBtn = [...document.querySelectorAll('.sideItem')].find(el => el.getAttribute('onclick')?.includes("'speed'"));
@@ -684,6 +717,7 @@ function aNav(name, el) {
   if (name === 'schools') loadSchools();
   if (name === 'report') initAdminReportTab();
   if (name === 'compare') initCompare();
+  if (name === 'wish') loadAllWishes();
   // 履歴に追加
   if (!_navSkip) {
     _navHist.splice(_navIdx + 1);
@@ -1120,6 +1154,31 @@ async function goToCompare(studentId) {
   // studentsとセレクタを必ず構築してからloadCompare
   await initCompare();
   await loadCompare(studentId);
+}
+
+// ===== 志望校 =====
+async function loadAllWishes() {
+  const campus = document.getElementById('wishCampus').value;
+  const grade  = document.getElementById('wishGrade').value;
+  const r = await api({ action: 'getAllWishes', campus, grade });
+  const wishes = r.wishes || [];
+  const tbody = document.getElementById('wishBody');
+  if (!wishes.length) {
+    tbody.innerHTML = '<tr><td colspan="15" class="noData">データなし</td></tr>';
+    return;
+  }
+  const td = (v, bg) => `<td style="padding:4px 6px;text-align:center${bg?';background:'+bg:''}">${v||'-'}</td>`;
+  tbody.innerHTML = wishes.map(w => `<tr>
+    <td style="padding:4px 8px;font-weight:600">${w.name}</td>
+    ${td(w.grade)}
+    ${td(w.pub1name,'#f5f7ff')}${td(w.pub1dept,'#f5f7ff')}
+    ${td(w.pub2name,'#f5f7ff')}${td(w.pub2dept,'#f5f7ff')}
+    ${td(w.pub3name,'#f5f7ff')}${td(w.pub3dept,'#f5f7ff')}
+    ${td(w.pri1name,'#fffbf0')}${td(w.pri1dept,'#fffbf0')}
+    ${td(w.pri2name,'#fffbf0')}${td(w.pri2dept,'#fffbf0')}
+    ${td(w.pri3name,'#fffbf0')}${td(w.pri3dept,'#fffbf0')}
+    <td style="padding:4px 6px;font-size:.7rem;color:#94a3b8">${w.updatedAt ? w.updatedAt.slice(0,10) : '-'}</td>
+  </tr>`).join('');
 }
 
 // ===== 学校 =====

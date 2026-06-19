@@ -213,10 +213,20 @@ tr:hover td{background:var(--primary-lt)}
     <button class="tabBtn" onclick="sTabs('report',1)">📒 通知表</button>
     <button class="tabBtn" onclick="sTabs('chart',2)">📈 グラフ</button>
     <button class="tabBtn" onclick="sTabs('history',3)">📋 履歴</button>
+    <button class="tabBtn" onclick="sTabs('wish',4)">🏫 志望校</button>
   </div>
 
   <!-- 入力 -->
   <div id="sTab_input">
+    <!-- 志望校サマリー -->
+    <div id="wishSummary" class="card" style="display:none;background:linear-gradient(135deg,#eef2ff,#fef9ee);border:1px solid #e2e8f0">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:.9rem;font-weight:700;color:#1e293b">🏫 志望校</span>
+        <span id="wishSummaryDate" style="font-size:.68rem;color:#94a3b8"></span>
+        <button onclick="sTabs('wish',4)" style="margin-left:auto;font-size:.7rem;padding:2px 8px;border:1px solid #c7d2fe;border-radius:6px;background:#fff;color:#6366f1;cursor:pointer">編集</button>
+      </div>
+      <div id="wishSummaryBody" style="font-size:.78rem;color:#475569;line-height:1.8"></div>
+    </div>
     <div class="card">
       <div class="cardHead">🗓️ テスト選択</div>
       <div class="termRow">
@@ -304,6 +314,34 @@ tr:hover td{background:var(--primary-lt)}
   </div>
 
   <!-- グラフ -->
+  <!-- 志望校 -->
+  <div id="sTab_wish" style="display:none">
+    <div class="card">
+      <div class="cardHead">🏫 志望校</div>
+      <div style="font-size:.78rem;color:#64748b;margin-bottom:12px">入力した志望校は先生にも共有されます</div>
+
+      <div style="font-weight:700;color:#1e293b;margin-bottom:8px;font-size:.85rem">📌 公立高校</div>
+      <div class="fld"><label>第1志望 高校名</label><input id="pub1name" type="text" placeholder="例：南山高校"></div>
+      <div class="fld"><label>第1志望 学科・コース</label><input id="pub1dept" type="text" placeholder="例：普通科"></div>
+      <div class="fld"><label>第2志望 高校名</label><input id="pub2name" type="text" placeholder="例：瑞陵高校"></div>
+      <div class="fld"><label>第2志望 学科・コース</label><input id="pub2dept" type="text" placeholder="例：普通科"></div>
+      <div class="fld"><label>第3志望 高校名</label><input id="pub3name" type="text" placeholder="例：菊里高校"></div>
+      <div class="fld"><label>第3志望 学科・コース</label><input id="pub3dept" type="text" placeholder="例：普通科"></div>
+
+      <div style="font-weight:700;color:#1e293b;margin:16px 0 8px;font-size:.85rem">📌 私立高校</div>
+      <div class="fld"><label>第1志望 高校名</label><input id="pri1name" type="text" placeholder="例：中京大中京高校"></div>
+      <div class="fld"><label>第1志望 学科・コース</label><input id="pri1dept" type="text" placeholder="例：特進コース"></div>
+      <div class="fld"><label>第2志望 高校名</label><input id="pri2name" type="text" placeholder="例：東邦高校"></div>
+      <div class="fld"><label>第2志望 学科・コース</label><input id="pri2dept" type="text" placeholder="例：普通科"></div>
+      <div class="fld"><label>第3志望 高校名</label><input id="pri3name" type="text" placeholder="例：名城大附属高校"></div>
+      <div class="fld"><label>第3志望 学科・コース</label><input id="pri3dept" type="text" placeholder="例：普通科"></div>
+
+      <div id="wishUpdatedAt" style="font-size:.72rem;color:#94a3b8;margin-top:8px;text-align:right"></div>
+      <button class="btn btn-primary btn-full" onclick="saveWish()" style="margin-top:16px">💾 保存する</button>
+      <div id="wishMsg" style="margin-top:8px;text-align:center;font-size:.82rem"></div>
+    </div>
+  </div>
+
   <div id="sTab_chart" style="display:none">
     <!-- グラフ① 得点推移 -->
     <div class="card">
@@ -729,12 +767,13 @@ function showPage(id) {
 }
 
 function sTabs(name, idx) {
-  ['input','report','chart','history'].forEach(t => document.getElementById('sTab_' + t).style.display = 'none');
+  ['input','report','chart','history','wish'].forEach(t => document.getElementById('sTab_' + t).style.display = 'none');
   document.getElementById('sTab_' + name).style.display = 'block';
   document.querySelectorAll('#studentPage .tabBtn').forEach((b, i) => b.classList.toggle('on', i === idx));
   if (name === 'history') { renderHistory(); renderReportHistory(); }
   if (name === 'chart') setTimeout(() => renderChart(), 50);
   if (name === 'report') initReportTab();
+  if (name === 'wish') loadWish();
 }
 
 function aTabs(name, idx) {
@@ -803,6 +842,11 @@ async function initStudent() {
     const sr = await api({ action: 'getStudentScores', studentId: me.id });
     myScores = sr.scores || [];
   } catch(e) { myScores = []; }
+  // 志望校サマリーを読み込む
+  try {
+    const wr = await api({ action: 'getWish', studentId: me.id });
+    if (wr.wish) renderWishSummary(wr.wish);
+  } catch(e) {}
   sTabs('input', 0);
 }
 
@@ -1376,6 +1420,69 @@ async function loadSyncLog() {
 function getSemesterOptions(semType) {
   if (semType === '2term') return [{ val: '前期', label: '前期' }, { val: '後期', label: '後期' }];
   return [{ val: '1学期', label: '1学期' }, { val: '2学期', label: '2学期' }, { val: '3学期', label: '3学期' }];
+}
+
+// ===================================================
+// 志望校
+// ===================================================
+function renderWishSummary(w) {
+  const box = document.getElementById('wishSummary');
+  const body = document.getElementById('wishSummaryBody');
+  const date = document.getElementById('wishSummaryDate');
+  if (!box || !body) return;
+  const lines = [];
+  if (w.pub1name) lines.push('【公立1】' + w.pub1name + (w.pub1dept ? ' ' + w.pub1dept : ''));
+  if (w.pub2name) lines.push('【公立2】' + w.pub2name + (w.pub2dept ? ' ' + w.pub2dept : ''));
+  if (w.pub3name) lines.push('【公立3】' + w.pub3name + (w.pub3dept ? ' ' + w.pub3dept : ''));
+  if (w.pri1name) lines.push('【私立1】' + w.pri1name + (w.pri1dept ? ' ' + w.pri1dept : ''));
+  if (w.pri2name) lines.push('【私立2】' + w.pri2name + (w.pri2dept ? ' ' + w.pri2dept : ''));
+  if (w.pri3name) lines.push('【私立3】' + w.pri3name + (w.pri3dept ? ' ' + w.pri3dept : ''));
+  if (lines.length === 0) return;
+  body.innerHTML = lines.join('<br>');
+  if (date && w.updatedAt) date.textContent = '更新: ' + w.updatedAt.slice(0,10);
+  box.style.display = 'block';
+}
+
+async function loadWish() {
+  try {
+    const r = await api({ action: 'getWish', studentId: me.id });
+    const w = r.wish;
+    if (!w) return;
+    ['pub1name','pub1dept','pub2name','pub2dept','pub3name','pub3dept',
+     'pri1name','pri1dept','pri2name','pri2dept','pri3name','pri3dept'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = w[id] || '';
+    });
+    const upEl = document.getElementById('wishUpdatedAt');
+    if (upEl && w.updatedAt) upEl.textContent = '最終更新: ' + w.updatedAt;
+  } catch(e) {}
+}
+
+async function saveWish() {
+  const data = { action: 'saveWish', studentId: me.id };
+  ['pub1name','pub1dept','pub2name','pub2dept','pub3name','pub3dept',
+   'pri1name','pri1dept','pri2name','pri2dept','pri3name','pri3dept'].forEach(id => {
+    const el = document.getElementById(id);
+    data[id] = el ? el.value.trim() : '';
+  });
+  const msg = document.getElementById('wishMsg');
+  try {
+    const r = await api(data);
+    if (r.success) {
+      msg.textContent = '✅ 保存しました';
+      msg.style.color = '#10b981';
+      const now = new Date().toLocaleString('ja-JP');
+      const upEl = document.getElementById('wishUpdatedAt');
+      if (upEl) upEl.textContent = '最終更新: ' + now;
+    } else {
+      msg.textContent = '❌ ' + (r.error||'エラー');
+      msg.style.color = '#ef4444';
+    }
+  } catch(e) {
+    msg.textContent = '❌ 通信エラー';
+    msg.style.color = '#ef4444';
+  }
+  setTimeout(() => { if(msg) msg.textContent = ''; }, 3000);
 }
 
 function initReportTab() {
