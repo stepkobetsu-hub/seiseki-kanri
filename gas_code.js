@@ -94,6 +94,7 @@ function route(e) {
       case 'getEntrySheetData':   result = getEntrySheetData(data); break;
       case 'saveEntrySheetData':  result = saveEntrySheetData(data); break;
       case 'importEntrySheet':    result = importEntrySheet(data); break;
+      case 'uploadEntryImage':    result = uploadEntryImage(data); break;
       default: result = { success: false, error: '不明なアクション: ' + data.action };
     }
   } catch(err) {
@@ -765,21 +766,11 @@ const ENTRY_INFO_COLS = [
 ];
 
 const ENTRY_MASTER_MAP = {
-  guardian1Name: 17,      // Q
-  guardian1Kana: 18,      // R
-  guardian1Relation: 19,  // S
-  postalCode: 20,         // T
-  prefecture: 21,         // U
-  city: 22,               // V
-  addressLine: 23,        // W
-  guardian1Email: 24,     // X
-  guardian1Mobile: 25,    // Y
   guardian2Name: 26,      // Z
   guardian2Kana: 27,      // AA
   guardian2Relation: 28,  // AB
   guardian2Email: 29,     // AC
-  guardian2Mobile: 30,    // AD
-  homePhone: 31           // AE
+  guardian2Mobile: 30     // AD
 };
 
 function getEntrySheetData(data) {
@@ -914,4 +905,28 @@ function findStudentById_(studentId) {
 
 function normalizeName_(s) {
   return String(s || '').replace(/\s+/g, '').replace(/　/g, '').trim();
+}
+
+function uploadEntryImage(data) {
+  if (!data.studentId) return { success: false, error: '生徒IDがありません' };
+  if (!data.imageData) return { success: false, error: '画像データがありません' };
+
+  const match = String(data.imageData).match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) return { success: false, error: '画像データの形式が正しくありません' };
+
+  const mimeType = match[1];
+  const ext = mimeType.indexOf('png') >= 0 ? 'png' : mimeType.indexOf('webp') >= 0 ? 'webp' : 'jpg';
+  const bytes = Utilities.base64Decode(match[2]);
+  const folder = getOrCreateDriveFolder_('入塾書類画像');
+  const safeName = String(data.name || '').replace(/[\\/:*?"<>|]/g, '');
+  const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+  const fileName = [data.studentId, safeName, data.label || 'entry', stamp].filter(Boolean).join('_') + '.' + ext;
+  const file = folder.createFile(Utilities.newBlob(bytes, mimeType, fileName));
+  return { success: true, url: file.getUrl(), fileId: file.getId(), name: file.getName() };
+}
+
+function getOrCreateDriveFolder_(name) {
+  const it = DriveApp.getFoldersByName(name);
+  if (it.hasNext()) return it.next();
+  return DriveApp.createFolder(name);
 }

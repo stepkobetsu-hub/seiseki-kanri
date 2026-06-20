@@ -539,29 +539,20 @@ tr:hover td{background:#f8fafc}
           <div class="fld" style="min-width:140px"><label>生徒ID</label><input id="entryStudentId" placeholder="例: 1001"></div>
           <div class="fld" style="min-width:180px"><label>生徒氏名</label><input id="entryName" placeholder="例: 加瀬壮真"></div>
           <button class="btn btn-ghost btn-sm" onclick="loadEntryData()">既存データ確認</button>
+          <a class="btn btn-ghost btn-sm" href="entry_import.html" target="_blank" rel="noopener" style="text-decoration:none">スマホ取込ページ</a>
         </div>
         <div style="font-size:.78rem;color:#64748b;margin:8px 0 12px">
           OCR後の内容を確認して登録します。生徒IDと氏名が一致しない場合は保存されません。
         </div>
         <div class="adminGrid">
           <div>
-            <div class="cardHead" style="font-size:.86rem;margin-bottom:8px">生徒マスタへ反映する保護者欄</div>
+            <div class="cardHead" style="font-size:.86rem;margin-bottom:8px">生徒マスタへ反映する右側保護者欄（Z〜AD列）</div>
             <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
-              <input id="entryG1Name" placeholder="左 保護者氏名">
-              <input id="entryG1Kana" placeholder="左 フリガナ">
-              <input id="entryG1Relation" placeholder="左 続柄">
-              <input id="entryG1Mobile" placeholder="左 携帯電話番号">
-              <input id="entryG1Email" placeholder="左 メール">
-              <input id="entryPostalCode" placeholder="郵便番号">
-              <input id="entryPrefecture" placeholder="県名">
-              <input id="entryCity" placeholder="市名">
-              <input id="entryAddressLine" placeholder="それ以降の住所" style="grid-column:1/-1">
               <input id="entryG2Name" placeholder="右 保護者氏名">
               <input id="entryG2Kana" placeholder="右 フリガナ">
               <input id="entryG2Relation" placeholder="右 続柄">
               <input id="entryG2Mobile" placeholder="右 携帯電話番号">
               <input id="entryG2Email" placeholder="右 メール">
-              <input id="entryHomePhone" placeholder="自宅電話番号">
             </div>
           </div>
           <div>
