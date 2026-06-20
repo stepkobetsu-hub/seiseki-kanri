@@ -1873,7 +1873,7 @@ function renderEntryAiSummary(ai, masterInfo) {
     ${scoreRows.length ? `<div style="margin-top:12px;font-weight:800;color:#1e293b">定期テスト</div>${entrySmallTable(['年度','学年','回','国','社','数','理','英','5計'], scoreRows)}` : ''}
     ${reportRows.length ? `<div style="margin-top:12px;font-weight:800;color:#1e293b">通知表</div>${entrySmallTable(['年度','学年','学期','国','社','数','理','英','音','美','体','技'], reportRows)}` : ''}
     ${wishRows.length ? `<div style="margin-top:12px;font-weight:800;color:#1e293b">志望校</div>${entrySmallTable(['区分','学校名','学科'], wishRows)}` : ''}
-    ${entryInfoRow('AIメモ', ai.notes)}
+    ${entryInfoRow('メモ（裏面下部）', ai.notes)}
   `;
 }
 
