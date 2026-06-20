@@ -323,18 +323,28 @@ tr:hover td{background:var(--primary-lt)}
       <div style="font-weight:700;color:#1e293b;margin-bottom:8px;font-size:.85rem">📌 公立高校</div>
       <div class="fld"><label>第1志望 高校名</label><input id="pub1name" type="text" placeholder="例：南山高校"></div>
       <div class="fld"><label>第1志望 学科・コース</label><input id="pub1dept" type="text" placeholder="例：普通科"></div>
+      <div class="fld"><label>第1志望 合否</label><select id="pub1result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+
       <div class="fld"><label>第2志望 高校名</label><input id="pub2name" type="text" placeholder="例：瑞陵高校"></div>
       <div class="fld"><label>第2志望 学科・コース</label><input id="pub2dept" type="text" placeholder="例：普通科"></div>
+      <div class="fld"><label>第2志望 合否</label><select id="pub2result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+
       <div class="fld"><label>第3志望 高校名</label><input id="pub3name" type="text" placeholder="例：菊里高校"></div>
       <div class="fld"><label>第3志望 学科・コース</label><input id="pub3dept" type="text" placeholder="例：普通科"></div>
+      <div class="fld"><label>第3志望 合否</label><select id="pub3result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
 
       <div style="font-weight:700;color:#1e293b;margin:16px 0 8px;font-size:.85rem">📌 私立高校</div>
       <div class="fld"><label>第1志望 高校名</label><input id="pri1name" type="text" placeholder="例：中京大中京高校"></div>
       <div class="fld"><label>第1志望 学科・コース</label><input id="pri1dept" type="text" placeholder="例：特進コース"></div>
+      <div class="fld"><label>第1志望 合否</label><select id="pri1result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+
       <div class="fld"><label>第2志望 高校名</label><input id="pri2name" type="text" placeholder="例：東邦高校"></div>
       <div class="fld"><label>第2志望 学科・コース</label><input id="pri2dept" type="text" placeholder="例：普通科"></div>
+      <div class="fld"><label>第2志望 合否</label><select id="pri2result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+
       <div class="fld"><label>第3志望 高校名</label><input id="pri3name" type="text" placeholder="例：名城大附属高校"></div>
       <div class="fld"><label>第3志望 学科・コース</label><input id="pri3dept" type="text" placeholder="例：普通科"></div>
+      <div class="fld"><label>第3志望 合否</label><select id="pri3result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
 
       <div id="wishUpdatedAt" style="font-size:.72rem;color:#94a3b8;margin-top:8px;text-align:right"></div>
       <button class="btn btn-primary btn-full" onclick="saveWish()" style="margin-top:16px">💾 保存する</button>
@@ -1454,6 +1464,11 @@ function renderWishSummary(w) {
   box.style.display = 'block';
 }
 
+function updateResultColor(sel) {
+  sel.style.color = sel.value === '合格' ? '#10b981' : sel.value === '不合格' ? '#ef4444' : '#94a3b8';
+  sel.style.fontWeight = sel.value !== '-' ? '700' : '400';
+}
+
 async function loadWish() {
   try {
     const r = await api({ action: 'getWish', studentId: me.id });
@@ -1463,6 +1478,12 @@ async function loadWish() {
      'pri1name','pri1dept','pri2name','pri2dept','pri3name','pri3dept'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = w[id] || '';
+    });
+    // 合否を読み込む
+    const r = w.results || {};
+    ['pub1','pub2','pub3','pri1','pri2','pri3'].forEach(key => {
+      const el = document.getElementById(key + 'result');
+      if (el) { el.value = r[key] || '-'; updateResultColor(el); }
     });
     const upEl = document.getElementById('wishUpdatedAt');
     if (upEl && w.updatedAt) upEl.textContent = '最終更新: ' + w.updatedAt;
@@ -1476,6 +1497,13 @@ async function saveWish() {
     const el = document.getElementById(id);
     data[id] = el ? el.value.trim() : '';
   });
+  // 合否も保存
+  const results = {};
+  ['pub1','pub2','pub3','pri1','pri2','pri3'].forEach(key => {
+    const el = document.getElementById(key + 'result');
+    if (el) results[key] = el.value;
+  });
+  data.results = JSON.stringify(results);
   const msg = document.getElementById('wishMsg');
   try {
     const r = await api(data);
