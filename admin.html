@@ -215,6 +215,7 @@ tr:hover td{background:#f8fafc}
     <div class="sideItem" onclick="aNav('report',this)"><span class="ico">📒</span> 通知表</div>
     <div class="sideSection">システム</div>
     <div class="sideItem" onclick="aNav('wish',this)"><span class="ico">🏫</span> 志望校</div>
+    <div class="sideItem" onclick="aNav('entry',this)"><span class="ico">📝</span> 入塾書類</div>
     <div class="sideItem" onclick="aNav('sync',this)"><span class="ico">🔄</span> 同期</div>
     <div class="sideItem" onclick="aNav('settings',this)"><span class="ico">⚙️</span> 設定</div>
   </nav>
@@ -530,6 +531,67 @@ tr:hover td{background:#f8fafc}
     </div>
 
     <!-- 同期 -->
+    <div id="aTab_entry" style="display:none">
+      <div class="card">
+        <div class="cardHead">入塾書類取込</div>
+        <div class="filterRow" style="align-items:flex-end">
+          <div class="fld" style="min-width:140px"><label>生徒ID</label><input id="entryStudentId" placeholder="例: 1001"></div>
+          <div class="fld" style="min-width:180px"><label>生徒氏名</label><input id="entryName" placeholder="例: 加瀬壮真"></div>
+          <button class="btn btn-ghost btn-sm" onclick="loadEntryData()">既存データ確認</button>
+        </div>
+        <div style="font-size:.78rem;color:#64748b;margin:8px 0 12px">
+          OCR後の内容を確認して登録します。生徒IDと氏名が一致しない場合は保存されません。
+        </div>
+        <div class="adminGrid">
+          <div>
+            <div class="cardHead" style="font-size:.86rem;margin-bottom:8px">生徒マスタへ反映する保護者欄</div>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+              <input id="entryG1Name" placeholder="左 保護者氏名">
+              <input id="entryG1Kana" placeholder="左 フリガナ">
+              <input id="entryG1Relation" placeholder="左 続柄">
+              <input id="entryG1Mobile" placeholder="左 携帯電話番号">
+              <input id="entryG1Email" placeholder="左 メール">
+              <input id="entryPostalCode" placeholder="郵便番号">
+              <input id="entryPrefecture" placeholder="県名">
+              <input id="entryCity" placeholder="市名">
+              <input id="entryAddressLine" placeholder="それ以降の住所" style="grid-column:1/-1">
+              <input id="entryG2Name" placeholder="右 保護者氏名">
+              <input id="entryG2Kana" placeholder="右 フリガナ">
+              <input id="entryG2Relation" placeholder="右 続柄">
+              <input id="entryG2Mobile" placeholder="右 携帯電話番号">
+              <input id="entryG2Email" placeholder="右 メール">
+              <input id="entryHomePhone" placeholder="自宅電話番号">
+            </div>
+          </div>
+          <div>
+            <div class="cardHead" style="font-size:.86rem;margin-bottom:8px">生徒ページに表示する入塾時情報</div>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+              <input id="entryClub" placeholder="部活動">
+              <input id="entryNickname" placeholder="ニックネーム">
+              <input id="entryCommute" placeholder="通塾方法">
+              <input id="entrySignatureDate" placeholder="保護者署名日">
+              <input id="entrySignatureName" placeholder="保護者署名氏名">
+              <input id="entryImageUrl1" placeholder="原本画像URL 1">
+              <input id="entryImageUrl2" placeholder="原本画像URL 2" style="grid-column:1/-1">
+              <textarea id="entryCurrentLessons" placeholder="現在通っている習い事や塾" style="grid-column:1/-1;min-height:52px"></textarea>
+              <textarea id="entryPastLessons" placeholder="過去に通っていた習い事や塾" style="grid-column:1/-1;min-height:52px"></textarea>
+              <textarea id="entryFamilyRequest" placeholder="ご家庭からの要望・希望" style="grid-column:1/-1;min-height:70px"></textarea>
+              <textarea id="entryFamilyJson" placeholder='家族情報JSON 例: [{"name":"山田太郎","relation":"父","job":"会社員","workplace":"○○会社","grade":""}]' style="grid-column:1/-1;min-height:80px"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardHead">OCR結果JSON / 成績・通知表・志望校</div>
+        <textarea id="entryJson" style="width:100%;min-height:180px;font-family:Consolas,monospace;font-size:.78rem" placeholder='{"scores":[{"year":2026,"term":1,"jpn":58,"soc":77,"math":66,"sci":55,"eng":44,"total5":300}],"reports":[{"year":2026,"semester":"1学期","rp_jpn":5,"rp_soc":5,"rp_math":5,"rp_sci":5,"rp_eng":5,"rp_mus":4,"rp_art":3,"rp_pe":2,"rp_tech":2}],"wish":{"pub1name":"春日井高校","pub1dept":"ふつう"}}'></textarea>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-ghost btn-sm" onclick="fillEntryFromJson()">JSONをフォームへ反映</button>
+          <button class="btn btn-primary btn-sm" onclick="saveEntryImport()">確認して取り込む</button>
+        </div>
+        <div id="entryImportMsg" style="margin-top:10px;font-size:.82rem;color:#64748b"></div>
+      </div>
+    </div>
+
     <div id="aTab_sync" style="display:none">
       <div class="card">
         <div class="cardHead">🔄 生徒マスタ同期</div>
@@ -586,7 +648,7 @@ let students = [];
 let allScores = [];
 let allReports = [];
 let pendingSync = null;
-const TABS = ['speed','compare','students','schools','report','wish','sync','settings'];
+const TABS = ['speed','compare','students','schools','report','wish','entry','sync','settings'];
 // タブ履歴管理（グローバル宣言）
 let _navHist = [];
 let _navIdx = -1;
@@ -768,6 +830,7 @@ function aNav(name, el) {
   if (name === 'report') initAdminReportTab();
   if (name === 'compare') initCompare();
   if (name === 'wish') loadAllWishes();
+  if (name === 'entry') initEntryTab();
   // 履歴に追加
   if (!_navSkip) {
     _navHist.splice(_navIdx + 1);
@@ -776,6 +839,130 @@ function aNav(name, el) {
       _navIdx = _navHist.length - 1;
     }
     _updateNavBtns();
+  }
+}
+
+// ===== ENTRY SHEET IMPORT =====
+function initEntryTab() {
+  const msg = document.getElementById('entryImportMsg');
+  if (msg && !msg.textContent) msg.textContent = 'OCR結果を貼り付けるか、各欄へ入力して取り込みます。';
+}
+
+function entryVal(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+
+function setEntryVal(id, value) {
+  const el = document.getElementById(id);
+  if (el && value != null) el.value = value;
+}
+
+function parseEntryJson() {
+  const raw = entryVal('entryJson');
+  if (!raw) return {};
+  try { return JSON.parse(raw); }
+  catch(e) { throw new Error('JSONの形式を確認してください: ' + e.message); }
+}
+
+function fillEntryFromJson() {
+  try {
+    const d = parseEntryJson();
+    const map = {
+      studentId:'entryStudentId', name:'entryName',
+      guardian1Name:'entryG1Name', guardian1Kana:'entryG1Kana', guardian1Relation:'entryG1Relation',
+      guardian1Mobile:'entryG1Mobile', guardian1Email:'entryG1Email',
+      postalCode:'entryPostalCode', prefecture:'entryPrefecture', city:'entryCity', addressLine:'entryAddressLine',
+      guardian2Name:'entryG2Name', guardian2Kana:'entryG2Kana', guardian2Relation:'entryG2Relation',
+      guardian2Mobile:'entryG2Mobile', guardian2Email:'entryG2Email', homePhone:'entryHomePhone',
+      club:'entryClub', nickname:'entryNickname', commuteMethod:'entryCommute',
+      signatureDate:'entrySignatureDate', signatureName:'entrySignatureName',
+      imageUrl1:'entryImageUrl1', imageUrl2:'entryImageUrl2',
+      currentLessons:'entryCurrentLessons', pastLessons:'entryPastLessons', familyRequest:'entryFamilyRequest'
+    };
+    Object.keys(map).forEach(k => setEntryVal(map[k], d[k]));
+    if (d.family) setEntryVal('entryFamilyJson', JSON.stringify(d.family, null, 2));
+    document.getElementById('entryImportMsg').textContent = 'JSONをフォームへ反映しました。内容を確認して取り込んでください。';
+  } catch(e) {
+    document.getElementById('entryImportMsg').textContent = e.message;
+  }
+}
+
+function buildEntryPayload() {
+  let extra = {};
+  try { extra = parseEntryJson(); } catch(e) { throw e; }
+  let family = [];
+  const familyRaw = entryVal('entryFamilyJson');
+  if (familyRaw) {
+    try { family = JSON.parse(familyRaw); }
+    catch(e) { throw new Error('家族情報JSONの形式を確認してください: ' + e.message); }
+  }
+  return Object.assign({}, extra, {
+    action: 'importEntrySheet',
+    studentId: entryVal('entryStudentId') || extra.studentId,
+    name: entryVal('entryName') || extra.name,
+    guardian1Name: entryVal('entryG1Name'),
+    guardian1Kana: entryVal('entryG1Kana'),
+    guardian1Relation: entryVal('entryG1Relation'),
+    guardian1Mobile: entryVal('entryG1Mobile'),
+    guardian1Email: entryVal('entryG1Email'),
+    postalCode: entryVal('entryPostalCode'),
+    prefecture: entryVal('entryPrefecture'),
+    city: entryVal('entryCity'),
+    addressLine: entryVal('entryAddressLine'),
+    guardian2Name: entryVal('entryG2Name'),
+    guardian2Kana: entryVal('entryG2Kana'),
+    guardian2Relation: entryVal('entryG2Relation'),
+    guardian2Mobile: entryVal('entryG2Mobile'),
+    guardian2Email: entryVal('entryG2Email'),
+    homePhone: entryVal('entryHomePhone'),
+    club: entryVal('entryClub'),
+    nickname: entryVal('entryNickname'),
+    commuteMethod: entryVal('entryCommute'),
+    signatureDate: entryVal('entrySignatureDate'),
+    signatureName: entryVal('entrySignatureName'),
+    imageUrl1: entryVal('entryImageUrl1'),
+    imageUrl2: entryVal('entryImageUrl2'),
+    currentLessons: entryVal('entryCurrentLessons'),
+    pastLessons: entryVal('entryPastLessons'),
+    familyRequest: entryVal('entryFamilyRequest'),
+    family
+  });
+}
+
+async function loadEntryData() {
+  const sid = entryVal('entryStudentId');
+  const msg = document.getElementById('entryImportMsg');
+  if (!sid) { msg.textContent = '生徒IDを入力してください。'; return; }
+  msg.textContent = '確認中...';
+  const r = await api({ action: 'getEntrySheetData', studentId: sid });
+  if (!r.success) { msg.textContent = r.error || '取得できませんでした'; return; }
+  if (!r.data) { msg.textContent = '入塾時情報はまだ保存されていません。'; return; }
+  setEntryVal('entryName', r.data.name);
+  setEntryVal('entryClub', r.data.club);
+  setEntryVal('entryNickname', r.data.nickname);
+  setEntryVal('entryCommute', r.data.commuteMethod);
+  setEntryVal('entryCurrentLessons', r.data.currentLessons);
+  setEntryVal('entryPastLessons', r.data.pastLessons);
+  setEntryVal('entryFamilyRequest', r.data.familyRequest);
+  setEntryVal('entrySignatureDate', r.data.signatureDate);
+  setEntryVal('entrySignatureName', r.data.signatureName);
+  setEntryVal('entryImageUrl1', r.data.imageUrl1);
+  setEntryVal('entryImageUrl2', r.data.imageUrl2);
+  setEntryVal('entryFamilyJson', JSON.stringify(r.data.family || [], null, 2));
+  msg.textContent = '保存済みの入塾時情報を読み込みました。';
+}
+
+async function saveEntryImport() {
+  const msg = document.getElementById('entryImportMsg');
+  try {
+    const payload = buildEntryPayload();
+    if (!payload.studentId || !payload.name) throw new Error('生徒IDと氏名を入力してください。');
+    msg.textContent = '取り込み中...';
+    const r = await api(payload);
+    msg.textContent = r.success ? (r.message + '（' + (r.saved || []).join(', ') + '）') : (r.error || '取り込みに失敗しました');
+  } catch(e) {
+    msg.textContent = e.message;
   }
 }
 

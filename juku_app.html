@@ -214,6 +214,7 @@ tr:hover td{background:var(--primary-lt)}
     <button class="tabBtn" onclick="sTabs('chart',2)">📈 グラフ</button>
     <button class="tabBtn" onclick="sTabs('history',3)">📋 履歴</button>
     <button class="tabBtn" onclick="sTabs('wish',4)">🏫 志望校</button>
+    <button class="tabBtn" onclick="sTabs('entry',5)">📝 入塾時情報</button>
   </div>
 
   <!-- 入力 -->
@@ -781,6 +782,15 @@ tr:hover td{background:var(--primary-lt)}
   </div>
 </div>
 
+  <div id="sTab_entry" style="display:none">
+    <div class="card">
+      <div class="cardHead">入塾時情報</div>
+      <div id="entryInfoBody" style="font-size:.84rem;color:#334155;line-height:1.8">
+        読み込み中...
+      </div>
+    </div>
+  </div>
+
 <div id="toast"></div>
 
 <script>
@@ -928,13 +938,55 @@ function showPage(id) {
 }
 
 function sTabs(name, idx) {
-  ['input','report','chart','history','wish'].forEach(t => document.getElementById('sTab_' + t).style.display = 'none');
+  ['input','report','chart','history','wish','entry'].forEach(t => document.getElementById('sTab_' + t).style.display = 'none');
   document.getElementById('sTab_' + name).style.display = 'block';
   document.querySelectorAll('#studentPage .tabBtn').forEach((b, i) => b.classList.toggle('on', i === idx));
   if (name === 'history') { renderHistory(); renderReportHistory(); }
   if (name === 'chart') setTimeout(() => renderChart(), 50);
   if (name === 'report') initReportTab();
   if (name === 'wish') loadWish();
+  if (name === 'entry') loadEntryInfo();
+}
+
+function h(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function loadEntryInfo() {
+  const body = document.getElementById('entryInfoBody');
+  if (!body || !me) return;
+  body.textContent = '読み込み中...';
+  const r = await api({ action: 'getEntrySheetData', studentId: me.id });
+  if (!r.success) {
+    body.textContent = r.error || '読み込みに失敗しました';
+    return;
+  }
+  const d = r.data;
+  if (!d) {
+    body.innerHTML = '<div style="color:#94a3b8">入塾時情報はまだ登録されていません。</div>';
+    return;
+  }
+  const item = (label, value) => value ? `<div><b>${label}</b>：${h(value)}</div>` : '';
+  const familyRows = (d.family || []).map(f => {
+    const parts = [f.name, f.relation, f.job, f.workplace, f.grade].filter(Boolean).map(h).join(' / ');
+    return parts ? `<li>${parts}</li>` : '';
+  }).join('');
+  const imageLinks = [d.imageUrl1, d.imageUrl2].filter(Boolean).map((url, i) =>
+    `<a href="${h(url)}" target="_blank" rel="noopener">原本画像${i + 1}</a>`
+  ).join('　');
+  body.innerHTML = `
+    ${item('部活動', d.club)}
+    ${item('現在通っている習い事や塾', d.currentLessons)}
+    ${item('過去に通っていた習い事や塾', d.pastLessons)}
+    ${item('通塾方法', d.commuteMethod)}
+    ${item('ニックネーム', d.nickname)}
+    ${familyRows ? `<div style="margin-top:10px"><b>家族情報</b><ul style="margin:6px 0 0 18px;padding:0">${familyRows}</ul></div>` : ''}
+    ${item('ご家庭からの要望・希望', d.familyRequest)}
+    ${item('保護者署名日', d.signatureDate)}
+    ${item('保護者署名氏名', d.signatureName)}
+    ${imageLinks ? `<div style="margin-top:10px">${imageLinks}</div>` : ''}
+    ${item('更新日時', d.updatedAt)}
+  `;
 }
 
 function aTabs(name, idx) {

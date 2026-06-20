@@ -90,6 +90,10 @@ function route(e) {
       case 'saveWishResult':     result = saveWishResult(data); break;
       case 'getWish':            result = getWish(data); break;
       case 'getAllWishes':        result = getAllWishes(data); break;
+      // 入塾書類
+      case 'getEntrySheetData':   result = getEntrySheetData(data); break;
+      case 'saveEntrySheetData':  result = saveEntrySheetData(data); break;
+      case 'importEntrySheet':    result = importEntrySheet(data); break;
       default: result = { success: false, error: '不明なアクション: ' + data.action };
     }
   } catch(err) {
@@ -748,4 +752,156 @@ function rowToWish(r) {
     pri1name:r[10], pri1dept:r[11], pri2name:r[12], pri2dept:r[13], pri3name:r[14], pri3dept:r[15],
     createdAt:r[16], updatedAt:r[17], results
   };
+}
+
+// ===================================================
+// 入塾書類
+// ===================================================
+const ENTRY_INFO_COLS = [
+  '生徒ID','氏名','校舎','学年','中学校',
+  '部活動','現在通っている習い事や塾','過去に通っていた習い事や塾','通塾方法','ニックネーム',
+  '家族情報JSON','ご家庭からの要望','保護者署名日','保護者署名氏名',
+  '原本画像URL1','原本画像URL2','OCRメモ','登録日時','更新日時'
+];
+
+const ENTRY_MASTER_MAP = {
+  guardian1Name: 17,      // Q
+  guardian1Kana: 18,      // R
+  guardian1Relation: 19,  // S
+  postalCode: 20,         // T
+  prefecture: 21,         // U
+  city: 22,               // V
+  addressLine: 23,        // W
+  guardian1Email: 24,     // X
+  guardian1Mobile: 25,    // Y
+  guardian2Name: 26,      // Z
+  guardian2Kana: 27,      // AA
+  guardian2Relation: 28,  // AB
+  guardian2Email: 29,     // AC
+  guardian2Mobile: 30,    // AD
+  homePhone: 31           // AE
+};
+
+function getEntrySheetData(data) {
+  const sh = getOrCreateSheet('入塾時情報データ', ENTRY_INFO_COLS);
+  const rows = sh.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(data.studentId)) {
+      return { success: true, data: rowToEntryInfo(rows[i]) };
+    }
+  }
+  return { success: true, data: null };
+}
+
+function saveEntrySheetData(data) {
+  const student = findStudentById_(data.studentId);
+  if (!student) return { success: false, error: '生徒IDが見つかりません: ' + data.studentId };
+  if (data.name && normalizeName_(data.name) !== normalizeName_(student.name)) {
+    return { success: false, error: '生徒IDと氏名が一致しません。マスタ: ' + student.name + ' / 入力: ' + data.name };
+  }
+
+  const now = new Date().toLocaleString('ja-JP');
+  updateMasterGuardianInfo_(data);
+  const sh = getOrCreateSheet('入塾時情報データ', ENTRY_INFO_COLS);
+  const rows = sh.getDataRange().getValues();
+  const row = buildEntryInfoRow_(data, student, now, now);
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(data.studentId)) {
+      row[17] = rows[i][17] || now;
+      sh.getRange(i + 1, 1, 1, row.length).setValues([row]);
+      return { success: true, message: '入塾時情報を更新しました' };
+    }
+  }
+  sh.appendRow(row);
+  return { success: true, message: '入塾時情報を保存しました' };
+}
+
+function importEntrySheet(data) {
+  const student = findStudentById_(data.studentId);
+  if (!student) return { success: false, error: '生徒IDが見つかりません: ' + data.studentId };
+  if (data.name && normalizeName_(data.name) !== normalizeName_(student.name)) {
+    return { success: false, error: '生徒IDと氏名が一致しません。マスタ: ' + student.name + ' / 入力: ' + data.name };
+  }
+
+  const result = { success: true, saved: [] };
+  const entryResult = saveEntrySheetData(Object.assign({}, data, student));
+  if (!entryResult.success) return entryResult;
+  result.saved.push('entryInfo');
+
+  (data.scores || []).forEach(s => {
+    saveScore(Object.assign({}, s, {
+      studentId: student.id, name: student.name, campus: student.campus,
+      grade: s.grade || student.grade, school: s.school || student.school
+    }));
+  });
+  if (data.scores && data.scores.length) result.saved.push('scores');
+
+  (data.reports || []).forEach(r => {
+    saveReport(Object.assign({}, r, {
+      studentId: student.id, name: student.name, campus: student.campus,
+      grade: r.grade || student.grade, school: r.school || student.school
+    }));
+  });
+  if (data.reports && data.reports.length) result.saved.push('reports');
+
+  if (data.wish) {
+    saveWish(Object.assign({}, data.wish, { studentId: student.id }));
+    result.saved.push('wish');
+  }
+
+  result.message = '入塾書類データを取り込みました';
+  return result;
+}
+
+function buildEntryInfoRow_(d, student, created, updated) {
+  return [
+    student.id, student.name, student.campus, student.grade, student.school,
+    d.club || '', d.currentLessons || '', d.pastLessons || '', d.commuteMethod || '', d.nickname || '',
+    JSON.stringify(d.family || []), d.familyRequest || '', d.signatureDate || '', d.signatureName || '',
+    d.imageUrl1 || '', d.imageUrl2 || '', d.ocrMemo || '', created, updated
+  ];
+}
+
+function rowToEntryInfo(r) {
+  let family = [];
+  try { family = r[10] ? JSON.parse(r[10]) : []; } catch(e) {}
+  return {
+    studentId: r[0], name: r[1], campus: r[2], grade: r[3], school: r[4],
+    club: r[5], currentLessons: r[6], pastLessons: r[7], commuteMethod: r[8], nickname: r[9],
+    family, familyRequest: r[11], signatureDate: r[12], signatureName: r[13],
+    imageUrl1: r[14], imageUrl2: r[15], ocrMemo: r[16], createdAt: r[17], updatedAt: r[18]
+  };
+}
+
+function updateMasterGuardianInfo_(data) {
+  const ss = SpreadsheetApp.openById(MASTER_SPREADSHEET_ID);
+  const sh = ss.getSheetByName(MASTER_SHEET_NAME) || ss.getSheetByName('☆マスタ');
+  if (!sh) throw new Error('生徒マスタの「☆マスタ」シートが見つかりません');
+  const rows = sh.getDataRange().getValues();
+  let rowNo = 0;
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(data.studentId)) { rowNo = i + 1; break; }
+  }
+  if (!rowNo) throw new Error('生徒マスタに生徒IDが見つかりません: ' + data.studentId);
+
+  Object.keys(ENTRY_MASTER_MAP).forEach(key => {
+    if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
+      sh.getRange(rowNo, ENTRY_MASTER_MAP[key]).setValue(data[key]);
+    }
+  });
+}
+
+function findStudentById_(studentId) {
+  const sh = getOrCreateSheet('生徒マスタ', []);
+  const rows = sh.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(studentId)) {
+      return { id: rows[i][0], name: rows[i][1], campus: rows[i][2], grade: rows[i][3], school: rows[i][4] };
+    }
+  }
+  return null;
+}
+
+function normalizeName_(s) {
+  return String(s || '').replace(/\s+/g, '').replace(/　/g, '').trim();
 }
