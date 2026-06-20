@@ -1788,27 +1788,20 @@ async function openEntryInfoModal() {
   const imageLinks = [d.imageUrl1, d.imageUrl2].filter(Boolean).map((url, i) =>
     `<a href="${htmlEsc(url)}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:600">原本画像${i + 1}</a>`
   ).join('　');
-
-  body.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px">
-      ${entryInfoRow('生徒ID', d.studentId)}
-      ${entryInfoRow('氏名', d.name)}
-      ${entryInfoRow('校舎', d.campus)}
-      ${entryInfoRow('学年', d.grade)}
-      ${entryInfoRow('中学校', d.school)}
-      ${entryInfoRow('部活動', d.club)}
-      ${entryInfoRow('ニックネーム', d.nickname)}
-      ${entryInfoRow('通塾方法', d.commuteMethod)}
-      ${entryInfoRow('保護者署名日', d.signatureDate)}
-      ${entryInfoRow('保護者署名氏名', d.signatureName)}
-    </div>
-    ${entryInfoRow('現在の習い事', d.currentLessons)}
-    ${entryInfoRow('過去の習い事', d.pastLessons)}
-    ${entryInfoRow('要望・希望', d.familyRequest)}
+  const detailHtml = `
+    ${entryInfoRow('部活動', d.club)}
+    ${entryInfoRow('現在通っている習い事や塾', d.currentLessons)}
+    ${entryInfoRow('過去に通っていた習い事や塾', d.pastLessons)}
+    ${entryInfoRow('通塾方法', d.commuteMethod)}
+    ${entryInfoRow('ニックネーム', d.nickname)}
     ${familyTable}
+    ${entryInfoRow('ご家庭からの要望・希望', d.familyRequest)}
+    ${entryInfoRow('保護者署名日', d.signatureDate)}
+    ${entryInfoRow('保護者署名氏名', d.signatureName)}
     ${imageLinks ? `<div style="margin-top:14px">${imageLinks}</div>` : ''}
-    ${entryInfoRow('更新日時', d.updatedAt)}
-  `;
+  `.trim();
+
+  body.innerHTML = detailHtml || '<div style="color:#94a3b8">保護者署名欄より下の情報はまだ登録されていません。</div>';
 }
 
 function closeEntryInfoModal() {
