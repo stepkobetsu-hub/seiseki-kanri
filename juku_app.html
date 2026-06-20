@@ -325,19 +325,97 @@ tr:hover td{background:var(--primary-lt)}
         <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:8px">第1志望</div>
         <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">高校名</label><input id="pub1name" type="text" placeholder="例：南山高校" style="background:#fff"></div>
         <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">学科・コース</label><input id="pub1dept" type="text" placeholder="例：普通科" style="background:#fff"></div>
-        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><select id="pub1result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%;background:#fff"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><div style="display:flex;gap:6px;margin-top:4px">
+          <!-- 入試区分 -->
+          <div style="flex:1">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px">入試</div>
+            <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
+              <button type="button" id="pub1type_none" onclick="setExamType('pub1','')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#e2e8f0;color:#475569;cursor:pointer;font-weight:700">ー</button>
+              <button type="button" id="pub1type_ippan" onclick="setExamType('pub1','一般')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">一般</button>
+              <button type="button" id="pub1type_suisen" onclick="setExamType('pub1','推薦')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">推薦</button>
+            </div>
+            <input type="hidden" id="pub1type" value="">
+          </div>
+          <!-- 合否 -->
+          <div style="flex:1.5">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px">合否</div>
+            <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
+              <button type="button" id="pub1result_none" onclick="setResult('pub1','-')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#f1f5f9;color:#64748b;cursor:pointer">ー</button>
+              <button type="button" id="pub1result_pass" onclick="setResult('pub1','合格')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">合格</button>
+              <button type="button" id="pub1result_fail" onclick="setResult('pub1','不合格')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#f1f5f9;color:#64748b;cursor:pointer">不合格</button>
+            </div>
+            <input type="hidden" id="pub1result" value="-">
+          </div>
+          <!-- 進学先 -->
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:4px">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:5px">進学先</div>
+            <input type="checkbox" id="pub1enroll" style="width:18px;height:18px;cursor:pointer;accent-color:#1a56a0">
+          </div>
+        </div></div>
       </div>
       <div style="background:#f0f4ff;border-radius:10px;padding:12px;margin-bottom:10px">
         <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:8px">第2志望</div>
         <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">高校名</label><input id="pub2name" type="text" placeholder="例：瑞陵高校" style="background:#fff"></div>
         <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">学科・コース</label><input id="pub2dept" type="text" placeholder="例：普通科" style="background:#fff"></div>
-        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><select id="pub2result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%;background:#fff"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><div style="display:flex;gap:6px;margin-top:4px">
+          <!-- 入試区分 -->
+          <div style="flex:1">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px">入試</div>
+            <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
+              <button type="button" id="pub2type_none" onclick="setExamType('pub2','')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#e2e8f0;color:#475569;cursor:pointer;font-weight:700">ー</button>
+              <button type="button" id="pub2type_ippan" onclick="setExamType('pub2','一般')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">一般</button>
+              <button type="button" id="pub2type_suisen" onclick="setExamType('pub2','推薦')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">推薦</button>
+            </div>
+            <input type="hidden" id="pub2type" value="">
+          </div>
+          <!-- 合否 -->
+          <div style="flex:1.5">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px">合否</div>
+            <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
+              <button type="button" id="pub2result_none" onclick="setResult('pub2','-')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#f1f5f9;color:#64748b;cursor:pointer">ー</button>
+              <button type="button" id="pub2result_pass" onclick="setResult('pub2','合格')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">合格</button>
+              <button type="button" id="pub2result_fail" onclick="setResult('pub2','不合格')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#f1f5f9;color:#64748b;cursor:pointer">不合格</button>
+            </div>
+            <input type="hidden" id="pub2result" value="-">
+          </div>
+          <!-- 進学先 -->
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:4px">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:5px">進学先</div>
+            <input type="checkbox" id="pub2enroll" style="width:18px;height:18px;cursor:pointer;accent-color:#1a56a0">
+          </div>
+        </div></div>
       </div>
       <div style="background:#f0f4ff;border-radius:10px;padding:12px;margin-bottom:10px">
         <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:8px">第3志望</div>
         <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">高校名</label><input id="pub3name" type="text" placeholder="例：菊里高校" style="background:#fff"></div>
         <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">学科・コース</label><input id="pub3dept" type="text" placeholder="例：普通科" style="background:#fff"></div>
-        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><select id="pub3result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%;background:#fff"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><div style="display:flex;gap:6px;margin-top:4px">
+          <!-- 入試区分 -->
+          <div style="flex:1">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px">入試</div>
+            <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
+              <button type="button" id="pub3type_none" onclick="setExamType('pub3','')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#e2e8f0;color:#475569;cursor:pointer;font-weight:700">ー</button>
+              <button type="button" id="pub3type_ippan" onclick="setExamType('pub3','一般')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">一般</button>
+              <button type="button" id="pub3type_suisen" onclick="setExamType('pub3','推薦')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">推薦</button>
+            </div>
+            <input type="hidden" id="pub3type" value="">
+          </div>
+          <!-- 合否 -->
+          <div style="flex:1.5">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px">合否</div>
+            <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
+              <button type="button" id="pub3result_none" onclick="setResult('pub3','-')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#f1f5f9;color:#64748b;cursor:pointer">ー</button>
+              <button type="button" id="pub3result_pass" onclick="setResult('pub3','合格')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">合格</button>
+              <button type="button" id="pub3result_fail" onclick="setResult('pub3','不合格')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#f1f5f9;color:#64748b;cursor:pointer">不合格</button>
+            </div>
+            <input type="hidden" id="pub3result" value="-">
+          </div>
+          <!-- 進学先 -->
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:4px">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:5px">進学先</div>
+            <input type="checkbox" id="pub3enroll" style="width:18px;height:18px;cursor:pointer;accent-color:#1a56a0">
+          </div>
+        </div></div>
       </div>
 
       <div style="font-weight:700;color:#1e293b;margin:16px 0 10px;font-size:.85rem">📌 私立高校</div>
@@ -345,19 +423,97 @@ tr:hover td{background:var(--primary-lt)}
         <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:8px">第1志望</div>
         <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">高校名</label><input id="pri1name" type="text" placeholder="例：中京大中京高校" style="background:#fff"></div>
         <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">学科・コース</label><input id="pri1dept" type="text" placeholder="例：特進コース" style="background:#fff"></div>
-        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><select id="pri1result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%;background:#fff"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><div style="display:flex;gap:6px;margin-top:4px">
+          <!-- 入試区分 -->
+          <div style="flex:1">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px">入試</div>
+            <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
+              <button type="button" id="pri1type_none" onclick="setExamType('pri1','')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#e2e8f0;color:#475569;cursor:pointer;font-weight:700">ー</button>
+              <button type="button" id="pri1type_ippan" onclick="setExamType('pri1','一般')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">一般</button>
+              <button type="button" id="pri1type_suisen" onclick="setExamType('pri1','推薦')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">推薦</button>
+            </div>
+            <input type="hidden" id="pri1type" value="">
+          </div>
+          <!-- 合否 -->
+          <div style="flex:1.5">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px">合否</div>
+            <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
+              <button type="button" id="pri1result_none" onclick="setResult('pri1','-')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#f1f5f9;color:#64748b;cursor:pointer">ー</button>
+              <button type="button" id="pri1result_pass" onclick="setResult('pri1','合格')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">合格</button>
+              <button type="button" id="pri1result_fail" onclick="setResult('pri1','不合格')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#f1f5f9;color:#64748b;cursor:pointer">不合格</button>
+            </div>
+            <input type="hidden" id="pri1result" value="-">
+          </div>
+          <!-- 進学先 -->
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:4px">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:5px">進学先</div>
+            <input type="checkbox" id="pri1enroll" style="width:18px;height:18px;cursor:pointer;accent-color:#1a56a0">
+          </div>
+        </div></div>
       </div>
       <div style="background:#fffbf0;border-radius:10px;padding:12px;margin-bottom:10px">
         <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:8px">第2志望</div>
         <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">高校名</label><input id="pri2name" type="text" placeholder="例：東邦高校" style="background:#fff"></div>
         <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">学科・コース</label><input id="pri2dept" type="text" placeholder="例：普通科" style="background:#fff"></div>
-        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><select id="pri2result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%;background:#fff"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><div style="display:flex;gap:6px;margin-top:4px">
+          <!-- 入試区分 -->
+          <div style="flex:1">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px">入試</div>
+            <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
+              <button type="button" id="pri2type_none" onclick="setExamType('pri2','')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#e2e8f0;color:#475569;cursor:pointer;font-weight:700">ー</button>
+              <button type="button" id="pri2type_ippan" onclick="setExamType('pri2','一般')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">一般</button>
+              <button type="button" id="pri2type_suisen" onclick="setExamType('pri2','推薦')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">推薦</button>
+            </div>
+            <input type="hidden" id="pri2type" value="">
+          </div>
+          <!-- 合否 -->
+          <div style="flex:1.5">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px">合否</div>
+            <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
+              <button type="button" id="pri2result_none" onclick="setResult('pri2','-')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#f1f5f9;color:#64748b;cursor:pointer">ー</button>
+              <button type="button" id="pri2result_pass" onclick="setResult('pri2','合格')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">合格</button>
+              <button type="button" id="pri2result_fail" onclick="setResult('pri2','不合格')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#f1f5f9;color:#64748b;cursor:pointer">不合格</button>
+            </div>
+            <input type="hidden" id="pri2result" value="-">
+          </div>
+          <!-- 進学先 -->
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:4px">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:5px">進学先</div>
+            <input type="checkbox" id="pri2enroll" style="width:18px;height:18px;cursor:pointer;accent-color:#1a56a0">
+          </div>
+        </div></div>
       </div>
       <div style="background:#fffbf0;border-radius:10px;padding:12px;margin-bottom:10px">
         <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:8px">第3志望</div>
         <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">高校名</label><input id="pri3name" type="text" placeholder="例：名城大附属高校" style="background:#fff"></div>
         <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">学科・コース</label><input id="pri3dept" type="text" placeholder="例：普通科" style="background:#fff"></div>
-        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><select id="pri3result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%;background:#fff"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><div style="display:flex;gap:6px;margin-top:4px">
+          <!-- 入試区分 -->
+          <div style="flex:1">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px">入試</div>
+            <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
+              <button type="button" id="pri3type_none" onclick="setExamType('pri3','')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#e2e8f0;color:#475569;cursor:pointer;font-weight:700">ー</button>
+              <button type="button" id="pri3type_ippan" onclick="setExamType('pri3','一般')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">一般</button>
+              <button type="button" id="pri3type_suisen" onclick="setExamType('pri3','推薦')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">推薦</button>
+            </div>
+            <input type="hidden" id="pri3type" value="">
+          </div>
+          <!-- 合否 -->
+          <div style="flex:1.5">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:3px">合否</div>
+            <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
+              <button type="button" id="pri3result_none" onclick="setResult('pri3','-')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#f1f5f9;color:#64748b;cursor:pointer">ー</button>
+              <button type="button" id="pri3result_pass" onclick="setResult('pri3','合格')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;background:#f1f5f9;color:#64748b;cursor:pointer">合格</button>
+              <button type="button" id="pri3result_fail" onclick="setResult('pri3','不合格')" style="flex:1;padding:8px 2px;font-size:.78rem;border:none;background:#f1f5f9;color:#64748b;cursor:pointer">不合格</button>
+            </div>
+            <input type="hidden" id="pri3result" value="-">
+          </div>
+          <!-- 進学先 -->
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding-bottom:4px">
+            <div style="font-size:.68rem;color:#94a3b8;margin-bottom:5px">進学先</div>
+            <input type="checkbox" id="pri3enroll" style="width:18px;height:18px;cursor:pointer;accent-color:#1a56a0">
+          </div>
+        </div></div>
       </div>
 
       <div id="wishUpdatedAt" style="font-size:.72rem;color:#94a3b8;margin-top:8px;text-align:right"></div>
@@ -1478,10 +1634,30 @@ function renderWishSummary(w) {
   box.style.display = 'block';
 }
 
-function updateResultColor(sel) {
-  sel.style.color = sel.value === '合格' ? '#10b981' : sel.value === '不合格' ? '#ef4444' : '#94a3b8';
-  sel.style.fontWeight = sel.value !== '-' ? '700' : '400';
+function setResult(key, value) {
+  document.getElementById(key + 'result').value = value;
+  const n = document.getElementById(key + 'result_none');
+  const p = document.getElementById(key + 'result_pass');
+  const f = document.getElementById(key + 'result_fail');
+  [n,p,f].forEach(b => { if(b){ b.style.background='#f1f5f9'; b.style.color='#64748b'; b.style.fontWeight='400'; }});
+  if (value === '-'    && n) { n.style.background='#e2e8f0'; n.style.color='#475569'; n.style.fontWeight='700'; }
+  if (value === '合格' && p) { p.style.background='#dcfce7'; p.style.color='#10b981'; p.style.fontWeight='700'; }
+  if (value === '不合格' && f) { f.style.background='#fee2e2'; f.style.color='#ef4444'; f.style.fontWeight='700'; }
 }
+
+function setExamType(key, value) {
+  const el = document.getElementById(key + 'type');
+  if (el) el.value = value;
+  const n = document.getElementById(key + 'type_none');
+  const i = document.getElementById(key + 'type_ippan');
+  const s = document.getElementById(key + 'type_suisen');
+  const cur = value;
+  if (n) { n.style.background = cur==='' ? '#e2e8f0' : '#f1f5f9'; n.style.color = cur==='' ? '#475569' : '#64748b'; n.style.fontWeight = cur==='' ? '700' : '400'; }
+  if (i) { i.style.background = cur==='一般' ? '#dbeafe' : '#f1f5f9'; i.style.color = cur==='一般' ? '#1a56a0' : '#64748b'; i.style.fontWeight = cur==='一般' ? '700' : '400'; }
+  if (s) { s.style.background = cur==='推薦' ? '#dbeafe' : '#f1f5f9'; s.style.color = cur==='推薦' ? '#1a56a0' : '#64748b'; s.style.fontWeight = cur==='推薦' ? '700' : '400'; }
+}
+
+function updateResultColor(sel) {} // 互換性のため残す
 
 async function loadWish() {
   try {
@@ -1497,7 +1673,10 @@ async function loadWish() {
     const r = w.results || {};
     ['pub1','pub2','pub3','pri1','pri2','pri3'].forEach(key => {
       const el = document.getElementById(key + 'result');
-      if (el) { el.value = r[key] || '-'; updateResultColor(el); }
+      setResult(key, r[key] || '-');
+      setExamType(key, r[key+'type'] || '');
+      const enEl = document.getElementById(key + 'enroll');
+      if (enEl) enEl.checked = r[key+'enroll'] || false;
     });
     const upEl = document.getElementById('wishUpdatedAt');
     if (upEl && w.updatedAt) upEl.textContent = '最終更新: ' + w.updatedAt;
@@ -1511,11 +1690,15 @@ async function saveWish() {
     const el = document.getElementById(id);
     data[id] = el ? el.value.trim() : '';
   });
-  // 合否も保存
+  // 合否・入試区分・進学先も保存
   const results = {};
   ['pub1','pub2','pub3','pri1','pri2','pri3'].forEach(key => {
-    const el = document.getElementById(key + 'result');
-    if (el) results[key] = el.value;
+    const r = document.getElementById(key + 'result');
+    const t = document.getElementById(key + 'type');
+    const e = document.getElementById(key + 'enroll');
+    results[key] = r ? r.value : '-';
+    results[key+'type'] = t ? t.value : '';
+    results[key+'enroll'] = e ? e.checked : false;
   });
   data.results = JSON.stringify(results);
   const msg = document.getElementById('wishMsg');
