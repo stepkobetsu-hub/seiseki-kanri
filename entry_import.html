@@ -37,8 +37,8 @@ textarea{width:100%;min-height:120px;border:1px solid #d8e0ea;border-radius:8px;
     </div>
     <div id="queue" class="queue"></div>
     <div class="row" style="margin-top:12px">
-      <button id="readBtn" class="btn primary" onclick="startRead()">一括で読み取る</button>
-      <button id="saveBtn" class="btn success" onclick="saveAll()" disabled>読み取り結果を保存</button>
+      <button id="readBtn" class="btn primary" onclick="startRead()">読み取り</button>
+      <button id="saveBtn" class="btn success" onclick="saveAll()" disabled>成績管理にアップロード</button>
       <button id="editBtn" class="btn" onclick="toggleEdit()" disabled>編集</button>
     </div>
     <div id="msg" class="msg" style="margin-top:10px"></div>
@@ -94,7 +94,7 @@ async function startRead(){
   }
   $('readBtn').disabled=false;$('saveBtn').disabled=!results.some(r=>r && !r.error && r.studentId);
   $('editBtn').disabled=$('saveBtn').disabled;
-  say('読み取りが終わりました。内容は管理画面で確認できます。保存する場合は「読み取り結果を保存」を押してください。','ok');
+  say('読み取りが終わりました。内容は管理画面で確認できます。保存する場合は「成績管理にアップロード」を押してください。','ok');
 }
 
 async function readEntrySheets(files){
