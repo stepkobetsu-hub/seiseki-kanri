@@ -807,7 +807,9 @@ function saveEntrySheetData(data) {
   const row = buildEntryInfoRow_(data, student, now, now);
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]) === String(data.studentId)) {
+      mergeEntryInfoRow_(row, rows[i]);
       row[17] = rows[i][17] || now;
+      row[18] = now;
       sh.getRange(i + 1, 1, 1, row.length).setValues([row]);
       return { success: true, message: '入塾時情報を更新しました' };
     }
@@ -860,6 +862,14 @@ function buildEntryInfoRow_(d, student, created, updated) {
     JSON.stringify(d.family || []), d.familyRequest || '', d.signatureDate || '', d.signatureName || '',
     d.imageUrl1 || '', d.imageUrl2 || '', d.ocrMemo || '', created, updated
   ];
+}
+
+function mergeEntryInfoRow_(next, prev) {
+  for (let i = 5; i <= 16; i++) {
+    if ((next[i] === '' || next[i] == null || next[i] === '[]') && prev[i] !== '' && prev[i] != null) {
+      next[i] = prev[i];
+    }
+  }
 }
 
 function rowToEntryInfo(r) {

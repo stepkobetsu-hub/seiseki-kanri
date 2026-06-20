@@ -645,6 +645,7 @@ tr:hover td{background:#f8fafc}
     <h3 id="entryInfoTitle" style="margin-bottom:12px">入塾時情報</h3>
     <div id="entryInfoModalBody" style="font-size:.84rem;color:#334155;line-height:1.7"></div>
     <div class="modalFoot" style="margin-top:16px">
+      <button class="btn btn-primary btn-sm" onclick="editCurrentEntryInfo()">編集する</button>
       <button class="btn btn-ghost btn-sm" onclick="closeEntryInfoModal()">閉じる</button>
     </div>
   </div>
@@ -674,6 +675,7 @@ let cmpDiffChartInst = null;
 let reportChartInst = null;
 let cmpScoreData = [];
 let cmpRpData = [];
+let currentEntryInfoStudentId = '';
 
 function getNendo(date) {
   const d = date || new Date();
@@ -918,35 +920,36 @@ function buildEntryPayload() {
   } else if (Array.isArray(extra.family)) {
     family = extra.family;
   }
+  const pick = (id, key) => entryVal(id) || extra[key] || '';
   return Object.assign({}, extra, {
     action: 'importEntrySheet',
     studentId: entryVal('entryStudentId') || extra.studentId,
     name: entryVal('entryName') || extra.name,
-    guardian1Name: entryVal('entryG1Name'),
-    guardian1Kana: entryVal('entryG1Kana'),
-    guardian1Relation: entryVal('entryG1Relation'),
-    guardian1Mobile: entryVal('entryG1Mobile'),
-    guardian1Email: entryVal('entryG1Email'),
-    postalCode: entryVal('entryPostalCode'),
-    prefecture: entryVal('entryPrefecture'),
-    city: entryVal('entryCity'),
-    addressLine: entryVal('entryAddressLine'),
-    guardian2Name: entryVal('entryG2Name'),
-    guardian2Kana: entryVal('entryG2Kana'),
-    guardian2Relation: entryVal('entryG2Relation'),
-    guardian2Mobile: entryVal('entryG2Mobile'),
-    guardian2Email: entryVal('entryG2Email'),
-    homePhone: entryVal('entryHomePhone'),
-    club: entryVal('entryClub'),
-    nickname: entryVal('entryNickname'),
-    commuteMethod: entryVal('entryCommute'),
-    signatureDate: entryVal('entrySignatureDate'),
-    signatureName: entryVal('entrySignatureName'),
-    imageUrl1: entryVal('entryImageUrl1'),
-    imageUrl2: entryVal('entryImageUrl2'),
-    currentLessons: entryVal('entryCurrentLessons'),
-    pastLessons: entryVal('entryPastLessons'),
-    familyRequest: entryVal('entryFamilyRequest'),
+    guardian1Name: pick('entryG1Name', 'guardian1Name'),
+    guardian1Kana: pick('entryG1Kana', 'guardian1Kana'),
+    guardian1Relation: pick('entryG1Relation', 'guardian1Relation'),
+    guardian1Mobile: pick('entryG1Mobile', 'guardian1Mobile'),
+    guardian1Email: pick('entryG1Email', 'guardian1Email'),
+    postalCode: pick('entryPostalCode', 'postalCode'),
+    prefecture: pick('entryPrefecture', 'prefecture'),
+    city: pick('entryCity', 'city'),
+    addressLine: pick('entryAddressLine', 'addressLine'),
+    guardian2Name: pick('entryG2Name', 'guardian2Name'),
+    guardian2Kana: pick('entryG2Kana', 'guardian2Kana'),
+    guardian2Relation: pick('entryG2Relation', 'guardian2Relation'),
+    guardian2Mobile: pick('entryG2Mobile', 'guardian2Mobile'),
+    guardian2Email: pick('entryG2Email', 'guardian2Email'),
+    homePhone: pick('entryHomePhone', 'homePhone'),
+    club: pick('entryClub', 'club'),
+    nickname: pick('entryNickname', 'nickname'),
+    commuteMethod: pick('entryCommute', 'commuteMethod'),
+    signatureDate: pick('entrySignatureDate', 'signatureDate'),
+    signatureName: pick('entrySignatureName', 'signatureName'),
+    imageUrl1: pick('entryImageUrl1', 'imageUrl1'),
+    imageUrl2: pick('entryImageUrl2', 'imageUrl2'),
+    currentLessons: pick('entryCurrentLessons', 'currentLessons'),
+    pastLessons: pick('entryPastLessons', 'pastLessons'),
+    familyRequest: pick('entryFamilyRequest', 'familyRequest'),
     family
   });
 }
@@ -1768,6 +1771,7 @@ async function openEntryInfoModal() {
   const body = document.getElementById('entryInfoModalBody');
   const title = document.getElementById('entryInfoTitle');
   if (!sid) { toast('生徒を選択してください'); return; }
+  currentEntryInfoStudentId = sid;
   const st = students.find(s => String(s.id) === String(sid)) || {};
   title.textContent = `入塾時情報：${st.name || sid}`;
   body.innerHTML = '<div style="color:#64748b">読み込み中...</div>';
@@ -1816,6 +1820,18 @@ async function openEntryInfoModal() {
 
 function closeEntryInfoModal() {
   document.getElementById('entryInfoModal').classList.remove('show');
+}
+
+async function editCurrentEntryInfo() {
+  const sid = currentEntryInfoStudentId || document.getElementById('cmpStudent')?.value;
+  if (!sid) return;
+  closeEntryInfoModal();
+  const entryBtn = [...document.querySelectorAll('.sideItem')].find(el => el.getAttribute('onclick')?.includes("'entry'"));
+  if (entryBtn) aNav('entry', entryBtn);
+  const st = students.find(s => String(s.id) === String(sid)) || {};
+  setEntryVal('entryStudentId', sid);
+  setEntryVal('entryName', st.name || '');
+  await loadEntryData();
 }
 const CMP_SUBS = [
   { key:'jpn',    label:'国語',    color:'#6366f1', avgKey:'avg_jpn' },
