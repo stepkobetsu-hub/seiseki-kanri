@@ -879,6 +879,11 @@ function parseEntryJson() {
 function fillEntryFromJson() {
   try {
     const d = parseEntryJson();
+    if (Array.isArray(d)) {
+      setEntryVal('entryFamilyJson', JSON.stringify(d, null, 2));
+      document.getElementById('entryImportMsg').textContent = '家族情報JSONをフォームへ反映しました。内容を確認して取り込んでください。';
+      return;
+    }
     const map = {
       studentId:'entryStudentId', name:'entryName',
       guardian1Name:'entryG1Name', guardian1Kana:'entryG1Kana', guardian1Relation:'entryG1Relation',
@@ -907,6 +912,11 @@ function buildEntryPayload() {
   if (familyRaw) {
     try { family = JSON.parse(familyRaw); }
     catch(e) { throw new Error('家族情報JSONの形式を確認してください: ' + e.message); }
+  } else if (Array.isArray(extra)) {
+    family = extra;
+    extra = {};
+  } else if (Array.isArray(extra.family)) {
+    family = extra.family;
   }
   return Object.assign({}, extra, {
     action: 'importEntrySheet',
