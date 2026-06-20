@@ -586,6 +586,7 @@ let students = [];
 let allScores = [];
 let allReports = [];
 let pendingSync = null;
+const TABS = ['speed','compare','students','schools','report','wish','sync','settings'];
 // タブ履歴管理（グローバル宣言）
 let _navHist = [];
 let _navIdx = -1;
@@ -674,8 +675,6 @@ function logout() {
 })();
 
 // ===== NAV =====
-const TABS = ['speed','compare','students','schools','report','wish','sync','settings'];
-
 function getInitialAdminTab() {
   const tab = (location.hash || '').replace(/^#/, '');
   return TABS.includes(tab) ? tab : 'speed';
