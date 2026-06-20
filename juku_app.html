@@ -320,31 +320,45 @@ tr:hover td{background:var(--primary-lt)}
       <div class="cardHead">🏫 志望校</div>
       <div style="font-size:.78rem;color:#64748b;margin-bottom:12px">入力した志望校は先生にも共有されます</div>
 
-      <div style="font-weight:700;color:#1e293b;margin-bottom:8px;font-size:.85rem">📌 公立高校</div>
-      <div class="fld"><label>第1志望 高校名</label><input id="pub1name" type="text" placeholder="例：南山高校"></div>
-      <div class="fld"><label>第1志望 学科・コース</label><input id="pub1dept" type="text" placeholder="例：普通科"></div>
-      <div class="fld"><label>第1志望 合否</label><select id="pub1result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+      <div style="font-weight:700;color:#1e293b;margin-bottom:10px;font-size:.85rem">📌 公立高校</div>
+      <div style="background:#f0f4ff;border-radius:10px;padding:12px;margin-bottom:10px">
+        <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:8px">第1志望</div>
+        <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">高校名</label><input id="pub1name" type="text" placeholder="例：南山高校" style="background:#fff"></div>
+        <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">学科・コース</label><input id="pub1dept" type="text" placeholder="例：普通科" style="background:#fff"></div>
+        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><select id="pub1result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%;background:#fff"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+      </div>
+      <div style="background:#f0f4ff;border-radius:10px;padding:12px;margin-bottom:10px">
+        <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:8px">第2志望</div>
+        <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">高校名</label><input id="pub2name" type="text" placeholder="例：瑞陵高校" style="background:#fff"></div>
+        <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">学科・コース</label><input id="pub2dept" type="text" placeholder="例：普通科" style="background:#fff"></div>
+        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><select id="pub2result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%;background:#fff"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+      </div>
+      <div style="background:#f0f4ff;border-radius:10px;padding:12px;margin-bottom:10px">
+        <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:8px">第3志望</div>
+        <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">高校名</label><input id="pub3name" type="text" placeholder="例：菊里高校" style="background:#fff"></div>
+        <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">学科・コース</label><input id="pub3dept" type="text" placeholder="例：普通科" style="background:#fff"></div>
+        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><select id="pub3result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%;background:#fff"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+      </div>
 
-      <div class="fld"><label>第2志望 高校名</label><input id="pub2name" type="text" placeholder="例：瑞陵高校"></div>
-      <div class="fld"><label>第2志望 学科・コース</label><input id="pub2dept" type="text" placeholder="例：普通科"></div>
-      <div class="fld"><label>第2志望 合否</label><select id="pub2result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
-
-      <div class="fld"><label>第3志望 高校名</label><input id="pub3name" type="text" placeholder="例：菊里高校"></div>
-      <div class="fld"><label>第3志望 学科・コース</label><input id="pub3dept" type="text" placeholder="例：普通科"></div>
-      <div class="fld"><label>第3志望 合否</label><select id="pub3result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
-
-      <div style="font-weight:700;color:#1e293b;margin:16px 0 8px;font-size:.85rem">📌 私立高校</div>
-      <div class="fld"><label>第1志望 高校名</label><input id="pri1name" type="text" placeholder="例：中京大中京高校"></div>
-      <div class="fld"><label>第1志望 学科・コース</label><input id="pri1dept" type="text" placeholder="例：特進コース"></div>
-      <div class="fld"><label>第1志望 合否</label><select id="pri1result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
-
-      <div class="fld"><label>第2志望 高校名</label><input id="pri2name" type="text" placeholder="例：東邦高校"></div>
-      <div class="fld"><label>第2志望 学科・コース</label><input id="pri2dept" type="text" placeholder="例：普通科"></div>
-      <div class="fld"><label>第2志望 合否</label><select id="pri2result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
-
-      <div class="fld"><label>第3志望 高校名</label><input id="pri3name" type="text" placeholder="例：名城大附属高校"></div>
-      <div class="fld"><label>第3志望 学科・コース</label><input id="pri3dept" type="text" placeholder="例：普通科"></div>
-      <div class="fld"><label>第3志望 合否</label><select id="pri3result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+      <div style="font-weight:700;color:#1e293b;margin:16px 0 10px;font-size:.85rem">📌 私立高校</div>
+      <div style="background:#fffbf0;border-radius:10px;padding:12px;margin-bottom:10px">
+        <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:8px">第1志望</div>
+        <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">高校名</label><input id="pri1name" type="text" placeholder="例：中京大中京高校" style="background:#fff"></div>
+        <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">学科・コース</label><input id="pri1dept" type="text" placeholder="例：特進コース" style="background:#fff"></div>
+        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><select id="pri1result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%;background:#fff"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+      </div>
+      <div style="background:#fffbf0;border-radius:10px;padding:12px;margin-bottom:10px">
+        <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:8px">第2志望</div>
+        <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">高校名</label><input id="pri2name" type="text" placeholder="例：東邦高校" style="background:#fff"></div>
+        <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">学科・コース</label><input id="pri2dept" type="text" placeholder="例：普通科" style="background:#fff"></div>
+        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><select id="pri2result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%;background:#fff"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+      </div>
+      <div style="background:#fffbf0;border-radius:10px;padding:12px;margin-bottom:10px">
+        <div style="font-size:.78rem;font-weight:700;color:#475569;margin-bottom:8px">第3志望</div>
+        <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">高校名</label><input id="pri3name" type="text" placeholder="例：名城大附属高校" style="background:#fff"></div>
+        <div class="fld" style="margin-bottom:6px"><label style="font-size:.75rem">学科・コース</label><input id="pri3dept" type="text" placeholder="例：普通科" style="background:#fff"></div>
+        <div class="fld" style="margin-bottom:0"><label style="font-size:.75rem">合否</label><select id="pri3result" onchange="updateResultColor(this)" style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem;width:100%;background:#fff"><option value="-">-</option><option value="合格" style="color:#10b981">合格</option><option value="不合格" style="color:#ef4444">不合格</option></select></div>
+      </div>
 
       <div id="wishUpdatedAt" style="font-size:.72rem;color:#94a3b8;margin-top:8px;text-align:right"></div>
       <button class="btn btn-primary btn-full" onclick="saveWish()" style="margin-top:16px">💾 保存する</button>
