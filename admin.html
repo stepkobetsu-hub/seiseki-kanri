@@ -636,7 +636,7 @@ tr:hover td{background:#f8fafc}
     <h3 id="entryInfoTitle" style="margin-bottom:12px">入塾時情報</h3>
     <div id="entryInfoModalBody" style="font-size:.84rem;color:#334155;line-height:1.7"></div>
     <div class="modalFoot" style="margin-top:16px">
-      <button id="entryGuardian2Btn" class="btn btn-primary btn-sm" onclick="applyEntryGuardian2ToMaster()" style="display:none">保護者2を生徒マスタへ転記</button>
+      <button id="entryGuardian2Btn" class="btn btn-primary btn-sm" onclick="applyEntryGuardian2ToMaster()" style="display:none">保護者2（手書き追加分）を生徒マスタへ転記</button>
       <button class="btn btn-primary btn-sm" onclick="editCurrentEntryInfo()">編集する</button>
       <button class="btn btn-ghost btn-sm" onclick="closeEntryInfoModal()">閉じる</button>
     </div>
@@ -1760,6 +1760,11 @@ function entryInfoRow(label, value) {
   </div>`;
 }
 
+function formatEntryValue(value) {
+  if (value instanceof Date) return value.toLocaleDateString('ja-JP');
+  return value;
+}
+
 function parseEntryAiData(memo) {
   const s = String(memo || '');
   const marker = 'AI_JSON:';
@@ -1780,6 +1785,33 @@ function entrySmallTable(headers, rows) {
       <tbody>${rows.map(row => `<tr>${row.map(c => `<td>${htmlEsc(c || '')}</td>`).join('')}</tr>`).join('')}</tbody>
     </table>
   </div>`;
+}
+
+function renderEntryMasterInfo(info) {
+  if (!info || !Object.values(info).some(v => v !== '' && v != null)) return '';
+  const rows = [
+    ['☆マスタC列', info.colC],
+    ['校舎', info.campus],
+    ['生年月日', info.birthday],
+    ['学年', info.grade],
+    ['在学学校', info.school],
+    ['住所', info.address],
+    ['保護者1 続柄', info.guardian1Relation],
+    ['保護者1 携帯', info.guardian1Mobile],
+    ['保護者2 続柄', info.guardian2Relation],
+    ['保護者2 携帯', info.guardian2Mobile]
+  ].filter(r => r[1] !== '' && r[1] != null);
+  if (!rows.length) return '';
+  return `
+    <div style="margin-bottom:14px">
+      <div style="font-weight:800;color:#1e293b;margin-bottom:6px">生徒マスタ情報</div>
+      <div style="display:grid;grid-template-columns:130px 1fr;gap:0;border-top:1px solid #edf2f7">
+        ${rows.map(r => `
+          <div style="color:#64748b;font-weight:600;padding:7px 8px;border-bottom:1px solid #edf2f7;background:#f8fafc">${htmlEsc(r[0])}</div>
+          <div style="padding:7px 8px;border-bottom:1px solid #edf2f7;white-space:pre-wrap">${htmlEsc(r[1])}</div>
+        `).join('')}
+      </div>
+    </div>`;
 }
 
 function renderEntryAiSummary(ai) {
@@ -1808,8 +1840,8 @@ function renderEntryAiSummary(ai) {
     <div style="display:inline-flex;align-items:center;background:#fee2e2;color:#991b1b;border-radius:999px;padding:4px 10px;font-weight:800;margin-bottom:10px">NEW AI読取確認待ち</div>
     ${entryInfoRow('生徒番号', ai.studentId)}
     ${entryInfoRow('生徒氏名', ai.studentName)}
-    <div style="margin-top:12px;font-weight:800;color:#1e293b">保護者2（未転記）</div>
-    ${guardianRows.length ? entrySmallTable(['氏名','フリガナ','続柄','携帯','メール'], guardianRows) : '<div style="color:#94a3b8">保護者2情報は読み取れていません。</div>'}
+    <div style="margin-top:12px;font-weight:800;color:#1e293b">保護者2（手書き追加分・未転記）</div>
+    ${guardianRows.length ? entrySmallTable(['氏名','フリガナ','続柄','携帯','メール'], guardianRows) : '<div style="color:#94a3b8">保護者2（手書き追加分）は読み取れていません。</div>'}
     <div style="margin-top:12px;font-weight:800;color:#1e293b">入塾時情報</div>
     ${entryInfoRow('部活動', e.club)}
     ${entryInfoRow('現在通っている習い事や塾', e.currentLessons)}
@@ -1874,7 +1906,9 @@ async function openEntryInfoModal() {
     ? `<div style="display:inline-flex;align-items:center;background:#fee2e2;color:#991b1b;border-radius:999px;padding:4px 10px;font-weight:800;margin-bottom:10px">NEW 原本確認待ち</div>`
     : '';
   const aiHtml = renderEntryAiSummary(ai);
+  const masterInfoHtml = renderEntryMasterInfo(Object.assign({ colC: d.masterColumnC || '' }, d.masterInfo || {}));
   const normalHtml = `
+    ${masterInfoHtml}
     ${newBadge}
     ${entryInfoRow('状態メモ', d.ocrMemo)}
     ${entryInfoRow('部活動', d.club)}
@@ -1888,6 +1922,7 @@ async function openEntryInfoModal() {
     ${entryInfoRow('保護者署名氏名', d.signatureName)}
   `;
   const detailHtml = `
+    ${aiHtml ? masterInfoHtml : ''}
     ${aiHtml || normalHtml}
     ${(pdfLink || imageLinks) ? `<div style="margin-top:14px">${pdfLink}${pdfLink && imageLinks ? '　' : ''}${imageLinks}</div>` : ''}
   `.trim();
@@ -1903,9 +1938,9 @@ async function applyEntryGuardian2ToMaster() {
   const sid = currentEntryInfoStudentId || document.getElementById('cmpStudent')?.value;
   const g = currentEntryGuardian2 || {};
   if (!sid) { toast('生徒を選択してください'); return; }
-  if (!Object.values(g).some(Boolean)) { toast('転記できる保護者2情報がありません'); return; }
+  if (!Object.values(g).some(Boolean)) { toast('転記できる保護者2（手書き追加分）がありません'); return; }
   const ok = confirm(
-    '保護者2情報を生徒マスタ Z〜AD列へ転記します。\n\n' +
+    '保護者2（手書き追加分）を生徒マスタ Z〜AD列へ転記します。\n\n' +
     '氏名: ' + (g.name || '') + '\n' +
     'フリガナ: ' + (g.kana || '') + '\n' +
     '続柄: ' + (g.relation || '') + '\n' +
@@ -1924,7 +1959,7 @@ async function applyEntryGuardian2ToMaster() {
     guardian2Email: g.email || ''
   });
   if (!r.success) { toast(r.error || '転記に失敗しました'); return; }
-  toast('保護者2情報を生徒マスタへ転記しました');
+  toast('保護者2（手書き追加分）を生徒マスタへ転記しました');
 }
 
 async function editCurrentEntryInfo() {

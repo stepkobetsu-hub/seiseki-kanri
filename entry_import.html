@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>入塾書類AI読取</title>
+<title>エントリーシート読取</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f5f5f0;color:#2c2c2a;font-family:"Hiragino Kaku Gothic ProN","Meiryo",sans-serif}
 header{background:#fff;border-bottom:1px solid #e0dfd8;padding:14px 18px;font-weight:700;color:#1a56a0}
@@ -20,19 +20,26 @@ textarea{width:100%;min-height:120px;border:1px solid #d8e0ea;border-radius:8px;
 </style>
 </head>
 <body>
-<header>入塾書類AI読取</header>
+<header>エントリーシート読取</header>
 <main>
   <div class="card">
-    <h2>写真・PDFをアップロード</h2>
-    <p class="small">入塾時に提出された書類をAIで読み取り、同じ生徒番号の成績管理DBへ保存します。スマホでは修正しません。読み取り結果は管理画面で確認します。</p>
-    <div id="drop" onclick="fileInput.click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
-      クリックまたはドラッグして画像/PDFを選択<br><b>エントリーシートと成績・志望校シートをまとめて選択できます</b>
+    <h2>表面・裏面をアップロード</h2>
+    <p class="small">表面だけでも読み取れます。裏面に中学生成績・志望校がある場合は、裏面も選んでから下のボタンを1回押してください。</p>
+    <div class="row">
+      <div style="flex:1;min-width:260px">
+        <label class="small">表面用（エントリーシート）</label>
+        <input id="frontInput" type="file" accept="image/*,.pdf" onchange="setSideFile('front', this.files[0])">
+      </div>
+      <div style="flex:1;min-width:260px">
+        <label class="small">裏面用（成績・志望校）</label>
+        <input id="backInput" type="file" accept="image/*,.pdf" onchange="setSideFile('back', this.files[0])">
+      </div>
     </div>
-    <input id="fileInput" type="file" accept="image/*,.pdf" multiple style="display:none" onchange="addFiles(this.files)">
     <div id="queue" class="queue"></div>
     <div class="row" style="margin-top:12px">
-      <button id="readBtn" class="btn primary" onclick="startRead()">AIで読み取る</button>
+      <button id="readBtn" class="btn primary" onclick="startRead()">一括で読み取る</button>
       <button id="saveBtn" class="btn success" onclick="saveAll()" disabled>読み取り結果を保存</button>
+      <button id="editBtn" class="btn" onclick="toggleEdit()" disabled>編集</button>
     </div>
     <div id="msg" class="msg" style="margin-top:10px"></div>
   </div>
@@ -41,7 +48,7 @@ textarea{width:100%;min-height:120px;border:1px solid #d8e0ea;border-radius:8px;
     <h2>読み取り結果</h2>
     <div class="tableWrap">
       <table>
-        <thead><tr><th>#</th><th>生徒番号</th><th>氏名</th><th>部活</th><th>家族</th><th>保護者2</th><th>成績/志望校</th><th>状態</th></tr></thead>
+        <thead><tr><th>#</th><th>生徒番号</th><th>氏名</th><th>部活</th><th>家族</th><th>保護者2（手書き追加分）</th><th>成績/志望校</th><th>状態</th></tr></thead>
         <tbody id="tbody"></tbody>
       </table>
     </div>
@@ -56,15 +63,25 @@ textarea{width:100%;min-height:120px;border:1px solid #d8e0ea;border-radius:8px;
 <script>
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 const AI_API = 'https://juku-card-system.onrender.com/api/read-card';
+let sideFiles = { front:null, back:null };
 let fileGroups = [];
 let results = [];
+let editMode = false;
 
 function $(id){return document.getElementById(id)}
 function say(t, cls){$('msg').className='msg '+(cls||'');$('msg').textContent=t}
 async function api(data){const r=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(data)});return await r.json()}
-function handleDrop(e){e.preventDefault();$('drop').classList.remove('drag');addFiles(e.dataTransfer.files)}
-function addFiles(files){fileGroups=[{files:[...files],status:'待機中',data:null,error:''}];renderQueue();$('saveBtn').disabled=true;results=[];renderResults()}
-function renderQueue(){const q=$('queue');q.innerHTML=fileGroups.map((g,i)=>`<div class="q"><span>${g.files.map(f=>f.name).join(' / ')}</span><span class="badge ${g.status==='完了'?'done':g.status==='エラー'?'err':g.status==='読み取り中'?'doing':''}">${g.status}</span></div>`).join('')}
+function handleDrop(e){e.preventDefault()}
+function setSideFile(side,file){sideFiles[side]=file||null;makeGroupFromSides()}
+function makeGroupFromSides(){
+  const files=[
+    sideFiles.front ? { side:'front', label:'表面', file:sideFiles.front } : null,
+    sideFiles.back ? { side:'back', label:'裏面', file:sideFiles.back } : null
+  ].filter(Boolean);
+  fileGroups=files.length?[{files,status:'待機中',data:null,error:''}]:[];
+  renderQueue();$('saveBtn').disabled=true;$('editBtn').disabled=true;results=[];renderResults();
+}
+function renderQueue(){const q=$('queue');q.innerHTML=fileGroups.map((g,i)=>`<div class="q"><span>${g.files.map(x=>x.label+': '+x.file.name).join(' / ')}</span><span class="badge ${g.status==='完了'?'done':g.status==='エラー'?'err':g.status==='読み取り中'?'doing':''}">${g.status}</span></div>`).join('')}
 
 async function startRead(){
   if(!fileGroups.length){say('先に画像またはPDFを選択してください','err');return}
@@ -76,12 +93,15 @@ async function startRead(){
     renderQueue();renderResults();
   }
   $('readBtn').disabled=false;$('saveBtn').disabled=!results.some(r=>r && !r.error && r.studentId);
+  $('editBtn').disabled=$('saveBtn').disabled;
   say('読み取りが終わりました。内容は管理画面で確認できます。保存する場合は「読み取り結果を保存」を押してください。','ok');
 }
 
 async function readEntrySheets(files){
   const content=[];
-  for(const file of files){
+  for(const item of files){
+    const file = item.file;
+    content.push({type:'text',text:`次のファイルは${item.label}です。${item.side === 'front' ? 'エントリーシート表面として読んでください。' : '中学生成績・志望校シート裏面として読んでください。左側が定期テスト、右側が通知表です。'}`});
     content.push({type:file.type.startsWith('image/')?'image':'document',source:{type:'base64',media_type:file.type,data:await toBase64(file)}});
   }
   content.push({type:'text',text:`これは個別指導Stepの入塾書類です。エントリーシートと中学生成績シートが含まれる場合があります。
@@ -90,9 +110,13 @@ async function readEntrySheets(files){
 重要:
 - 生徒番号は「生徒番号:」欄の番号です。記入日や西暦2026を生徒番号にしないでください。
 - 手書きが読みにくい場合は空欄でよいです。
-- 保護者2は右側上部の保護者欄です。これはまだ生徒マスタへ転記せず、確認用に保存します。
+- 保護者2（手書き追加分）は右側上部の手書き保護者欄です。これはまだ生徒マスタへ転記せず、確認用に保存します。
 - 保護者署名欄より下の、部活動、習い事、通塾方法、ニックネーム、家族情報、要望を重視してください。
-- 成績シートがある場合は定期テスト、通知表、志望校を読み取ってください。
+- 裏面の成績シートがある場合、左側は定期テスト、右側は通知表です。定期テストはscoresへ、通知表はreportsへ必ず分けてください。
+- 定期テストの「1回、2回...」はtermに数字で入れてください。通知表の「1学期、2学期、3学期」はsemesterに入れてください。
+- 成績表の左端にある「1年・2年・3年」を必ずgradeへ入れてください。例: 1年、2年。
+- 年度が紙にない場合、yearは空欄でよいです。保存時に現在学年から自動判定します。
+- 科目順は定期テストが 国語・社会・数学・理科・英語、通知表が 国語・社会・数学・理科・英語・音楽・美術・保健体育・技術家庭 です。
 
 {
  "studentId":"",
@@ -124,6 +148,24 @@ function normalizeResult(d){
   d.scores=Array.isArray(d.scores)?d.scores:[];
   d.reports=Array.isArray(d.reports)?d.reports:[];
   d.wish=d.wish||{};
+  d.scores=d.scores.map((s,idx)=>normalizeScore(s,idx)).filter(s=>['jpn','soc','math','sci','eng','total5'].some(k=>s[k]!==''&&s[k]!=null));
+  d.reports=d.reports.map((r,idx)=>normalizeReport(r,idx)).filter(r=>['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech'].some(k=>r[k]!==''&&r[k]!=null));
+}
+
+function normalizeScore(s,idx){
+  s=s||{};
+  const year=String(s.year||'').replace(/[^\d]/g,'')||'2026';
+  const term=String(s.term||s.testNo||s.round||idx+1).replace(/[^\d]/g,'')||String(idx+1);
+  return Object.assign({},s,{year,term});
+}
+
+function normalizeReport(r,idx){
+  r=r||{};
+  const year=String(r.year||'').replace(/[^\d]/g,'')||'2026';
+  let semester=String(r.semester||r.term||'').trim();
+  if(!semester) semester=(idx+1)+'学期';
+  if(/^\d$/.test(semester)) semester=semester+'学期';
+  return Object.assign({},r,{year,semester});
 }
 
 function renderResults(){
@@ -136,13 +178,31 @@ function renderResults(){
     const e=r.entryInfo||{};
     const gw=[g.name,g.relation,g.mobile,g.email].filter(Boolean).join('<br>');
     const score=[(r.scores||[]).length?'定期:'+r.scores.length:'',(r.reports||[]).length?'通知表:'+r.reports.length:'',r.wish&&Object.values(r.wish).some(Boolean)?'志望校あり':''].filter(Boolean).join('<br>');
+    if(editMode){
+      return `<tr><td>${i+1}</td><td><input value="${esc(r.studentId||'')}" onchange="results[${i}].studentId=this.value"></td><td><input value="${esc(r.studentName||'')}" onchange="results[${i}].studentName=this.value"></td><td><input value="${esc(e.club||'')}" onchange="results[${i}].entryInfo.club=this.value"></td><td>${fam}</td><td>${esc(gw)}</td><td>${esc(score)}</td><td>${r.studentId?'保存待ち':'生徒番号なし'}</td></tr>`;
+    }
     return `<tr><td>${i+1}</td><td><b>${esc(r.studentId||'')}</b></td><td>${esc(r.studentName||'')}</td><td>${esc(e.club||'')}</td><td>${fam}</td><td>${esc(gw)}</td><td>${esc(score)}</td><td>${r.studentId?'保存待ち':'生徒番号なし'}</td></tr>`;
   }).join('');
   $('jsonBox').value=JSON.stringify(results,null,2);
   $('resultCard').classList.toggle('hidden',results.length===0);
 }
 
+function toggleEdit(){
+  editMode=!editMode;
+  $('editBtn').textContent=editMode?'編集終了':'編集';
+  $('jsonBox').readOnly=!editMode;
+  if(!editMode){
+    try{results=JSON.parse($('jsonBox').value);results.forEach(r=>r&&!r.error&&normalizeResult(r));}
+    catch(e){say('AI JSONの形式が正しくありません: '+e.message,'err');editMode=true;$('editBtn').textContent='編集終了';$('jsonBox').readOnly=false;return}
+  }
+  renderResults();
+}
+
 async function saveAll(){
+  if(editMode){
+    try{results=JSON.parse($('jsonBox').value);results.forEach(r=>r&&!r.error&&normalizeResult(r));editMode=false;$('editBtn').textContent='編集';$('jsonBox').readOnly=true;renderResults();}
+    catch(e){say('AI JSONの形式が正しくありません: '+e.message,'err');return}
+  }
   let ok=0, ng=0;
   $('saveBtn').disabled=true;
   for(const r of results){
@@ -191,26 +251,28 @@ function buildPayload(r,pdfUrl,imageUrls){
 }
 
 async function uploadImages(studentId,files){
-  const urls=[];
-  for(let i=0;i<Math.min(files.length,2);i++){
-    if(!files[i].type.startsWith('image/'))continue;
-    const res=await api({action:'uploadEntryImage',studentId,name:'',label:i===0?'entry_sheet':'grade_sheet',imageData:await resizeImage(files[i])});
-    if(res.success)urls.push(res.url);
+  const urls={front:'',back:''};
+  for(const item of files){
+    const file=item.file;
+    if(!file.type.startsWith('image/'))continue;
+    const res=await api({action:'uploadEntryImage',studentId,name:'',label:item.side==='front'?'entry_front':'entry_back',imageData:await resizeImage(file)});
+    if(res.success)urls[item.side]=res.url;
   }
-  return urls;
+  return [urls.front, urls.back];
 }
 
 async function uploadPdf(studentId,files){
-  const pdfFile=files.find(f=>f.type==='application/pdf');
+  const pdfFile=files.find(x=>x.file.type==='application/pdf');
   if(pdfFile){
-    const res=await api({action:'uploadEntryPdf',studentId,name:'',pdfData:'data:application/pdf;base64,'+await toBase64(pdfFile)});
+    const res=await api({action:'uploadEntryPdf',studentId,name:'',pdfData:'data:application/pdf;base64,'+await toBase64(pdfFile.file)});
     return res.success?res.url:'';
   }
   if(!window.jspdf||!window.jspdf.jsPDF)return '';
   const {jsPDF}=window.jspdf;
   const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   let pages=0;
-  for(const file of files){
+  for(const item of files){
+    const file=item.file;
     if(!file.type.startsWith('image/'))continue;
     if(pages>0)pdf.addPage();
     const imgData=await resizeImage(file);

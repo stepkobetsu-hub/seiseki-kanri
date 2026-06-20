@@ -768,11 +768,11 @@ const ENTRY_INFO_COLS = [
 ];
 
 const ENTRY_MASTER_MAP = {
-  guardian2Name: 26,      // Z
-  guardian2Kana: 27,      // AA
-  guardian2Relation: 28,  // AB
-  guardian2Email: 29,     // AC
-  guardian2Mobile: 30     // AD
+  guardian2Name: 27,      // AA
+  guardian2Kana: 28,      // AB
+  guardian2Relation: 29,  // AC
+  guardian2Email: 30,     // AD
+  guardian2Mobile: 31     // AE
 };
 
 function getEntrySheetData(data) {
@@ -780,10 +780,13 @@ function getEntrySheetData(data) {
   const rows = sh.getDataRange().getValues();
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]) === String(data.studentId)) {
-      return { success: true, data: rowToEntryInfo(rows[i]) };
+      const info = rowToEntryInfo(rows[i]);
+      info.masterInfo = getEntryMasterInfo_(data.studentId);
+      return { success: true, data: info };
     }
   }
-  return { success: true, data: null };
+  const masterInfo = getEntryMasterInfo_(data.studentId);
+  return { success: true, data: hasEntryMasterInfo_(masterInfo) ? { studentId: data.studentId, masterInfo } : null };
 }
 
 function saveEntrySheetData(data) {
@@ -810,36 +813,105 @@ function saveEntrySheetData(data) {
 function importEntrySheet(data) {
   const student = resolveEntryStudent_(data);
 
-  const result = { success: true, saved: [] };
+  const result = { success: true, saved: [], errors: [] };
   const entryResult = saveEntrySheetData(Object.assign({}, data, student));
   if (!entryResult.success) return entryResult;
   result.saved.push('entryInfo');
   if (entryResult.masterUpdated === false) result.masterUpdated = false;
 
-  (data.scores || []).forEach(s => {
-    saveScore(Object.assign({}, s, {
+  const scores = normalizeEntryScores_(data.scores || [], student);
+  scores.forEach(s => {
+    const r = saveScore(Object.assign({}, s, {
       studentId: student.id, name: student.name, campus: student.campus,
       grade: s.grade || student.grade, school: s.school || student.school
     }));
+    if (!r.success) result.errors.push('定期テスト: ' + (r.error || '保存失敗'));
   });
-  if (data.scores && data.scores.length) result.saved.push('scores');
+  if (scores.length) result.saved.push('scores');
 
-  (data.reports || []).forEach(r => {
-    saveReport(Object.assign({}, r, {
+  const reports = normalizeEntryReports_(data.reports || [], student);
+  reports.forEach(rp => {
+    const r = saveReport(Object.assign({}, rp, {
       studentId: student.id, name: student.name, campus: student.campus,
-      grade: r.grade || student.grade, school: r.school || student.school
+      grade: rp.grade || student.grade, school: rp.school || student.school
     }));
+    if (!r.success) result.errors.push('通知表: ' + (r.error || '保存失敗'));
   });
-  if (data.reports && data.reports.length) result.saved.push('reports');
+  if (reports.length) result.saved.push('reports');
 
-  if (data.wish) {
+  if (data.wish && Object.keys(data.wish).some(k => data.wish[k] !== '' && data.wish[k] != null)) {
     saveWish(Object.assign({}, data.wish, { studentId: student.id }));
     result.saved.push('wish');
   }
 
   result.message = '入塾書類データを取り込みました';
   if (result.masterUpdated === false) result.warning = '生徒マスタ元ファイルに同じ生徒IDが見つからなかったため、右側保護者欄は生徒マスタへ反映していません。成績管理側には保存しました。';
+  if (result.errors.length) result.warning = (result.warning ? result.warning + '\n' : '') + result.errors.join('\n');
   return result;
+}
+
+function normalizeEntryScores_(scores, student) {
+  return (scores || []).map((s, idx) => {
+    s = s || {};
+    const paperGradeNo = extractGradeNumber_(s.grade || s.schoolGrade || s.rowGrade);
+    const year = normalizeYearByGrade_(s.year, paperGradeNo, student);
+    const term = normalizeNumberText_(s.term || s.testNo || s.round) || String(idx + 1);
+    const row = Object.assign({}, s, { year, term });
+    if (paperGradeNo) row.grade = gradeLabelFromNumber_(paperGradeNo, student.grade);
+    if (!row.total5) {
+      const total = ['jpn','soc','math','sci','eng'].reduce((sum, k) => sum + (Number(row[k]) || 0), 0);
+      if (total) row.total5 = total;
+    }
+    return row;
+  }).filter(s => ['jpn','soc','math','sci','eng','total5'].some(k => s[k] !== '' && s[k] != null));
+}
+
+function normalizeEntryReports_(reports, student) {
+  return (reports || []).map((r, idx) => {
+    r = r || {};
+    const paperGradeNo = extractGradeNumber_(r.grade || r.schoolGrade || r.rowGrade);
+    const year = normalizeYearByGrade_(r.year, paperGradeNo, student);
+    let semester = String(r.semester || r.term || '').trim();
+    if (!semester) semester = (idx + 1) + '学期';
+    if (/^\d$/.test(semester)) semester += '学期';
+    const row = Object.assign({}, r, { year, semester });
+    if (paperGradeNo) row.grade = gradeLabelFromNumber_(paperGradeNo, student.grade);
+    return row;
+  }).filter(r => ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech'].some(k => r[k] !== '' && r[k] != null));
+}
+
+function normalizeYearByGrade_(v, paperGradeNo, student) {
+  const y = normalizeNumberText_(v);
+  if (y) return y;
+  const currentYear = getAcademicYear_(new Date());
+  const currentGradeNo = extractGradeNumber_(student && student.grade);
+  if (paperGradeNo && currentGradeNo) {
+    return String(currentYear - (currentGradeNo - paperGradeNo));
+  }
+  return String(currentYear);
+}
+
+function normalizeNumberText_(v) {
+  return String(v || '').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)).replace(/[^\d]/g, '');
+}
+
+function getAcademicYear_(date) {
+  const d = date || new Date();
+  const y = d.getFullYear();
+  return d.getMonth() + 1 >= 4 ? y : y - 1;
+}
+
+function extractGradeNumber_(v) {
+  const s = String(v || '').replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+  const m = s.match(/[中小高]?\s*([1-6])\s*(年|$)/) || s.match(/([1-6])/);
+  return m ? Number(m[1]) : 0;
+}
+
+function gradeLabelFromNumber_(n, currentGrade) {
+  const s = String(currentGrade || '');
+  if (s.indexOf('小') >= 0) return '小' + n;
+  if (s.indexOf('高') >= 0) return '高' + n;
+  return '中' + n;
 }
 
 function applyEntryGuardian2ToMaster(data) {
@@ -858,12 +930,12 @@ function applyEntryGuardian2ToMaster(data) {
   };
 
   if (!payload.guardian2Name && !payload.guardian2Kana && !payload.guardian2Relation && !payload.guardian2Mobile && !payload.guardian2Email) {
-    return { success: false, error: '転記できる保護者2情報がありません' };
+    return { success: false, error: '転記できる保護者2（手書き追加分）がありません' };
   }
 
   const updated = updateMasterGuardianInfo_(payload);
   if (!updated) return { success: false, error: '生徒マスタ元ファイルに同じ生徒IDが見つかりませんでした' };
-  return { success: true, message: '保護者2情報を生徒マスタへ転記しました', guardian2: payload };
+  return { success: true, message: '保護者2（手書き追加分）を生徒マスタへ転記しました', guardian2: payload };
 }
 
 function buildEntryInfoRow_(d, student, created, updated) {
@@ -927,6 +999,49 @@ function updateMasterGuardianInfo_(data) {
     }
   });
   return true;
+}
+
+function getEntryMasterInfo_(studentId) {
+  const empty = {
+    colC:'',
+    campus:'',
+    birthday:'',
+    grade:'',
+    school:'',
+    address:'',
+    guardian1Relation:'',
+    guardian1Mobile:'',
+    guardian2Relation:'',
+    guardian2Mobile:''
+  };
+  if (!studentId) return empty;
+  try {
+    const ss = SpreadsheetApp.openById(MASTER_SPREADSHEET_ID);
+    const sh = ss.getSheetByName(MASTER_SHEET_NAME) || ss.getSheetByName('☆マスタ');
+    if (!sh) return empty;
+    const rows = sh.getDataRange().getValues();
+    for (let i = 1; i < rows.length; i++) {
+      if (String(rows[i][0]) === String(studentId)) {
+        return {
+          colC: rows[i][2] || '',                    // C
+          campus: rows[i][7] || '',                  // H
+          birthday: rows[i][8] || '',                // I
+          grade: rows[i][9] || '',                   // J
+          school: rows[i][15] || '',                 // P
+          guardian1Relation: rows[i][18] || '',      // S
+          guardian1Mobile: rows[i][24] || '',        // Y
+          address: [rows[i][21] || '', rows[i][22] || ''].filter(String).join(''), // V + W
+          guardian2Relation: rows[i][28] || '',      // AC
+          guardian2Mobile: rows[i][30] || ''         // AE
+        };
+      }
+    }
+  } catch(e) {}
+  return empty;
+}
+
+function hasEntryMasterInfo_(info) {
+  return !!(info && Object.keys(info).some(k => info[k] !== '' && info[k] != null));
 }
 
 function findStudentById_(studentId) {
