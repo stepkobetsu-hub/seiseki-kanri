@@ -973,9 +973,10 @@ async function saveEntryImport() {
   try {
     const payload = buildEntryPayload();
     if (!payload.studentId || !payload.name) throw new Error('生徒IDと氏名を入力してください。');
+    if (!confirm('生徒ID: ' + payload.studentId + '\n氏名: ' + payload.name + '\n\nこの生徒として取り込みます。\n間違いがあれば「キャンセル」を押して、画面の欄を修正してください。')) return;
     msg.textContent = '取り込み中...';
     const r = await api(payload);
-    msg.textContent = r.success ? (r.message + '（' + (r.saved || []).join(', ') + '）') : (r.error || '取り込みに失敗しました');
+    msg.textContent = r.success ? (r.message + '（' + (r.saved || []).join(', ') + '）' + (r.warning ? ' ' + r.warning : '')) : (r.error || '取り込みに失敗しました');
   } catch(e) {
     msg.textContent = e.message;
   }

@@ -38,7 +38,7 @@ textarea{min-height:82px;resize:vertical;font-family:inherit}
       <div><label>生徒ID</label><input id="studentId" inputmode="numeric" placeholder="例: 1000"></div>
       <div><label>生徒氏名</label><input id="studentName" placeholder="例: 大野智子"></div>
     </div>
-    <p class="small">生徒IDと氏名が一致しない場合は保存されません。</p>
+    <p class="small">取り込み前に確認します。間違いがあれば、その場で各欄を直してから保存できます。</p>
   </div>
 
   <div class="card">
@@ -59,6 +59,7 @@ textarea{min-height:82px;resize:vertical;font-family:inherit}
 
   <div class="card">
     <div class="head">生徒マスタへ反映する右側保護者欄（Z〜AD列）</div>
+    <p class="small">読み取り結果が入る欄です。違っているところだけ直してください。左側保護者欄や住所は上書きしません。</p>
     <div class="grid">
       <div><label>右 保護者氏名</label><input id="guardian2Name"></div>
       <div><label>右 フリガナ</label><input id="guardian2Kana"></div>
@@ -70,6 +71,7 @@ textarea{min-height:82px;resize:vertical;font-family:inherit}
 
   <div class="card">
     <div class="head">保護者署名欄より下の情報</div>
+    <p class="small">部活・習い事・家族情報・ご家庭からの要望など、管理画面の「入塾時情報」で見るための欄です。</p>
     <div class="grid">
       <div><label>部活動</label><input id="club"></div>
       <div><label>ニックネーム</label><input id="nickname"></div>
@@ -91,6 +93,7 @@ textarea{min-height:82px;resize:vertical;font-family:inherit}
     </div>
     <div style="margin-top:10px">
       <label>家族情報JSON</label>
+      <p class="small">通常は読み取り結果から入ります。手直しが必要な時だけ編集してください。</p>
       <textarea id="familyJson" class="json" placeholder='[{"name":"加瀬俊介","relation":"父","job":"社長","workplace":"個別指導ステップ","grade":""}]'></textarea>
     </div>
   </div>
@@ -99,8 +102,8 @@ textarea{min-height:82px;resize:vertical;font-family:inherit}
     <div class="head">OCR結果JSON / 成績・通知表・志望校</div>
     <textarea id="entryJson" class="json" placeholder='{"scores":[{"year":2026,"term":1,"jpn":58,"soc":77,"math":66,"sci":55,"eng":44,"total5":300}],"reports":[{"year":2026,"semester":"1学期","rp_jpn":5,"rp_soc":5,"rp_math":5,"rp_sci":5,"rp_eng":5}],"wish":{"pub1name":"春日井高校","pub1dept":"ふつう"}}'></textarea>
     <div class="row" style="margin-top:10px">
-      <button class="btn ghost" onclick="fillFromJson()">JSONをフォームへ反映</button>
-      <button class="btn primary" onclick="submitEntry()">画像保存して取り込む</button>
+      <button class="btn ghost" onclick="fillFromJson()">読み取り結果を各欄に入れる</button>
+      <button class="btn primary" onclick="submitEntry()">確認して取り込む</button>
     </div>
     <div id="msg" class="msg" style="margin-top:10px"></div>
   </div>
@@ -279,6 +282,7 @@ function buildPayload(imageUrl1, imageUrl2, pdfUrl) {
 async function submitEntry() {
   try {
     if (!v('studentId') || !v('studentName')) { msg('生徒IDと氏名を入力してください。', 'err'); return; }
+    if (!confirm('生徒ID: ' + v('studentId') + '\n氏名: ' + v('studentName') + '\n\nこの生徒として取り込みます。\n間違いがあれば「キャンセル」を押して、画面の欄を修正してください。')) return;
     const pdfUrl = await uploadPdf();
     const imageUrl1 = await uploadImage('image1', 'entry_sheet');
     const imageUrl2 = await uploadImage('image2', 'grade_sheet');
@@ -286,7 +290,7 @@ async function submitEntry() {
     const payload = buildPayload(imageUrl1, imageUrl2, pdfUrl);
     const r = await api(payload);
     if (!r.success) { msg(r.error || '取り込みに失敗しました。', 'err'); return; }
-    msg((r.message || '取り込みました') + '（' + (r.saved || []).join(', ') + '）', 'ok');
+    msg((r.message || '取り込みました') + '（' + (r.saved || []).join(', ') + '）' + (r.warning ? '\n' + r.warning : ''), 'ok');
   } catch(e) {
     msg(e.message, 'err');
   }

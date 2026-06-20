@@ -786,14 +786,10 @@ function getEntrySheetData(data) {
 }
 
 function saveEntrySheetData(data) {
-  const student = findStudentById_(data.studentId);
-  if (!student) return { success: false, error: '生徒IDが見つかりません: ' + data.studentId };
-  if (data.name && normalizeName_(data.name) !== normalizeName_(student.name)) {
-    return { success: false, error: '生徒IDと氏名が一致しません。マスタ: ' + student.name + ' / 入力: ' + data.name };
-  }
+  const student = resolveEntryStudent_(data);
 
   const now = new Date().toLocaleString('ja-JP');
-  updateMasterGuardianInfo_(data);
+  const masterUpdated = updateMasterGuardianInfo_(data);
   const sh = getOrCreateSheet('入塾時情報データ', ENTRY_INFO_COLS);
   const rows = sh.getDataRange().getValues();
   const row = buildEntryInfoRow_(data, student, now, now);
@@ -803,24 +799,21 @@ function saveEntrySheetData(data) {
       row[18] = rows[i][18] || now;
       row[19] = now;
       sh.getRange(i + 1, 1, 1, row.length).setValues([row]);
-      return { success: true, message: '入塾時情報を更新しました' };
+      return { success: true, message: '入塾時情報を更新しました', masterUpdated };
     }
   }
   sh.appendRow(row);
-  return { success: true, message: '入塾時情報を保存しました' };
+  return { success: true, message: '入塾時情報を保存しました', masterUpdated };
 }
 
 function importEntrySheet(data) {
-  const student = findStudentById_(data.studentId);
-  if (!student) return { success: false, error: '生徒IDが見つかりません: ' + data.studentId };
-  if (data.name && normalizeName_(data.name) !== normalizeName_(student.name)) {
-    return { success: false, error: '生徒IDと氏名が一致しません。マスタ: ' + student.name + ' / 入力: ' + data.name };
-  }
+  const student = resolveEntryStudent_(data);
 
   const result = { success: true, saved: [] };
   const entryResult = saveEntrySheetData(Object.assign({}, data, student));
   if (!entryResult.success) return entryResult;
   result.saved.push('entryInfo');
+  if (entryResult.masterUpdated === false) result.masterUpdated = false;
 
   (data.scores || []).forEach(s => {
     saveScore(Object.assign({}, s, {
@@ -844,6 +837,7 @@ function importEntrySheet(data) {
   }
 
   result.message = '入塾書類データを取り込みました';
+  if (result.masterUpdated === false) result.warning = '生徒マスタ元ファイルに同じ生徒IDが見つからなかったため、右側保護者欄は生徒マスタへ反映していません。成績管理側には保存しました。';
   return result;
 }
 
@@ -888,13 +882,14 @@ function updateMasterGuardianInfo_(data) {
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]) === String(data.studentId)) { rowNo = i + 1; break; }
   }
-  if (!rowNo) throw new Error('生徒マスタに生徒IDが見つかりません: ' + data.studentId);
+  if (!rowNo) return false;
 
   Object.keys(ENTRY_MASTER_MAP).forEach(key => {
     if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
       sh.getRange(rowNo, ENTRY_MASTER_MAP[key]).setValue(data[key]);
     }
   });
+  return true;
 }
 
 function findStudentById_(studentId) {
@@ -906,6 +901,26 @@ function findStudentById_(studentId) {
     }
   }
   return null;
+}
+
+function resolveEntryStudent_(data) {
+  const found = findStudentById_(data.studentId);
+  if (found) {
+    return {
+      id: found.id,
+      name: data.name || found.name,
+      campus: data.campus || found.campus,
+      grade: data.grade || found.grade,
+      school: data.school || found.school
+    };
+  }
+  return {
+    id: data.studentId,
+    name: data.name || '',
+    campus: data.campus || '',
+    grade: data.grade || '',
+    school: data.school || ''
+  };
 }
 
 function normalizeName_(s) {
