@@ -437,6 +437,9 @@ tr:hover td{background:#f8fafc}
       <div class="card">
         <div class="cardHead">📒 通知表一覧</div>
         <div class="filterRow">
+          <div class="searchWrap">
+            <input type="text" id="rpASearch" placeholder="名前・IDで検索" oninput="filterAdminReport()">
+          </div>
           <select id="rpAYear"></select>
           <select id="rpASemester">
             <option value="">全学期</option>
@@ -493,9 +496,9 @@ tr:hover td{background:#f8fafc}
           <select id="wishGrade" onchange="filterWishStudents()">
             <option value="">全学年</option><option>中1</option><option>中2</option><option>中3</option>
           </select>
-          <select id="wishStudent" onchange="loadAllWishes()" style="min-width:160px">
-            <option value="">生徒を選択（全員）</option>
-          </select>
+          <div class="searchWrap">
+            <input type="text" id="wishSearch" placeholder="名前・IDで検索" oninput="filterWishStudents()">
+          </div>
         </div>
         <div style="overflow-x:auto">
           <table style="font-size:.75rem;width:100%;border-collapse:collapse">
@@ -634,11 +637,19 @@ function showMain() {
   document.getElementById('mainHeader').style.display = 'flex';
   document.getElementById('mainLayout').style.display = 'flex';
   initYearSelects();
+  const initialTab = getInitialAdminTab();
   _navHist.length = 0;
-  _navHist.push('speed');
+  _navHist.push(initialTab);
   _navIdx = 0;
   _updateNavBtns();
-  loadSpeed();
+  const el = [...document.querySelectorAll('.sideItem')].find(e => e.getAttribute('onclick')?.includes("'" + initialTab + "'"));
+  if (el) {
+    _navSkip = true;
+    aNav(initialTab, el);
+    _navSkip = false;
+  } else {
+    loadSpeed();
+  }
 }
 function logout() {
   sessionStorage.removeItem('adminLoggedIn');
@@ -664,6 +675,11 @@ function logout() {
 
 // ===== NAV =====
 const TABS = ['speed','compare','students','schools','report','wish','sync','settings'];
+
+function getInitialAdminTab() {
+  const tab = (location.hash || '').replace(/^#/, '');
+  return TABS.includes(tab) ? tab : 'speed';
+}
 
 function navToSpeed() {
   const speedBtn = [...document.querySelectorAll('.sideItem')].find(el => el.getAttribute('onclick')?.includes("'speed'"));
@@ -735,6 +751,7 @@ function aNav(name, el) {
   document.getElementById('aTab_' + name).style.display = 'block';
   document.querySelectorAll('.sideItem').forEach(s => s.classList.remove('on'));
   el.classList.add('on');
+  if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
   if (name === 'speed') loadSpeed();
   if (name === 'students') loadStudents();
   if (name === 'schools') loadSchools();
@@ -1191,22 +1208,19 @@ let _allWishes = [];
 async function filterWishStudents() {
   const campus = document.getElementById('wishCampus').value;
   const grade  = document.getElementById('wishGrade').value;
-  const sel = document.getElementById('wishStudent');
-  const prev = sel.value;
+  const q = (document.getElementById('wishSearch')?.value || '').trim().toLowerCase();
   const filtered = _allWishes.filter(w =>
     (!campus || w.campus === campus) &&
-    (!grade || w.grade === grade)
+    (!grade || w.grade === grade) &&
+    (!q || String(w.name || '').toLowerCase().includes(q) || String(w.studentId || '').toLowerCase().includes(q))
   );
-  sel.innerHTML = '<option value="">生徒を選択（全員）</option>' +
-    filtered.map(w => `<option value="${w.studentId}">${w.name}（${w.grade}）</option>`).join('');
-  if (prev && filtered.find(w => String(w.studentId) === prev)) sel.value = prev;
   renderWishTable(filtered);
 }
 
 async function loadAllWishes() {
   const campus = document.getElementById('wishCampus').value;
   const grade  = document.getElementById('wishGrade').value;
-  const sid    = document.getElementById('wishStudent')?.value;
+  const q = (document.getElementById('wishSearch')?.value || '').trim().toLowerCase();
   if (_allWishes.length === 0) {
     const r = await api({ action: 'getAllWishes' });
     _allWishes = r.wishes || [];
@@ -1215,9 +1229,9 @@ async function loadAllWishes() {
   }
   let wishes = _allWishes.filter(w =>
     (!campus || w.campus === campus) &&
-    (!grade  || w.grade  === grade)
+    (!grade  || w.grade  === grade) &&
+    (!q || String(w.name || '').toLowerCase().includes(q) || String(w.studentId || '').toLowerCase().includes(q))
   );
-  if (sid) wishes = wishes.filter(w => String(w.studentId) === sid);
   renderWishTable(wishes);
 }
 
@@ -1321,9 +1335,27 @@ async function loadAdminReport() {
   const grade = document.getElementById('rpAGrade').value;
   const r = await api({ action: 'getAllReports', year, semester, campus, grade });
   allReports = r.data || [];
+  filterAdminReport();
+}
+function filterAdminReport() {
+  const q = (document.getElementById('rpASearch')?.value || '').trim().toLowerCase();
+  const reports = q
+    ? allReports.filter(d => String(d.name || '').toLowerCase().includes(q) || String(d.studentId || '').toLowerCase().includes(q))
+    : allReports;
+  renderAdminReport(reports);
+}
+function renderAdminReport(reports) {
   const tbody = document.getElementById('rpABody');
-  if (!allReports.length) { tbody.innerHTML = '<tr><td colspan="14" class="noData">データなし</td></tr>'; return; }
-  tbody.innerHTML = allReports.map(d => `
+  if (!reports.length) {
+    tbody.innerHTML = '<tr><td colspan="14" class="noData">データなし</td></tr>';
+    document.getElementById('rpAStudent').innerHTML = '<option value="">生徒を選択</option>';
+    if (reportChartInst) {
+      reportChartInst.destroy();
+      reportChartInst = null;
+    }
+    return;
+  }
+  tbody.innerHTML = reports.map(d => `
     <tr>
       <td style="text-align:left;font-weight:600">${d.name}</td>
       <td>${d.grade}</td><td>${d.school}</td><td>${d.semester}</td>
@@ -1332,12 +1364,18 @@ async function loadAdminReport() {
       <td>${rpRating(d.rp_mus)}</td><td>${rpRating(d.rp_art)}</td>
       <td>${rpRating(d.rp_pe)}</td><td>${rpRating(d.rp_tech)}</td>
     </tr>`).join('');
-  const names = [...new Set(allReports.map(d => d.studentId + '|' + d.name + '|' + d.grade))];
+  const names = [...new Set(reports.map(d => d.studentId + '|' + d.name + '|' + d.grade))];
   const sel = document.getElementById('rpAStudent');
+  const prev = sel.value;
   sel.innerHTML = '<option value="">生徒を選択</option>' + names.map(n => {
     const [id, name, grade] = n.split('|');
-    return `<option value="${id}">${name}（${grade}）</option>`;
+    return `<option value="${id}">${name}（${grade} / ${id}）</option>`;
   }).join('');
+  if (prev && reports.some(d => String(d.studentId) === String(prev))) sel.value = prev;
+  else if (reportChartInst) {
+    reportChartInst.destroy();
+    reportChartInst = null;
+  }
 }
 function rpRating(v) {
   if (!v) return '<span style="color:var(--sub)">-</span>';
