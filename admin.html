@@ -1762,7 +1762,9 @@ function entryInfoRow(label, value) {
 
 function formatEntryValue(value) {
   if (value instanceof Date) return value.toLocaleDateString('ja-JP');
-  return value;
+  const s = String(value == null ? '' : value);
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0, 10);
+  return s;
 }
 
 function parseEntryAiData(memo) {
@@ -1789,17 +1791,22 @@ function entrySmallTable(headers, rows) {
 
 function renderEntryMasterInfo(info) {
   if (!info || !Object.values(info).some(v => v !== '' && v != null)) return '';
+  const guardianText = (relation, mobile) => `${relation ? `（${relation}）` : ''}${mobile || ''}`;
+  const guardianRows = [];
+  if (info.guardian1Relation || info.guardian1Mobile) {
+    guardianRows.push(['保護者1', guardianText(info.guardian1Relation, info.guardian1Mobile)]);
+  }
+  if (info.guardian2Relation || info.guardian2Mobile) {
+    guardianRows.push(['保護者2', guardianText(info.guardian2Relation, info.guardian2Mobile)]);
+  }
   const rows = [
-    ['☆マスタC列', info.colC],
+    ['入塾日', info.colC],
     ['校舎', info.campus],
     ['生年月日', info.birthday],
     ['学年', info.grade],
     ['在学学校', info.school],
     ['住所', info.address],
-    ['保護者1 続柄', info.guardian1Relation],
-    ['保護者1 携帯', info.guardian1Mobile],
-    ['保護者2 続柄', info.guardian2Relation],
-    ['保護者2 携帯', info.guardian2Mobile]
+    ...guardianRows
   ].filter(r => r[1] !== '' && r[1] != null);
   if (!rows.length) return '';
   return `
@@ -1808,7 +1815,7 @@ function renderEntryMasterInfo(info) {
       <div style="display:grid;grid-template-columns:130px 1fr;gap:0;border-top:1px solid #edf2f7">
         ${rows.map(r => `
           <div style="color:#64748b;font-weight:600;padding:7px 8px;border-bottom:1px solid #edf2f7;background:#f8fafc">${htmlEsc(r[0])}</div>
-          <div style="padding:7px 8px;border-bottom:1px solid #edf2f7;white-space:pre-wrap">${htmlEsc(r[1])}</div>
+          <div style="padding:7px 8px;border-bottom:1px solid #edf2f7;white-space:pre-wrap">${htmlEsc(formatEntryValue(r[1]))}</div>
         `).join('')}
       </div>
     </div>`;
@@ -1818,7 +1825,8 @@ function renderEntryAiSummary(ai) {
   if (!ai) return '';
   const e = ai.entryInfo || {};
   const g = ai.guardian2 || {};
-  const guardianRows = (g.name || g.kana || g.relation || g.mobile || g.email) ? [[g.name, g.kana, g.relation, g.mobile, g.email]] : [];
+  const guardianTransferred = !!ai.guardian2Applied;
+  const guardianRows = (!guardianTransferred && (g.name || g.kana || g.relation || g.mobile || g.email)) ? [[g.name, g.kana, g.relation, g.mobile, g.email]] : [];
   const familyRows = (ai.family || [])
     .filter(f => f.name || f.relation || f.job || f.workplace || f.grade)
     .map(f => [f.name, f.relation, f.job, f.workplace, f.grade]);
@@ -1837,11 +1845,13 @@ function renderEntryAiSummary(ai) {
   ].filter(r => r[1] || r[2]);
 
   return `
-    <div style="display:inline-flex;align-items:center;background:#fee2e2;color:#991b1b;border-radius:999px;padding:4px 10px;font-weight:800;margin-bottom:10px">NEW AI読取確認待ち</div>
+    ${guardianTransferred ? '' : '<div style="display:inline-flex;align-items:center;background:#fee2e2;color:#991b1b;border-radius:999px;padding:4px 10px;font-weight:800;margin-bottom:10px">NEW AI読取確認待ち</div>'}
     ${entryInfoRow('生徒番号', ai.studentId)}
     ${entryInfoRow('生徒氏名', ai.studentName)}
-    <div style="margin-top:12px;font-weight:800;color:#1e293b">保護者2（手書き追加分・未転記）</div>
-    ${guardianRows.length ? entrySmallTable(['氏名','フリガナ','続柄','携帯','メール'], guardianRows) : '<div style="color:#94a3b8">保護者2（手書き追加分）は読み取れていません。</div>'}
+    ${guardianTransferred ? '' : `
+      <div style="margin-top:12px;font-weight:800;color:#1e293b">保護者2（手書き追加分・未転記）</div>
+      ${guardianRows.length ? entrySmallTable(['氏名','フリガナ','続柄','携帯','メール'], guardianRows) : '<div style="color:#94a3b8">保護者2（手書き追加分）は読み取れていません。</div>'}
+    `}
     <div style="margin-top:12px;font-weight:800;color:#1e293b">入塾時情報</div>
     ${entryInfoRow('部活動', e.club)}
     ${entryInfoRow('現在通っている習い事や塾', e.currentLessons)}
@@ -1849,7 +1859,7 @@ function renderEntryAiSummary(ai) {
     ${entryInfoRow('通塾方法', e.commuteMethod)}
     ${entryInfoRow('ニックネーム', e.nickname)}
     ${entryInfoRow('ご家庭からの要望・希望', e.familyRequest)}
-    ${familyRows.length ? `<div style="margin-top:12px;font-weight:800;color:#1e293b">家族情報</div>${entrySmallTable(['氏名','続柄','職業','勤務先・学校名','学年'], familyRows)}` : ''}
+    ${familyRows.length ? `<div style="margin-top:12px;font-weight:800;color:#1e293b">家族情報（入塾日現在）</div>${entrySmallTable(['氏名','続柄','職業','勤務先・学校名','学年'], familyRows)}` : ''}
     ${scoreRows.length ? `<div style="margin-top:12px;font-weight:800;color:#1e293b">定期テスト</div>${entrySmallTable(['年度','学年','回','国','社','数','理','英','5計'], scoreRows)}` : ''}
     ${reportRows.length ? `<div style="margin-top:12px;font-weight:800;color:#1e293b">通知表</div>${entrySmallTable(['年度','学年','学期','国','社','数','理','英','音','美','体','技'], reportRows)}` : ''}
     ${wishRows.length ? `<div style="margin-top:12px;font-weight:800;color:#1e293b">志望校</div>${entrySmallTable(['区分','学校名','学科'], wishRows)}` : ''}
@@ -1891,7 +1901,7 @@ async function openEntryInfoModal() {
     return `<tr><td>${cells[0]}</td><td>${cells[1]}</td><td>${cells[2]}</td><td>${cells[3]}</td><td>${cells[4]}</td></tr>`;
   }).join('');
   const familyTable = familyRows ? `
-    <div style="margin-top:12px;font-weight:700;color:#1e293b">家族情報</div>
+    <div style="margin-top:12px;font-weight:700;color:#1e293b">家族情報（入塾日現在）</div>
     <div style="overflow-x:auto;margin-top:6px">
       <table style="font-size:.78rem">
         <thead><tr><th>氏名</th><th>続柄</th><th>職業</th><th>勤務先・学校名</th><th>学年</th></tr></thead>
@@ -1960,6 +1970,9 @@ async function applyEntryGuardian2ToMaster() {
   });
   if (!r.success) { toast(r.error || '転記に失敗しました'); return; }
   toast('保護者2（手書き追加分）を生徒マスタへ転記しました');
+  currentEntryGuardian2 = null;
+  document.getElementById('entryGuardian2Btn').style.display = 'none';
+  await openEntryInfoModal();
 }
 
 async function editCurrentEntryInfo() {

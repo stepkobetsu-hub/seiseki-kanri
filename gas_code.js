@@ -935,7 +935,25 @@ function applyEntryGuardian2ToMaster(data) {
 
   const updated = updateMasterGuardianInfo_(payload);
   if (!updated) return { success: false, error: '生徒マスタ元ファイルに同じ生徒IDが見つかりませんでした' };
+  markEntryGuardian2Applied_(data.studentId);
   return { success: true, message: '保護者2（手書き追加分）を生徒マスタへ転記しました', guardian2: payload };
+}
+
+function markEntryGuardian2Applied_(studentId) {
+  const sh = getOrCreateSheet('入塾時情報データ', ENTRY_INFO_COLS);
+  const rows = sh.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(studentId)) {
+      const memo = String(rows[i][16] || '');
+      const parsed = parseEntryOcrMemo_(memo);
+      if (Object.keys(parsed).length) {
+        parsed.guardian2Applied = true;
+        sh.getRange(i + 1, 17).setValue('AI_JSON:' + JSON.stringify(parsed));
+      }
+      sh.getRange(i + 1, 20).setValue(new Date().toLocaleString('ja-JP'));
+      return;
+    }
+  }
 }
 
 function buildEntryInfoRow_(d, student, created, updated) {
