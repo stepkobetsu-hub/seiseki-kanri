@@ -1,4 +1,4 @@
-// ===================================================
+﻿// ===================================================
 // 塾成績管理システム - Google Apps Script
 // ===================================================
 
@@ -95,6 +95,7 @@ function route(e) {
       case 'saveEntrySheetData':  result = saveEntrySheetData(data); break;
       case 'importEntrySheet':    result = importEntrySheet(data); break;
       case 'applyEntryGuardian2ToMaster': result = applyEntryGuardian2ToMaster(data); break;
+      case 'applyEntryAiReview': result = applyEntryAiReview(data); break;
       case 'uploadEntryImage':    result = uploadEntryImage(data); break;
       case 'uploadEntryPdf':      result = uploadEntryPdf(data); break;
       default: result = { success: false, error: '不明なアクション: ' + data.action };
@@ -819,26 +820,10 @@ function importEntrySheet(data) {
   result.saved.push('entryInfo');
   if (entryResult.masterUpdated === false) result.masterUpdated = false;
 
-  const scores = normalizeEntryScores_(data.scores || [], student);
-  scores.forEach(s => {
-    const r = saveScore(Object.assign({}, s, {
-      studentId: student.id, name: student.name, campus: student.campus,
-      grade: s.grade || student.grade, school: s.school || student.school
-    }));
-    if (!r.success) result.errors.push('定期テスト: ' + (r.error || '保存失敗'));
-  });
-  if (scores.length) result.saved.push('scores');
-
-  const reports = normalizeEntryReports_(data.reports || [], student);
-  reports.forEach(rp => {
-    const r = saveReport(Object.assign({}, rp, {
-      studentId: student.id, name: student.name, campus: student.campus,
-      grade: rp.grade || student.grade, school: rp.school || student.school
-    }));
-    if (!r.success) result.errors.push('通知表: ' + (r.error || '保存失敗'));
-  });
-  if (reports.length) result.saved.push('reports');
-
+  const pendingScores = normalizeEntryScores_(data.scores || [], student);
+  const pendingReports = normalizeEntryReports_(data.reports || [], student);
+  if (pendingScores.length) result.saved.push('scoresPending');
+  if (pendingReports.length) result.saved.push('reportsPending');
   if (data.wish && Object.keys(data.wish).some(k => data.wish[k] !== '' && data.wish[k] != null)) {
     saveWish(Object.assign({}, data.wish, { studentId: student.id }));
     result.saved.push('wish');
@@ -946,6 +931,81 @@ function applyEntryGuardian2ToMaster(data) {
   if (!updated) return { success: false, error: '生徒マスタ元ファイルに同じ生徒IDが見つかりませんでした' };
   markEntryGuardian2Applied_(data.studentId);
   return { success: true, message: '保護者2（手書き追加分）を生徒マスタへ転記しました', guardian2: payload };
+}
+
+function applyEntryAiReview(data) {
+  const info = getEntrySheetData(data);
+  if (!info.success || !info.data) return { success: false, error: '入塾時情報が見つかりません' };
+  const student = findStudentById_(data.studentId) || resolveEntryStudent_(Object.assign({}, data, info.data));
+  const parsed = parseEntryOcrMemo_(info.data.ocrMemo);
+  const result = { success: true, saved: [], errors: [] };
+
+  if (!parsed.guardian2Applied) {
+    const guardian2 = parsed.guardian2 || {};
+    const payload = {
+      studentId: student.id,
+      guardian2Name: guardian2.name || '',
+      guardian2Kana: guardian2.kana || '',
+      guardian2Relation: guardian2.relation || '',
+      guardian2Mobile: guardian2.mobile || '',
+      guardian2Email: guardian2.email || ''
+    };
+    if (payload.guardian2Name || payload.guardian2Kana || payload.guardian2Relation || payload.guardian2Mobile || payload.guardian2Email) {
+      if (updateMasterGuardianInfo_(payload)) {
+        result.saved.push('guardian2');
+        parsed.guardian2Applied = true;
+      } else {
+        result.errors.push('保護者2: 生徒マスタに同じ生徒IDが見つかりません');
+      }
+    } else {
+      parsed.guardian2Applied = true;
+    }
+  }
+
+  if (!parsed.scoresApplied) {
+    const scores = normalizeEntryScores_(parsed.scores || [], student);
+    scores.forEach(s => {
+      const r = saveScore(Object.assign({}, s, {
+        studentId: student.id, name: student.name, campus: student.campus,
+        grade: s.grade || student.grade, school: s.school || student.school
+      }));
+      if (!r.success) result.errors.push('定期テスト: ' + (r.error || '保存失敗'));
+    });
+    if (scores.length) result.saved.push('scores');
+    parsed.scoresApplied = true;
+  }
+
+  if (!parsed.reportsApplied) {
+    const reports = normalizeEntryReports_(parsed.reports || [], student);
+    reports.forEach(rp => {
+      const r = saveReport(Object.assign({}, rp, {
+        studentId: student.id, name: student.name, campus: student.campus,
+        grade: rp.grade || student.grade, school: rp.school || student.school
+      }));
+      if (!r.success) result.errors.push('通知表: ' + (r.error || '保存失敗'));
+    });
+    if (reports.length) result.saved.push('reports');
+    parsed.reportsApplied = true;
+  }
+
+  markEntryAiApplied_(student.id, parsed);
+  result.message = '入塾書類の確認済みデータを転記しました';
+  if (result.errors.length) result.warning = result.errors.join('\n');
+  return result;
+}
+
+function markEntryAiApplied_(studentId, parsed) {
+  const sh = getOrCreateSheet('入塾時情報データ', ENTRY_INFO_COLS);
+  const rows = sh.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(studentId)) {
+      if (Object.keys(parsed || {}).length) {
+        sh.getRange(i + 1, 17).setValue('AI_JSON:' + JSON.stringify(parsed));
+      }
+      sh.getRange(i + 1, 20).setValue(new Date().toLocaleString('ja-JP'));
+      return;
+    }
+  }
 }
 
 function markEntryGuardian2Applied_(studentId) {

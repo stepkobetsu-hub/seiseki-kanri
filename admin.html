@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -642,7 +642,7 @@ tr:hover td{background:#f8fafc}
     </div>
     <div id="entryInfoModalBody" style="font-size:.84rem;color:#334155;line-height:1.7"></div>
     <div class="modalFoot" style="margin-top:16px">
-      <button id="entryGuardian2Btn" class="btn btn-primary btn-sm" onclick="applyEntryGuardian2ToMaster()" style="display:none">保護者2（手書き追加分）を生徒マスタへ転記</button>
+      <button id="entryGuardian2Btn" class="btn btn-primary btn-sm" onclick="applyEntryAiReview()" style="display:none">保護者2・定期テスト・通知表を確認済みにして転記</button>
       <button class="btn btn-primary btn-sm" onclick="editCurrentEntryInfo()">編集する</button>
       <button class="btn btn-ghost btn-sm" onclick="closeEntryInfoModal()">閉じる</button>
     </div>
@@ -675,6 +675,7 @@ let cmpScoreData = [];
 let cmpRpData = [];
 let currentEntryInfoStudentId = '';
 let currentEntryGuardian2 = null;
+let currentEntryAiReview = null;
 
 function getNendo(date) {
   const d = date || new Date();
@@ -1855,19 +1856,28 @@ function isGuardian2Transferred(ai, masterInfo) {
   return false;
 }
 
+function hasEntryAiReviewPending(ai, masterInfo) {
+  if (!ai) return false;
+  const hasGuardian = !isGuardian2Transferred(ai, masterInfo);
+  const hasScores = !ai.scoresApplied && (ai.scores || []).some(s => Object.values(s || {}).some(Boolean));
+  const hasReports = !ai.reportsApplied && (ai.reports || []).some(r => Object.values(r || {}).some(Boolean));
+  return hasGuardian || hasScores || hasReports;
+}
+
 function renderEntryAiSummary(ai, masterInfo) {
   if (!ai) return '';
   const e = ai.entryInfo || {};
   const g = ai.guardian2 || {};
   const guardianTransferred = isGuardian2Transferred(ai, masterInfo);
+  const reviewPending = hasEntryAiReviewPending(ai, masterInfo);
   const guardianRows = (!guardianTransferred && (g.name || g.kana || g.relation || g.mobile || g.email)) ? [[g.name, g.kana, g.relation, g.mobile, g.email]] : [];
   const familyRows = (ai.family || [])
     .filter(f => f.name || f.relation || f.job || f.workplace || f.grade)
     .map(f => [f.name, f.relation, f.job, f.workplace, f.grade]);
-  const scoreRows = (ai.scores || [])
+  const scoreRows = ai.scoresApplied ? [] : (ai.scores || [])
     .filter(s => Object.values(s).some(Boolean))
     .map(s => [s.year, s.grade, s.term, s.jpn, s.soc, s.math, s.sci, s.eng, s.total5]);
-  const reportRows = (ai.reports || [])
+  const reportRows = ai.reportsApplied ? [] : (ai.reports || [])
     .filter(r => Object.values(r).some(Boolean))
     .map(r => [r.year, r.grade, r.semester, r.rp_jpn, r.rp_soc, r.rp_math, r.rp_sci, r.rp_eng, r.rp_mus, r.rp_art, r.rp_pe, r.rp_tech]);
   const wish = ai.wish || {};
@@ -1879,7 +1889,7 @@ function renderEntryAiSummary(ai, masterInfo) {
   ].filter(r => r[1] || r[2]);
 
   return `
-    ${guardianTransferred ? '' : '<div style="display:inline-flex;align-items:center;background:#fee2e2;color:#991b1b;border-radius:999px;padding:4px 10px;font-weight:800;margin-bottom:10px">AI読取確認待ち</div>'}
+    ${reviewPending ? '<div style="display:inline-flex;align-items:center;background:#fee2e2;color:#991b1b;border-radius:999px;padding:4px 10px;font-weight:800;margin-bottom:10px">AI読取確認待ち</div>' : ''}
     ${guardianTransferred ? '' : `
       <div style="margin-top:12px;font-weight:800;color:#1e293b">保護者2（手書き追加分・未転記）</div>
       ${guardianRows.length ? entrySmallTable(['氏名','フリガナ','続柄','携帯','メール'], guardianRows) : '<div style="color:#94a3b8">保護者2（手書き追加分）は読み取れていません。</div>'}
@@ -1907,6 +1917,7 @@ async function openEntryInfoModal() {
   if (!sid) { toast('生徒を選択してください'); return; }
   currentEntryInfoStudentId = sid;
   currentEntryGuardian2 = null;
+  currentEntryAiReview = null;
   if (guardianBtn) guardianBtn.style.display = 'none';
   const st = students.find(s => String(s.id) === String(sid)) || {};
   title.textContent = `入塾時情報：${st.name || '生徒'}（No.${sid}）`;
@@ -1925,9 +1936,12 @@ async function openEntryInfoModal() {
   }
   const ai = parseEntryAiData(d.ocrMemo);
   const masterInfo = Object.assign({ colC: d.masterColumnC || '' }, d.masterInfo || {});
+  if (ai && hasEntryAiReviewPending(ai, masterInfo)) {
+    currentEntryAiReview = ai;
+    if (guardianBtn) guardianBtn.style.display = '';
+  }
   if (ai && ai.guardian2 && Object.values(ai.guardian2).some(Boolean) && !isGuardian2Transferred(ai, masterInfo)) {
     currentEntryGuardian2 = ai.guardian2;
-    if (guardianBtn) guardianBtn.style.display = '';
   }
   const familyRows = (d.family || []).map(f => {
     const cells = [f.name, f.relation, f.job, f.workplace, f.grade].map(x => htmlEsc(x || ''));
@@ -2006,6 +2020,37 @@ async function applyEntryGuardian2ToMaster() {
   currentEntryGuardian2 = null;
   document.getElementById('entryGuardian2Btn').style.display = 'none';
   await openEntryInfoModal();
+}
+
+async function applyEntryAiReview() {
+  const sid = currentEntryInfoStudentId || document.getElementById('cmpStudent')?.value;
+  if (!sid) { toast('生徒を選択してください'); return; }
+  const ai = currentEntryAiReview || {};
+  const scoreCount = (ai.scores || []).filter(s => Object.values(s || {}).some(Boolean)).length;
+  const reportCount = (ai.reports || []).filter(r => Object.values(r || {}).some(Boolean)).length;
+  const g = ai.guardian2 || {};
+  const hasGuardian = g.name || g.kana || g.relation || g.mobile || g.email;
+  const lines = [];
+  if (hasGuardian && !ai.guardian2Applied) lines.push('保護者2（手書き追加分）');
+  if (!ai.scoresApplied && scoreCount) lines.push(`定期テスト ${scoreCount}件`);
+  if (!ai.reportsApplied && reportCount) lines.push(`通知表 ${reportCount}件`);
+  if (!lines.length) { toast('転記待ちのデータはありません'); return; }
+  const ok = confirm(
+    '以下を確認済みにして転記します。\n\n' +
+    lines.join('\n') +
+    '\n\n転記後、このポップアップの未転記欄には表示しません。よろしいですか？'
+  );
+  if (!ok) return;
+  const btn = document.getElementById('entryGuardian2Btn');
+  if (btn) btn.disabled = true;
+  const r = await api({ action: 'applyEntryAiReview', studentId: sid });
+  if (btn) btn.disabled = false;
+  if (!r.success) { toast(r.error || '転記に失敗しました'); return; }
+  toast(r.warning ? '一部注意があります。ポップアップを確認してください。' : '確認済みデータを転記しました');
+  currentEntryAiReview = null;
+  if (btn) btn.style.display = 'none';
+  await openEntryInfoModal();
+  if (typeof loadCompare === 'function') await loadCompare(sid);
 }
 
 async function editCurrentEntryInfo() {
