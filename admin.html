@@ -300,6 +300,7 @@ tr:hover td{background:#f8fafc}
           <select id="cmpStudent" onchange="loadCompare()">
             <option value="">生徒を選択</option>
           </select>
+          <span id="cmpAdmissionDate" style="font-size:.78rem;color:#475569;font-weight:700;white-space:nowrap"></span>
           <select id="cmpYear" onchange="loadCompare()"></select>
           <button id="cmpEntryBtn" class="btn btn-ghost btn-sm" onclick="openEntryInfoModal()" disabled>入塾時情報</button>
         </div>
@@ -1475,7 +1476,7 @@ function renderWishTable(wishes) {
   tbody.innerHTML = wishes.map(w => {
     const r2 = res(w);
     return `<tr>
-    <td style="padding:4px 8px;font-weight:600">${w.name}</td>
+    <td style="padding:4px 8px;font-weight:600;color:#1a56a0;cursor:pointer;text-decoration:underline" onclick="goToCompare('${htmlEsc(w.studentId)}')" title="成績×通知表へ">${htmlEsc(w.name)}</td>
     <td style="padding:4px 4px;text-align:center">${w.grade||'-'}</td>
     ${tdName(w.pub1name?w.pub1name+(w.pub1dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub1dept+'</span>':''):null,'#dde8ff','border-left:3px solid #4f46e5')}${tdType(r2,'pub1','#dde8ff')}${tdResult(r2,'pub1','#dde8ff')}${tdEnroll(r2,'pub1','#dde8ff')}
     ${tdName(w.pub2name?w.pub2name+(w.pub2dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub2dept+'</span>':''):null,'#dde8ff','border-left:3px solid #4f46e5')}${tdType(r2,'pub2','#dde8ff')}${tdResult(r2,'pub2','#dde8ff')}${tdEnroll(r2,'pub2','#dde8ff')}
@@ -1572,7 +1573,7 @@ function renderAdminReport(reports) {
   }
   tbody.innerHTML = reports.map(d => `
     <tr>
-      <td style="text-align:left;font-weight:600">${d.name}</td>
+      <td style="text-align:left;font-weight:600;color:#1a56a0;cursor:pointer;text-decoration:underline" onclick="goToCompare('${htmlEsc(d.studentId)}')" title="成績×通知表へ">${htmlEsc(d.name)}</td>
       <td>${d.grade}</td><td>${d.school}</td><td>${d.semester}</td>
       <td>${rpRating(d.rp_jpn)}</td><td>${rpRating(d.rp_soc)}</td><td>${rpRating(d.rp_math)}</td>
       <td>${rpRating(d.rp_sci)}</td><td>${rpRating(d.rp_eng)}</td>
@@ -1646,11 +1647,29 @@ function filterCmpStudents() {
     `<option value="${s.id}">${s.name}（${s.grade}）</option>`).join('');
   if (prev) sel.value = prev;
   updateCmpEntryButton();
+  updateCmpAdmissionDate(sel.value);
+}
+function updateCmpAdmissionDate(sid) {
+  const box = document.getElementById('cmpAdmissionDate');
+  if (!box) return;
+  const targetId = String(sid || '');
+  box.textContent = '';
+  if (!targetId) return;
+  box.textContent = '入塾日: 読込中';
+  api({ action: 'getEntrySheetData', studentId: targetId }).then(r => {
+    if (String(document.getElementById('cmpStudent')?.value || targetId) !== targetId) return;
+    const info = Object.assign({ colC: r?.data?.masterColumnC || '' }, r?.data?.masterInfo || {});
+    const date = formatEntryValue(info.colC || '');
+    box.textContent = date ? `入塾日: ${date}` : '';
+  }).catch(() => {
+    if (String(document.getElementById('cmpStudent')?.value || targetId) === targetId) box.textContent = '';
+  });
 }
 async function loadCompare(overrideSid) {
   const sid = overrideSid ? String(overrideSid) : document.getElementById('cmpStudent').value;
   const year = document.getElementById('cmpYear').value;
   updateCmpEntryButton(sid);
+  updateCmpAdmissionDate(sid);
   if (!sid) return;
   // 志望校を取得して表示
   const wishCard = document.getElementById('cmpWishCard');
@@ -1710,6 +1729,7 @@ async function loadCompare(overrideSid) {
     }
     sel.value = String(overrideSid);
   }
+  updateCmpAdmissionDate(sid);
   const [scoreRes, rpRes] = await Promise.all([
     api({ action: 'getStudentScores', studentId: sid }),
     api({ action: 'getReports', studentId: sid })
