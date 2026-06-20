@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>職員用アプリ</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  min-height:100vh;
+  background:#eef3f8;
+  color:#102033;
+  font-family:"Hiragino Kaku Gothic ProN","Meiryo",sans-serif;
+}
+.page{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:28px 16px;
+}
+.shell{
+  width:min(980px,100%);
+}
+.top{
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  align-items:flex-end;
+  margin-bottom:18px;
+}
+h1{
+  margin:0;
+  font-size:1.55rem;
+  letter-spacing:0;
+}
+.sub{
+  margin:8px 0 0;
+  color:#52667c;
+  font-size:.92rem;
+}
+.badge{
+  flex:0 0 auto;
+  border:1px solid #cbd8e6;
+  background:#fff;
+  border-radius:999px;
+  padding:8px 12px;
+  font-size:.82rem;
+  font-weight:700;
+  color:#1d5fa8;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+}
+.app{
+  min-height:150px;
+  background:#fff;
+  border:1px solid #d7e1ec;
+  border-radius:12px;
+  padding:18px;
+  text-decoration:none;
+  color:inherit;
+  box-shadow:0 10px 24px rgba(31,52,78,.08);
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease;
+}
+.app:hover{
+  transform:translateY(-2px);
+  border-color:#8fb4dc;
+  box-shadow:0 16px 30px rgba(31,52,78,.13);
+}
+.appTitle{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:1.15rem;
+  font-weight:800;
+}
+.ico{
+  width:38px;
+  height:38px;
+  border-radius:10px;
+  display:grid;
+  place-items:center;
+  background:#eaf3ff;
+  color:#1d5fa8;
+  font-size:1.25rem;
+}
+.desc{
+  margin:14px 0 0;
+  color:#52667c;
+  font-size:.9rem;
+  line-height:1.65;
+}
+.go{
+  margin-top:16px;
+  color:#155aa5;
+  font-weight:800;
+  font-size:.9rem;
+}
+.primary{
+  background:#155aa5;
+  color:#fff;
+  border-color:#155aa5;
+}
+.primary .ico{
+  background:rgba(255,255,255,.16);
+  color:#fff;
+}
+.primary .desc,.primary .go{color:#eef6ff}
+@media(max-width:720px){
+  .page{align-items:flex-start;padding-top:22px}
+  .top{display:block}
+  .badge{display:inline-block;margin-top:12px}
+  .grid{grid-template-columns:1fr}
+  .app{min-height:132px}
+}
+</style>
+</head>
+<body>
+<main class="page">
+  <section class="shell">
+    <div class="top">
+      <div>
+        <h1>職員用アプリ</h1>
+        <p class="sub">よく使う入力・読取ページをここから開きます。</p>
+      </div>
+      <div class="badge">STEP 個別指導</div>
+    </div>
+
+    <div class="grid">
+      <a class="app primary" href="admin.html#meetings">
+        <div>
+          <div class="appTitle"><span class="ico">🗒️</span><span>面談メモ</span></div>
+          <p class="desc">面談・電話・相談内容を登録します。生徒別の履歴確認にも使います。</p>
+        </div>
+        <div class="go">開く</div>
+      </a>
+
+      <a class="app" href="entry_import.html">
+        <div>
+          <div class="appTitle"><span class="ico">📝</span><span>エントリーシート読取</span></div>
+          <p class="desc">入塾時の書類、成績、通知表、志望校を読み取って成績管理へ送ります。</p>
+        </div>
+        <div class="go">開く</div>
+      </a>
+
+      <a class="app" href="https://juku-card-system.onrender.com/" target="_blank" rel="noopener">
+        <div>
+          <div class="appTitle"><span class="ico">📇</span><span>受付カード読取</span></div>
+          <p class="desc">受付カードの写真を読み取り、必要な内容を取り込みます。</p>
+        </div>
+        <div class="go">別ページで開く</div>
+      </a>
+
+      <a class="app" href="https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec?page=upload" target="_blank" rel="noopener">
+        <div>
+          <div class="appTitle"><span class="ico">📤</span><span>過去問アップロード</span></div>
+          <p class="desc">過去問ファイルをアップロードして保管します。</p>
+        </div>
+        <div class="go">別ページで開く</div>
+      </a>
+    </div>
+  </section>
+</main>
+</body>
+</html>
