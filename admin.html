@@ -429,20 +429,29 @@ tr:hover td{background:#f8fafc}
     <div id="aTab_meetings" style="display:none">
       <div class="card">
         <div class="cardHead">🗒️ 面談・メモ 登録</div>
-        <div class="adminGrid">
-          <div>
+        <div style="display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:18px;align-items:start">
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
             <div class="fld"><label>日付</label><input id="meetDate" type="date"></div>
+            <div class="fld">
+              <label>校舎</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button id="meetCampusJinryo" class="btn btn-ghost btn-sm" type="button" onclick="selectMeetingCampus('神領')">神領</button>
+                <button id="meetCampusOte" class="btn btn-ghost btn-sm" type="button" onclick="selectMeetingCampus('大手')">大手町</button>
+                <button id="meetCampusAll" class="btn btn-ghost btn-sm" type="button" onclick="selectMeetingCampus('')">全校舎</button>
+              </div>
+            </div>
             <div class="fld"><label>生徒名</label><select id="meetStudent"><option value="">生徒を選択</option></select></div>
             <div class="fld"><label>相手</label>
-              <select id="meetCounterpart">
-                <option>父</option><option>母</option><option>本人</option><option>他</option>
+              <select id="meetCounterpart" onchange="toggleMeetingOther()">
+                <option>母</option><option>父</option><option>本人</option><option>他</option>
               </select>
             </div>
+            <div class="fld" id="meetOtherWrap" style="display:none"><label>相手（その他）</label><input id="meetOther" placeholder="例: 祖母、叔父、学校の先生"></div>
             <div class="fld"><label>担当</label><select id="meetStaff"><option value="">担当を選択</option></select></div>
           </div>
-          <div>
-            <div class="fld"><label>内容</label><textarea id="meetContent" placeholder="面談・電話・相談内容など" style="min-height:150px"></textarea></div>
-            <button class="btn btn-primary btn-sm" onclick="saveMeetingMemo()">保存する</button>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+            <div class="fld"><label>内容</label><textarea id="meetContent" placeholder="面談・電話・相談内容など" style="min-height:170px"></textarea></div>
+            <button id="meetSaveBtn" class="btn btn-primary btn-sm" onclick="saveMeetingMemo()">保存する</button>
             <button class="btn btn-ghost btn-sm" onclick="clearMeetingForm()">入力欄をクリア</button>
           </div>
         </div>
@@ -453,7 +462,7 @@ tr:hover td{background:#f8fafc}
           <div class="searchWrap"><input id="meetSearch" placeholder="名前・ID・内容で検索" oninput="loadMeetingMemos()"></div>
           <select id="meetFilterStaff" onchange="loadMeetingMemos()"><option value="">全担当</option></select>
           <select id="meetFilterCounterpart" onchange="loadMeetingMemos()">
-            <option value="">相手すべて</option><option>父</option><option>母</option><option>本人</option><option>他</option>
+            <option value="">相手すべて</option><option>母</option><option>父</option><option>本人</option><option>他</option>
           </select>
           <button class="btn btn-outline btn-sm" onclick="loadMeetingMemos()">🔄 更新</button>
         </div>
@@ -719,6 +728,8 @@ let allReports = [];
 let pendingSync = null;
 let staffMembers = [];
 let meetingMemos = [];
+let selectedMeetingCampus = '';
+let currentMeetingMemoId = '';
 const TABS = ['speed','compare','students','meetings','schools','report','wish','entry','sync','settings'];
 // タブ履歴管理（グローバル宣言）
 let _navHist = [];
@@ -2522,6 +2533,8 @@ async function initMeetings() {
   }
   await loadStaffMembers();
   populateMeetingStudents();
+  selectMeetingCampus(selectedMeetingCampus);
+  toggleMeetingOther();
   const dateEl = document.getElementById('meetDate');
   if (dateEl && !dateEl.value) dateEl.value = todayStr();
   await loadMeetingMemos();
@@ -2531,10 +2544,39 @@ function populateMeetingStudents() {
   const sel = document.getElementById('meetStudent');
   if (!sel) return;
   const prev = sel.value;
-  sel.innerHTML = '<option value="">生徒を選択</option>' + students.map(s =>
+  let list = students;
+  if (selectedMeetingCampus) list = list.filter(s => s.campus === selectedMeetingCampus);
+  sel.innerHTML = '<option value="">生徒を選択</option>' + list.map(s =>
     `<option value="${htmlEsc(s.id)}">${htmlEsc(s.name)}（${htmlEsc(s.grade || '')} / No.${htmlEsc(s.id)}）</option>`
   ).join('');
   if (prev) sel.value = prev;
+}
+
+function selectMeetingCampus(campus) {
+  selectedMeetingCampus = campus || '';
+  ['meetCampusJinryo','meetCampusOte','meetCampusAll'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-ghost');
+  });
+  const activeId = campus === '神領' ? 'meetCampusJinryo' : campus === '大手' ? 'meetCampusOte' : 'meetCampusAll';
+  const active = document.getElementById(activeId);
+  if (active) {
+    active.classList.add('btn-primary');
+    active.classList.remove('btn-ghost');
+  }
+  populateMeetingStudents();
+}
+
+function toggleMeetingOther() {
+  const isOther = document.getElementById('meetCounterpart')?.value === '他';
+  const wrap = document.getElementById('meetOtherWrap');
+  if (wrap) wrap.style.display = isOther ? '' : 'none';
+  if (!isOther) {
+    const other = document.getElementById('meetOther');
+    if (other) other.value = '';
+  }
 }
 
 async function loadStaffMembers() {
@@ -2590,26 +2632,39 @@ async function deleteStaffMember(name) {
 }
 
 function clearMeetingForm() {
-  ['meetStudent','meetContent'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  currentMeetingMemoId = '';
+  ['meetStudent','meetContent','meetOther'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   const dateEl = document.getElementById('meetDate');
   if (dateEl) dateEl.value = todayStr();
   const cp = document.getElementById('meetCounterpart');
-  if (cp) cp.value = '父';
+  if (cp) cp.value = '母';
+  const btn = document.getElementById('meetSaveBtn');
+  if (btn) btn.textContent = '保存する';
+  toggleMeetingOther();
 }
 
 async function saveMeetingMemo() {
+  const counterpartBase = document.getElementById('meetCounterpart')?.value || '';
+  const other = document.getElementById('meetOther')?.value.trim() || '';
+  const counterpart = counterpartBase === '他' && other ? `他: ${other}` : counterpartBase;
   const payload = {
     action: 'saveMeetingMemo',
+    id: currentMeetingMemoId,
     date: document.getElementById('meetDate')?.value || '',
     studentId: document.getElementById('meetStudent')?.value || '',
-    counterpart: document.getElementById('meetCounterpart')?.value || '',
+    counterpart,
     content: document.getElementById('meetContent')?.value.trim() || '',
     staff: document.getElementById('meetStaff')?.value || ''
   };
   const r = await api(payload);
   if (!r.success) { toast(r.error || '保存に失敗しました'); return; }
-  toast('面談メモを保存しました');
+  toast(currentMeetingMemoId ? '面談メモを更新しました' : '面談メモを保存しました');
+  currentMeetingMemoId = '';
+  const btn = document.getElementById('meetSaveBtn');
+  if (btn) btn.textContent = '保存する';
   document.getElementById('meetContent').value = '';
+  const otherEl = document.getElementById('meetOther');
+  if (otherEl) otherEl.value = '';
   await loadMeetingMemos();
   const sid = document.getElementById('cmpStudent')?.value;
   if (sid && String(sid) === String(payload.studentId)) loadCompareMeetings(sid);
@@ -2639,10 +2694,44 @@ function renderMeetingTable(list) {
       <td><button onclick="goToCompare('${htmlEsc(m.studentId)}')" style="border:0;background:transparent;color:#1a56a0;font-weight:700;text-decoration:underline;cursor:pointer;padding:0">${htmlEsc(m.name)}</button><div style="color:#94a3b8;font-size:.72rem">No.${htmlEsc(m.studentId)} / ${htmlEsc(m.grade || '')}</div></td>
       <td>${htmlEsc(m.counterpart || '')}</td>
       <td>${htmlEsc(m.staff || '')}</td>
-      <td style="white-space:pre-wrap;min-width:260px">${htmlEsc(m.content || '')}</td>
-      <td><button class="btn btn-danger btn-sm" onclick="deleteMeetingMemo('${htmlEsc(m.id)}')">削除</button></td>
+      <td style="white-space:pre-wrap;min-width:320px">${htmlEsc(m.content || '')}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-sm" onclick="editMeetingMemo('${htmlEsc(m.id)}')">更新</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMeetingMemo('${htmlEsc(m.id)}')">削除</button>
+      </td>
     </tr>
   `).join('');
+}
+
+function editMeetingMemo(id) {
+  const m = meetingMemos.find(x => String(x.id) === String(id));
+  if (!m) { toast('面談メモが見つかりません'); return; }
+  currentMeetingMemoId = m.id;
+  const dateEl = document.getElementById('meetDate');
+  if (dateEl) dateEl.value = formatEntryValue(m.date).replace(/\//g, '-').slice(0, 10);
+  if (m.campus) selectMeetingCampus(m.campus);
+  const studentEl = document.getElementById('meetStudent');
+  if (studentEl) studentEl.value = m.studentId;
+  const cpEl = document.getElementById('meetCounterpart');
+  const otherEl = document.getElementById('meetOther');
+  const cp = String(m.counterpart || '');
+  if (['母','父','本人'].includes(cp)) {
+    if (cpEl) cpEl.value = cp;
+    if (otherEl) otherEl.value = '';
+  } else {
+    if (cpEl) cpEl.value = '他';
+    if (otherEl) otherEl.value = cp.replace(/^他[:：]\s*/, '');
+  }
+  toggleMeetingOther();
+  const staffEl = document.getElementById('meetStaff');
+  if (staffEl) staffEl.value = m.staff || '';
+  const contentEl = document.getElementById('meetContent');
+  if (contentEl) {
+    contentEl.value = m.content || '';
+    contentEl.focus();
+  }
+  const btn = document.getElementById('meetSaveBtn');
+  if (btn) btn.textContent = '更新する';
 }
 
 async function deleteMeetingMemo(id) {

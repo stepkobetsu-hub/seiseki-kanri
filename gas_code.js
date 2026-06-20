@@ -751,7 +751,13 @@ function getMeetingMemos(data) {
     const m = rowToMeetingMemo_(rows[i]);
     if (data.studentId && String(m.studentId) !== String(data.studentId)) continue;
     if (data.staff && m.staff !== data.staff) continue;
-    if (data.counterpart && m.counterpart !== data.counterpart) continue;
+    if (data.counterpart) {
+      if (data.counterpart === '他') {
+        if (String(m.counterpart || '').indexOf('他') !== 0) continue;
+      } else if (m.counterpart !== data.counterpart) {
+        continue;
+      }
+    }
     if (q) {
       const hay = [m.studentId, m.name, m.counterpart, m.content, m.staff].join(' ').toLowerCase();
       if (hay.indexOf(q) < 0) continue;
