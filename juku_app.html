@@ -1127,7 +1127,10 @@ function renderHistory() {
       <td><strong>${d(s.total5)}</strong></td><td>${s.rank5 ? s.rank5+'位' : '-'}</td>
       <td>${d(s.mus)}</td><td>${d(s.art)}</td><td>${d(s.pe)}</td><td>${d(s.tech)}</td>
       <td><strong>${d(s.total9)}</strong></td><td>${s.rank9 ? s.rank9+'位' : '-'}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="jumpEdit('${s.year}','${s.term}')">編集</button></td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" onclick="jumpEdit('${s.year}','${s.term}')">編集</button>
+        <button class="btn btn-sm" onclick="deleteScore('${s.year}','${s.term}')" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;margin-left:4px">削除</button>
+      </td>
     </tr>`).join('') || '<tr><td colspan="16" class="noData">この年度のデータがありません</td></tr>';
   };
   yrs.forEach(y => {
@@ -1141,6 +1144,23 @@ function renderHistory() {
 }
 
 function d(v) { return (v !== '' && v != null) ? v : '-'; }
+
+async function deleteScore(yr, tm) {
+  if (!confirm(`${yr}年度 第${tm}回のデータを削除しますか？\nこの操作は元に戻せません。`)) return;
+  try {
+    const r = await api({ action: 'deleteScore', studentId: me.id, year: yr, term: tm });
+    if (r.success) {
+      // ローカルデータからも削除
+      myScores = myScores.filter(s => !(String(s.year)===String(yr) && String(s.term)===String(tm)));
+      renderHistory();
+      alert('削除しました');
+    } else {
+      alert('削除に失敗しました: ' + (r.error||''));
+    }
+  } catch(e) {
+    alert('通信エラー: ' + e.message);
+  }
+}
 
 function jumpEdit(yr, tm) {
   sTabs('input', 0);
