@@ -876,8 +876,17 @@ function normalizeEntryReports_(reports, student) {
     if (/^\d$/.test(semester)) semester += '学期';
     const row = Object.assign({}, r, { year, semester });
     if (paperGradeNo) row.grade = gradeLabelFromNumber_(paperGradeNo, student.grade);
+    sanitizeReportRatings_(row);
     return row;
   }).filter(r => ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech'].some(k => r[k] !== '' && r[k] != null));
+}
+
+function sanitizeReportRatings_(row) {
+  ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech'].forEach(k => {
+    if (row[k] === '' || row[k] == null) return;
+    const n = Number(normalizeNumberText_(row[k]));
+    row[k] = Number.isInteger(n) && n >= 1 && n <= 5 ? n : '';
+  });
 }
 
 function normalizeYearByGrade_(v, paperGradeNo, student) {

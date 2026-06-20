@@ -633,7 +633,10 @@ tr:hover td{background:#f8fafc}
 
 <div class="overlay" id="entryInfoModal">
   <div class="modal" style="max-width:760px">
-    <h3 id="entryInfoTitle" style="margin-bottom:12px">入塾時情報</h3>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
+      <h3 id="entryInfoTitle" style="margin:0">入塾時情報</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeEntryInfoModal()">閉じる</button>
+    </div>
     <div id="entryInfoModalBody" style="font-size:.84rem;color:#334155;line-height:1.7"></div>
     <div class="modalFoot" style="margin-top:16px">
       <button id="entryGuardian2Btn" class="btn btn-primary btn-sm" onclick="applyEntryGuardian2ToMaster()" style="display:none">保護者2（手書き追加分）を生徒マスタへ転記</button>
