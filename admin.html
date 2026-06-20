@@ -505,12 +505,12 @@ tr:hover td{background:#f8fafc}
             <thead><tr style="background:#f1f5f9">
               <th style="padding:5px 8px;text-align:left">氏名</th>
               <th style="padding:5px 4px">学年</th>
-              <th style="padding:5px 4px;background:#dde8ff;border-left:3px solid #6366f1" colspan="4">公立 第1志望</th>
-              <th style="padding:5px 4px;background:#f0f4ff;border-left:2px solid #a5b4fc" colspan="4">公立 第2志望</th>
-              <th style="padding:5px 4px;background:#dde8ff;border-left:3px solid #6366f1" colspan="4">公立 第3志望</th>
-              <th style="padding:5px 4px;background:#fde68a;border-left:3px solid #f59e0b" colspan="4">私立 第1志望</th>
-              <th style="padding:5px 4px;background:#fef5d0;border-left:2px solid #fcd34d" colspan="4">私立 第2志望</th>
-              <th style="padding:5px 4px;background:#fde68a;border-left:3px solid #f59e0b" colspan="4">私立 第3志望</th>
+              <th style="padding:5px 4px;background:#dde8ff;border-left:3px solid #4f46e5" colspan="4">公立 第1志望</th>
+              <th style="padding:5px 4px;background:#dde8ff;border-left:3px solid #4f46e5" colspan="4">公立 第2志望</th>
+              <th style="padding:5px 4px;background:#dde8ff;border-left:3px solid #4f46e5" colspan="4">公立 第3志望</th>
+              <th style="padding:5px 4px;background:#fef5d0;border-left:3px solid #d97706" colspan="4">私立 第1志望</th>
+              <th style="padding:5px 4px;background:#fef5d0;border-left:3px solid #d97706" colspan="4">私立 第2志望</th>
+              <th style="padding:5px 4px;background:#fef5d0;border-left:3px solid #d97706" colspan="4">私立 第3志望</th>
               <th style="padding:5px 4px">更新日</th>
             </tr>
             <tr style="background:#f8fafc;font-size:.68rem;color:#94a3b8">
@@ -1262,12 +1262,12 @@ function renderWishTable(wishes) {
     return `<tr>
     <td style="padding:4px 8px;font-weight:600">${w.name}</td>
     <td style="padding:4px 4px;text-align:center">${w.grade||'-'}</td>
-    ${tdName(w.pub1name?w.pub1name+(w.pub1dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub1dept+'</span>':''):null,'#dde8ff','border-left:3px solid #6366f1')}${tdType(r2,'pub1','#dde8ff')}${tdResult(r2,'pub1','#dde8ff')}${tdEnroll(r2,'pub1','#dde8ff')}
-    ${tdName(w.pub2name?w.pub2name+(w.pub2dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub2dept+'</span>':''):null,'#f0f4ff','border-left:2px solid #a5b4fc')}${tdType(r2,'pub2','#f0f4ff')}${tdResult(r2,'pub2','#f0f4ff')}${tdEnroll(r2,'pub2','#f0f4ff')}
-    ${tdName(w.pub3name?w.pub3name+(w.pub3dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub3dept+'</span>':''):null,'#dde8ff','border-left:3px solid #6366f1')}${tdType(r2,'pub3','#dde8ff')}${tdResult(r2,'pub3','#dde8ff')}${tdEnroll(r2,'pub3','#dde8ff')}
-    ${tdName(w.pri1name?w.pri1name+(w.pri1dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri1dept+'</span>':''):null,'#fde68a','border-left:3px solid #f59e0b')}${tdType(r2,'pri1','#fde68a')}${tdResult(r2,'pri1','#fde68a')}${tdEnroll(r2,'pri1','#fde68a')}
-    ${tdName(w.pri2name?w.pri2name+(w.pri2dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri2dept+'</span>':''):null,'#fef5d0','border-left:2px solid #fcd34d')}${tdType(r2,'pri2','#fef5d0')}${tdResult(r2,'pri2','#fef5d0')}${tdEnroll(r2,'pri2','#fef5d0')}
-    ${tdName(w.pri3name?w.pri3name+(w.pri3dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri3dept+'</span>':''):null,'#fde68a','border-left:3px solid #f59e0b')}${tdType(r2,'pri3','#fde68a')}${tdResult(r2,'pri3','#fde68a')}${tdEnroll(r2,'pri3','#fde68a')}
+    ${tdName(w.pub1name?w.pub1name+(w.pub1dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub1dept+'</span>':''):null,'#dde8ff','border-left:3px solid #4f46e5')}${tdType(r2,'pub1','#dde8ff')}${tdResult(r2,'pub1','#dde8ff')}${tdEnroll(r2,'pub1','#dde8ff')}
+    ${tdName(w.pub2name?w.pub2name+(w.pub2dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub2dept+'</span>':''):null,'#dde8ff','border-left:3px solid #4f46e5')}${tdType(r2,'pub2','#dde8ff')}${tdResult(r2,'pub2','#dde8ff')}${tdEnroll(r2,'pub2','#dde8ff')}
+    ${tdName(w.pub3name?w.pub3name+(w.pub3dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub3dept+'</span>':''):null,'#dde8ff','border-left:3px solid #4f46e5')}${tdType(r2,'pub3','#dde8ff')}${tdResult(r2,'pub3','#dde8ff')}${tdEnroll(r2,'pub3','#dde8ff')}
+    ${tdName(w.pri1name?w.pri1name+(w.pri1dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri1dept+'</span>':''):null,'#fef5d0','border-left:3px solid #d97706')}${tdType(r2,'pri1','#fef5d0')}${tdResult(r2,'pri1','#fef5d0')}${tdEnroll(r2,'pri1','#fef5d0')}
+    ${tdName(w.pri2name?w.pri2name+(w.pri2dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri2dept+'</span>':''):null,'#fef5d0','border-left:3px solid #d97706')}${tdType(r2,'pri2','#fef5d0')}${tdResult(r2,'pri2','#fef5d0')}${tdEnroll(r2,'pri2','#fef5d0')}
+    ${tdName(w.pri3name?w.pri3name+(w.pri3dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri3dept+'</span>':''):null,'#fef5d0','border-left:3px solid #d97706')}${tdType(r2,'pri3','#fef5d0')}${tdResult(r2,'pri3','#fef5d0')}${tdEnroll(r2,'pri3','#fef5d0')}
     <td style="padding:3px 6px;font-size:.68rem;color:#94a3b8;white-space:nowrap">${w.updatedAt?w.updatedAt.slice(0,10):'-'}</td>
   </tr>`;
   }).join('');
