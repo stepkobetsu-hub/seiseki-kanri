@@ -1575,24 +1575,60 @@ function renderWishTable(wishes) {
 async function loadSchools() {
   const r = await api({ action: 'getSchools' });
   schools = r.schools || [];
-  const schHeader = schools.length ? '<div style="display:flex;justify-content:flex-end;padding:0 4px 6px;gap:6px;align-items:center"><span style="width:52px;text-align:center;font-size:.72rem;color:#64748b;font-weight:600">テスト</span><span style="width:116px;text-align:center;font-size:.72rem;color:#64748b;font-weight:600">学期制</span><span style="width:52px"></span><span style="width:52px"></span></div>' : '';
-  document.getElementById('schoolListBox').innerHTML = schHeader + (schools.map(s => `
-    <div class="listRow">
-      <div>
-        <strong>${s.name}</strong>
-        <div class="listRowSub">年間${s.termCount}回 ／ ${s.semType === '2term' ? '前期・後期制' : '3学期制'}</div>
-      </div>
-      <div style="display:flex;gap:6px;align-items:center">
-        <input type="number" value="${s.termCount}" min="1" max="10" style="width:52px;padding:4px 6px;background:#fff;border:1px solid var(--border2);border-radius:6px;color:#1e293b;font-size:.78rem" id="tc_${s.name}">
-        <select id="st_${s.name}" style="padding:4px 6px;background:#fff;border:1px solid var(--border2);border-radius:6px;color:#1e293b;font-size:.74rem">
-          <option value="3term" ${(s.semType||'3term')==='3term'?'selected':''}>3学期制</option>
-          <option value="2term" ${s.semType==='2term'?'selected':''}>前期・後期制</option>
-        </select>
-        <button class="btn btn-outline btn-sm" onclick="updateSchool('${s.name}')">更新</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteSchool('${s.name}')">削除</button>
-      </div>
-    </div>`).join('') || '<div class="noData">登録なし</div>');
+  document.getElementById('schoolListBox').innerHTML = schools.map((s, idx) => renderSchoolCard(s, idx)).join('') || '<div class="noData">登録なし</div>';
 }
+
+function renderSchoolCard(s, idx) {
+  const count = Math.max(1, Math.min(10, Number(s.termCount || 3)));
+  const schedule = s.testSchedule || {};
+  const url = s.scheduleUrl || '';
+  const memo = s.scheduleMemo || '';
+  const aiQuery = encodeURIComponent(`${s.name} 年間行事予定 定期テスト 2026`);
+  const rows = ['g1','g2','g3'].map((key, gi) => {
+    const label = ['中1','中2','中3'][gi];
+    const vals = Array.isArray(schedule[key]) ? schedule[key] : [];
+    const cells = Array.from({ length: count }, (_, i) => `
+      <input id="sch_${idx}_${key}_${i}" value="${htmlEsc(vals[i] || '')}" placeholder="例: 5/20-5/22" style="min-width:118px;padding:6px 8px;background:#fff;border:1px solid var(--border2);border-radius:7px;color:#1e293b;font-size:.76rem">
+    `).join('');
+    return `
+      <div style="display:grid;grid-template-columns:46px 1fr;gap:8px;align-items:center;margin-top:8px">
+        <div style="font-weight:700;color:#334155;font-size:.78rem">${label}</div>
+        <div style="display:grid;grid-template-columns:repeat(${count},minmax(118px,1fr));gap:6px;overflow-x:auto">${cells}</div>
+      </div>
+    `;
+  }).join('');
+  return `
+    <div class="listRow" style="display:block;padding:12px 10px">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
+        <div>
+          <strong>${htmlEsc(s.name)}</strong>
+          <div class="listRowSub">年間${htmlEsc(count)}回 ／ ${s.semType === '2term' ? '前期・後期制' : '3学期制'}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <input type="number" value="${htmlEsc(count)}" min="1" max="10" style="width:58px;padding:5px 6px;background:#fff;border:1px solid var(--border2);border-radius:6px;color:#1e293b;font-size:.78rem" id="tc_${idx}">
+          <select id="st_${idx}" style="padding:5px 6px;background:#fff;border:1px solid var(--border2);border-radius:6px;color:#1e293b;font-size:.74rem">
+            <option value="3term" ${(s.semType||'3term')==='3term'?'selected':''}>3学期制</option>
+            <option value="2term" ${s.semType==='2term'?'selected':''}>前期・後期制</option>
+          </select>
+          <a class="btn btn-ghost btn-sm" href="https://www.google.com/search?q=${aiQuery}" target="_blank" rel="noopener" style="text-decoration:none">HP検索</a>
+          <button class="btn btn-outline btn-sm" onclick="updateSchool(${idx})">更新</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSchool(${idx})">削除</button>
+        </div>
+      </div>
+      <div style="margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:8px;background:#f8fafc">
+        <div style="font-weight:800;color:#1e293b;font-size:.82rem;margin-bottom:8px">定期テスト日程</div>
+        <div style="display:grid;grid-template-columns:repeat(${count},minmax(118px,1fr));gap:6px;margin-left:54px;color:#64748b;font-size:.7rem;overflow-x:auto">
+          ${Array.from({ length: count }, (_, i) => `<div>第${i + 1}回</div>`).join('')}
+        </div>
+        ${rows}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+          <input id="schUrl_${idx}" value="${htmlEsc(url)}" placeholder="学校HP・年間予定表URL" style="padding:6px 8px;background:#fff;border:1px solid var(--border2);border-radius:7px;color:#1e293b;font-size:.76rem">
+          <input id="schMemo_${idx}" value="${htmlEsc(memo)}" placeholder="日程メモ・確認日など" style="padding:6px 8px;background:#fff;border:1px solid var(--border2);border-radius:7px;color:#1e293b;font-size:.76rem">
+        </div>
+      </div>
+    </div>`;
+}
+
 async function addSchool() {
   const name = document.getElementById('newSchoolName').value.trim();
   const cnt = document.getElementById('newSchoolTerms').value;
@@ -1602,14 +1638,28 @@ async function addSchool() {
   if (r.success) { toast('✅ 追加しました'); loadSchools(); document.getElementById('newSchoolName').value = ''; document.getElementById('newSchoolTerms').value = ''; }
   else toast('❌ ' + r.error);
 }
-async function updateSchool(name) {
-  const cnt = document.getElementById('tc_' + name).value;
-  const semType = document.getElementById('st_' + name).value;
-  const r = await api({ action: 'updateSchool', name, termCount: cnt, semType });
+async function updateSchool(idx) {
+  const school = schools[idx];
+  if (!school) { toast('学校が見つかりません'); return; }
+  const cnt = Number(document.getElementById('tc_' + idx).value || school.termCount || 3);
+  const semType = document.getElementById('st_' + idx).value;
+  const readGrade = key => Array.from({ length: cnt }, (_, i) => document.getElementById(`sch_${idx}_${key}_${i}`)?.value.trim() || '');
+  const r = await api({
+    action: 'updateSchool',
+    name: school.name,
+    termCount: cnt,
+    semType,
+    testSchedule: { g1: readGrade('g1'), g2: readGrade('g2'), g3: readGrade('g3') },
+    scheduleUrl: document.getElementById('schUrl_' + idx)?.value.trim() || '',
+    scheduleMemo: document.getElementById('schMemo_' + idx)?.value.trim() || ''
+  });
   if (r.success) { toast('✅ 更新しました'); loadSchools(); }
   else toast('❌ ' + r.error);
 }
-async function deleteSchool(name) {
+async function deleteSchool(idx) {
+  const school = schools[idx];
+  if (!school) { toast('学校が見つかりません'); return; }
+  const name = school.name;
   if (!confirm(`「${name}」を削除しますか？`)) return;
   const r = await api({ action: 'deleteSchool', name });
   if (r.success) { toast('✅ 削除しました'); loadSchools(); }

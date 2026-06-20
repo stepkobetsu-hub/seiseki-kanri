@@ -8,6 +8,7 @@ const DATA_SPREADSHEET_ID   = '1Zq3AbL9Fx_skBUibh2F73kyWlw9Ionh3-dTOtots0D8'; //
 
 const MASTER_SHEET_NAME = '☆マスタ';
 const TARGET_GRADES     = ['中1', '中2', '中3'];
+const SCHOOL_MASTER_COLS = ['学校名','年間テスト回数','学期制','登録日時','定期テスト日程JSON','予定表URL','日程メモ'];
 const MEETING_MEMO_COLS = ['ID','日付','生徒ID','氏名','校舎','学年','中学校','相手','内容','担当','登録日時','更新日時'];
 const STAFF_COLS = ['担当者名','登録日時'];
 
@@ -30,7 +31,7 @@ function getOrCreateSheet(name, headers) {
 
 function ensureSheets() {
   getOrCreateSheet('生徒マスタ', ['生徒ID','氏名','校舎','学年','中学校','パスワード','在籍フラグ','最終同期日時']);
-  getOrCreateSheet('学校マスタ', ['学校名','年間テスト回数','学期制','登録日時']);
+  ensureSchoolMasterSheet_();
   getOrCreateSheet('成績データ', [
     '生徒ID','氏名','校舎','学年','中学校','年度','テスト回次',
     '国語','社会','数学','理科','英語','5科目合計','5科目順位',
@@ -48,6 +49,16 @@ function ensureSheets() {
   getOrCreateSheet('面談メモデータ', MEETING_MEMO_COLS);
   getOrCreateSheet('担当者マスタ', STAFF_COLS);
   ensureDefaultStaffMembers_();
+}
+
+function ensureSchoolMasterSheet_() {
+  const sh = getOrCreateSheet('学校マスタ', SCHOOL_MASTER_COLS);
+  const lastCol = Math.max(sh.getLastColumn(), 1);
+  const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  SCHOOL_MASTER_COLS.forEach((name, idx) => {
+    if (headers[idx] !== name) sh.getRange(1, idx + 1).setValue(name);
+  });
+  return sh;
 }
 
 // ===================================================
@@ -227,27 +238,35 @@ function normalizeGrade(grade) {
 // ===================================================
 
 function getSchools() {
-  const sh = getOrCreateSheet('学校マスタ', []);
+  const sh = ensureSchoolMasterSheet_();
   const rows = sh.getDataRange().getValues();
   const schools = [];
   for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0]) schools.push({ name: rows[i][0], termCount: rows[i][1], semType: rows[i][2] || '3term', createdAt: rows[i][3] });
+    if (rows[i][0]) schools.push({
+      name: rows[i][0],
+      termCount: rows[i][1],
+      semType: rows[i][2] || '3term',
+      createdAt: rows[i][3],
+      testSchedule: parseSchoolSchedule_(rows[i][4]),
+      scheduleUrl: rows[i][5] || '',
+      scheduleMemo: rows[i][6] || ''
+    });
   }
   return { success: true, schools };
 }
 
 function addSchool(data) {
-  const sh = getOrCreateSheet('学校マスタ', []);
+  const sh = ensureSchoolMasterSheet_();
   const rows = sh.getDataRange().getValues();
   for (let i = 1; i < rows.length; i++) {
     if (rows[i][0] === data.name) return { success: false, error: '同じ学校名がすでに存在します' };
   }
-  sh.appendRow([data.name, Number(data.termCount), data.semType || '3term', new Date().toLocaleString('ja-JP')]);
+  sh.appendRow([data.name, Number(data.termCount), data.semType || '3term', new Date().toLocaleString('ja-JP'), buildSchoolScheduleJson_(data), data.scheduleUrl || '', data.scheduleMemo || '']);
   return { success: true };
 }
 
 function deleteSchool(data) {
-  const sh = getOrCreateSheet('学校マスタ', []);
+  const sh = ensureSchoolMasterSheet_();
   const rows = sh.getDataRange().getValues();
   for (let i = 1; i < rows.length; i++) {
     if (rows[i][0] === data.name) { sh.deleteRow(i + 1); return { success: true }; }
@@ -256,16 +275,43 @@ function deleteSchool(data) {
 }
 
 function updateSchool(data) {
-  const sh = getOrCreateSheet('学校マスタ', []);
+  const sh = ensureSchoolMasterSheet_();
   const rows = sh.getDataRange().getValues();
   for (let i = 1; i < rows.length; i++) {
     if (rows[i][0] === data.name) {
       sh.getRange(i + 1, 2).setValue(Number(data.termCount));
       sh.getRange(i + 1, 3).setValue(data.semType || rows[i][2] || '3term');
+      sh.getRange(i + 1, 5).setValue(buildSchoolScheduleJson_(data));
+      sh.getRange(i + 1, 6).setValue(data.scheduleUrl || '');
+      sh.getRange(i + 1, 7).setValue(data.scheduleMemo || '');
       return { success: true };
     }
   }
   return { success: false, error: '学校が見つかりません' };
+}
+
+function parseSchoolSchedule_(raw) {
+  if (!raw) return { g1: [], g2: [], g3: [] };
+  try {
+    const obj = JSON.parse(String(raw));
+    return {
+      g1: Array.isArray(obj.g1) ? obj.g1 : [],
+      g2: Array.isArray(obj.g2) ? obj.g2 : [],
+      g3: Array.isArray(obj.g3) ? obj.g3 : []
+    };
+  } catch (e) {
+    return { g1: [], g2: [], g3: [] };
+  }
+}
+
+function buildSchoolScheduleJson_(data) {
+  const src = data.testSchedule || {};
+  const obj = {
+    g1: Array.isArray(src.g1) ? src.g1 : [],
+    g2: Array.isArray(src.g2) ? src.g2 : [],
+    g3: Array.isArray(src.g3) ? src.g3 : []
+  };
+  return JSON.stringify(obj);
 }
 
 // ===================================================
