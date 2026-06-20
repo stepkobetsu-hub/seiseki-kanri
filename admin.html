@@ -1821,11 +1821,20 @@ function renderEntryMasterInfo(info) {
     </div>`;
 }
 
-function renderEntryAiSummary(ai) {
+function isGuardian2Transferred(ai, masterInfo) {
+  const g = (ai && ai.guardian2) || {};
+  if (ai && ai.guardian2Applied) return true;
+  if (!g.name && !g.kana && !g.relation && !g.mobile && !g.email) return true;
+  const m = masterInfo || {};
+  if (m.guardian2Relation || m.guardian2Mobile) return true;
+  return false;
+}
+
+function renderEntryAiSummary(ai, masterInfo) {
   if (!ai) return '';
   const e = ai.entryInfo || {};
   const g = ai.guardian2 || {};
-  const guardianTransferred = !!ai.guardian2Applied;
+  const guardianTransferred = isGuardian2Transferred(ai, masterInfo);
   const guardianRows = (!guardianTransferred && (g.name || g.kana || g.relation || g.mobile || g.email)) ? [[g.name, g.kana, g.relation, g.mobile, g.email]] : [];
   const familyRows = (ai.family || [])
     .filter(f => f.name || f.relation || f.job || f.workplace || f.grade)
@@ -1845,7 +1854,7 @@ function renderEntryAiSummary(ai) {
   ].filter(r => r[1] || r[2]);
 
   return `
-    ${guardianTransferred ? '' : '<div style="display:inline-flex;align-items:center;background:#fee2e2;color:#991b1b;border-radius:999px;padding:4px 10px;font-weight:800;margin-bottom:10px">NEW AI読取確認待ち</div>'}
+    ${guardianTransferred ? '' : '<div style="display:inline-flex;align-items:center;background:#fee2e2;color:#991b1b;border-radius:999px;padding:4px 10px;font-weight:800;margin-bottom:10px">AI読取確認待ち</div>'}
     ${entryInfoRow('生徒番号', ai.studentId)}
     ${entryInfoRow('生徒氏名', ai.studentName)}
     ${guardianTransferred ? '' : `
@@ -1892,7 +1901,8 @@ async function openEntryInfoModal() {
     return;
   }
   const ai = parseEntryAiData(d.ocrMemo);
-  if (ai && ai.guardian2 && Object.values(ai.guardian2).some(Boolean)) {
+  const masterInfo = Object.assign({ colC: d.masterColumnC || '' }, d.masterInfo || {});
+  if (ai && ai.guardian2 && Object.values(ai.guardian2).some(Boolean) && !isGuardian2Transferred(ai, masterInfo)) {
     currentEntryGuardian2 = ai.guardian2;
     if (guardianBtn) guardianBtn.style.display = '';
   }
@@ -1915,8 +1925,8 @@ async function openEntryInfoModal() {
   const newBadge = d.ocrMemo && String(d.ocrMemo).indexOf('NEW:') === 0
     ? `<div style="display:inline-flex;align-items:center;background:#fee2e2;color:#991b1b;border-radius:999px;padding:4px 10px;font-weight:800;margin-bottom:10px">NEW 原本確認待ち</div>`
     : '';
-  const aiHtml = renderEntryAiSummary(ai);
-  const masterInfoHtml = renderEntryMasterInfo(Object.assign({ colC: d.masterColumnC || '' }, d.masterInfo || {}));
+  const aiHtml = renderEntryAiSummary(ai, masterInfo);
+  const masterInfoHtml = renderEntryMasterInfo(masterInfo);
   const normalHtml = `
     ${masterInfoHtml}
     ${newBadge}
