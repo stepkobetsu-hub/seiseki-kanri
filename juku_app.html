@@ -1754,6 +1754,34 @@ async function loadReport() {
 async function saveReport() {
   const year = document.getElementById('rpYear').value;
   const semester = document.getElementById('rpSemester').value;
+  document.querySelectorAll('.inputError').forEach(el => el.classList.remove('inputError'));
+  const reportFields = [
+    { key:'jpn', label:'国語' },
+    { key:'soc', label:'社会' },
+    { key:'math', label:'数学' },
+    { key:'sci', label:'理科' },
+    { key:'eng', label:'英語' },
+    { key:'mus', label:'音楽' },
+    { key:'art', label:'美術' },
+    { key:'pe', label:'保健体育' },
+    { key:'tech', label:'技術家庭' }
+  ];
+  const errors = [];
+  reportFields.forEach(f => {
+    const el = document.getElementById('rp_' + f.key);
+    const v = el ? el.value : '';
+    const num = Number(v);
+    if (v !== '' && (!Number.isInteger(num) || num < 1 || num > 5)) {
+      if (el) el.classList.add('inputError');
+      errors.push(f.label);
+    }
+  });
+  if (errors.length) {
+    toast('❌ 通知表は1〜5の整数で入力してください：' + errors.join('、'));
+    const firstErr = document.querySelector('.inputError');
+    if (firstErr) firstErr.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
   const payload = { action: 'saveReport', studentId: me.id, year, semester };
   ['jpn','soc','math','sci','eng','mus','art','pe','tech'].forEach(k => {
     payload['rp_' + k] = document.getElementById('rp_' + k).value || '';

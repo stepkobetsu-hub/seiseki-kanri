@@ -563,7 +563,26 @@ function deleteReport(data) {
   return { success: false, error: '通知表データが見つかりません' };
 }
 
+function validateReportRatings(data) {
+  const labels = {
+    rp_jpn:'国語', rp_soc:'社会', rp_math:'数学', rp_sci:'理科', rp_eng:'英語',
+    rp_mus:'音楽', rp_art:'美術', rp_pe:'保健体育', rp_tech:'技術家庭'
+  };
+  const errors = [];
+  Object.keys(labels).forEach(k => {
+    const v = data[k];
+    if (v === '' || v == null) return;
+    const num = Number(v);
+    if (!Number.isInteger(num) || num < 1 || num > 5) errors.push(labels[k]);
+  });
+  return errors;
+}
+
 function saveReport(data) {
+  const ratingErrors = validateReportRatings(data);
+  if (ratingErrors.length) {
+    return { success: false, error: '通知表は1〜5の整数で入力してください: ' + ratingErrors.join('、') };
+  }
   const sh = getOrCreateSheet('通知表データ', REPORT_COLS);
   const rows = sh.getDataRange().getValues();
   const now = new Date().toLocaleString('ja-JP');
