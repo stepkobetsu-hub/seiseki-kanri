@@ -300,7 +300,6 @@ tr:hover td{background:#f8fafc}
           <select id="cmpStudent" onchange="loadCompare()">
             <option value="">生徒を選択</option>
           </select>
-          <span id="cmpAdmissionDate" style="font-size:.78rem;color:#475569;font-weight:700;white-space:nowrap"></span>
           <select id="cmpYear" onchange="loadCompare()"></select>
           <button id="cmpEntryBtn" class="btn btn-ghost btn-sm" onclick="openEntryInfoModal()" disabled>入塾時情報</button>
         </div>
@@ -316,7 +315,10 @@ tr:hover td{background:#f8fafc}
 
       <!-- データ一覧 -->
       <div class="card">
-        <div class="cardHead">📋 データ一覧</div>
+        <div class="cardHead">
+          <span>📋 データ一覧</span>
+          <span id="cmpAdmissionDate" style="font-size:.78rem;color:#475569;font-weight:700;white-space:nowrap"></span>
+        </div>
         <div class="tblWrap" style="overflow-x:auto">
           <table style="font-size:.72rem;border-collapse:collapse;width:100%">
             <thead><tr>
