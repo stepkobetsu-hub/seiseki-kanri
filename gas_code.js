@@ -94,6 +94,7 @@ function route(e) {
       case 'getEntrySheetData':   result = getEntrySheetData(data); break;
       case 'saveEntrySheetData':  result = saveEntrySheetData(data); break;
       case 'importEntrySheet':    result = importEntrySheet(data); break;
+      case 'applyEntryGuardian2ToMaster': result = applyEntryGuardian2ToMaster(data); break;
       case 'uploadEntryImage':    result = uploadEntryImage(data); break;
       case 'uploadEntryPdf':      result = uploadEntryPdf(data); break;
       default: result = { success: false, error: '不明なアクション: ' + data.action };
@@ -841,6 +842,30 @@ function importEntrySheet(data) {
   return result;
 }
 
+function applyEntryGuardian2ToMaster(data) {
+  const info = getEntrySheetData(data);
+  if (!info.success || !info.data) return { success: false, error: '入塾時情報が見つかりません' };
+
+  const parsed = parseEntryOcrMemo_(info.data.ocrMemo);
+  const guardian2 = parsed.guardian2 || {};
+  const payload = {
+    studentId: data.studentId,
+    guardian2Name: data.guardian2Name || guardian2.name || '',
+    guardian2Kana: data.guardian2Kana || guardian2.kana || '',
+    guardian2Relation: data.guardian2Relation || guardian2.relation || '',
+    guardian2Mobile: data.guardian2Mobile || guardian2.mobile || '',
+    guardian2Email: data.guardian2Email || guardian2.email || ''
+  };
+
+  if (!payload.guardian2Name && !payload.guardian2Kana && !payload.guardian2Relation && !payload.guardian2Mobile && !payload.guardian2Email) {
+    return { success: false, error: '転記できる保護者2情報がありません' };
+  }
+
+  const updated = updateMasterGuardianInfo_(payload);
+  if (!updated) return { success: false, error: '生徒マスタ元ファイルに同じ生徒IDが見つかりませんでした' };
+  return { success: true, message: '保護者2情報を生徒マスタへ転記しました', guardian2: payload };
+}
+
 function buildEntryInfoRow_(d, student, created, updated) {
   return [
     student.id, student.name, student.campus, student.grade, student.school,
@@ -871,6 +896,18 @@ function rowToEntryInfo(r) {
     createdAt: hasPdfCol ? r[18] : r[17],
     updatedAt: hasPdfCol ? r[19] : r[18]
   };
+}
+
+function parseEntryOcrMemo_(memo) {
+  const s = String(memo || '');
+  const marker = 'AI_JSON:';
+  const idx = s.indexOf(marker);
+  if (idx < 0) return {};
+  try {
+    return JSON.parse(s.slice(idx + marker.length));
+  } catch(e) {
+    return {};
+  }
 }
 
 function updateMasterGuardianInfo_(data) {

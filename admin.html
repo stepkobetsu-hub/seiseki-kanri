@@ -636,6 +636,7 @@ tr:hover td{background:#f8fafc}
     <h3 id="entryInfoTitle" style="margin-bottom:12px">入塾時情報</h3>
     <div id="entryInfoModalBody" style="font-size:.84rem;color:#334155;line-height:1.7"></div>
     <div class="modalFoot" style="margin-top:16px">
+      <button id="entryGuardian2Btn" class="btn btn-primary btn-sm" onclick="applyEntryGuardian2ToMaster()" style="display:none">保護者2を生徒マスタへ転記</button>
       <button class="btn btn-primary btn-sm" onclick="editCurrentEntryInfo()">編集する</button>
       <button class="btn btn-ghost btn-sm" onclick="closeEntryInfoModal()">閉じる</button>
     </div>
@@ -667,6 +668,7 @@ let reportChartInst = null;
 let cmpScoreData = [];
 let cmpRpData = [];
 let currentEntryInfoStudentId = '';
+let currentEntryGuardian2 = null;
 
 function getNendo(date) {
   const d = date || new Date();
@@ -1758,12 +1760,80 @@ function entryInfoRow(label, value) {
   </div>`;
 }
 
+function parseEntryAiData(memo) {
+  const s = String(memo || '');
+  const marker = 'AI_JSON:';
+  const idx = s.indexOf(marker);
+  if (idx < 0) return null;
+  try { return JSON.parse(s.slice(idx + marker.length)); } catch(e) { return null; }
+}
+
+function compactText(values) {
+  return values.filter(v => v !== '' && v != null).map(v => String(v)).join(' / ');
+}
+
+function entrySmallTable(headers, rows) {
+  if (!rows.length) return '';
+  return `<div style="overflow-x:auto;margin-top:8px">
+    <table style="font-size:.78rem">
+      <thead><tr>${headers.map(h => `<th>${htmlEsc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${rows.map(row => `<tr>${row.map(c => `<td>${htmlEsc(c || '')}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+function renderEntryAiSummary(ai) {
+  if (!ai) return '';
+  const e = ai.entryInfo || {};
+  const g = ai.guardian2 || {};
+  const guardianRows = (g.name || g.kana || g.relation || g.mobile || g.email) ? [[g.name, g.kana, g.relation, g.mobile, g.email]] : [];
+  const familyRows = (ai.family || [])
+    .filter(f => f.name || f.relation || f.job || f.workplace || f.grade)
+    .map(f => [f.name, f.relation, f.job, f.workplace, f.grade]);
+  const scoreRows = (ai.scores || [])
+    .filter(s => Object.values(s).some(Boolean))
+    .map(s => [s.year, s.grade, s.term, s.jpn, s.soc, s.math, s.sci, s.eng, s.total5]);
+  const reportRows = (ai.reports || [])
+    .filter(r => Object.values(r).some(Boolean))
+    .map(r => [r.year, r.grade, r.semester, r.rp_jpn, r.rp_soc, r.rp_math, r.rp_sci, r.rp_eng, r.rp_mus, r.rp_art, r.rp_pe, r.rp_tech]);
+  const wish = ai.wish || {};
+  const wishRows = [
+    ['公立1', wish.pub1name, wish.pub1dept],
+    ['公立2', wish.pub2name, wish.pub2dept],
+    ['私立1', wish.priv1name, wish.priv1dept],
+    ['私立2', wish.priv2name, wish.priv2dept]
+  ].filter(r => r[1] || r[2]);
+
+  return `
+    <div style="display:inline-flex;align-items:center;background:#fee2e2;color:#991b1b;border-radius:999px;padding:4px 10px;font-weight:800;margin-bottom:10px">NEW AI読取確認待ち</div>
+    ${entryInfoRow('生徒番号', ai.studentId)}
+    ${entryInfoRow('生徒氏名', ai.studentName)}
+    <div style="margin-top:12px;font-weight:800;color:#1e293b">保護者2（未転記）</div>
+    ${guardianRows.length ? entrySmallTable(['氏名','フリガナ','続柄','携帯','メール'], guardianRows) : '<div style="color:#94a3b8">保護者2情報は読み取れていません。</div>'}
+    <div style="margin-top:12px;font-weight:800;color:#1e293b">入塾時情報</div>
+    ${entryInfoRow('部活動', e.club)}
+    ${entryInfoRow('現在通っている習い事や塾', e.currentLessons)}
+    ${entryInfoRow('過去に通っていた習い事や塾', e.pastLessons)}
+    ${entryInfoRow('通塾方法', e.commuteMethod)}
+    ${entryInfoRow('ニックネーム', e.nickname)}
+    ${entryInfoRow('ご家庭からの要望・希望', e.familyRequest)}
+    ${familyRows.length ? `<div style="margin-top:12px;font-weight:800;color:#1e293b">家族情報</div>${entrySmallTable(['氏名','続柄','職業','勤務先・学校名','学年'], familyRows)}` : ''}
+    ${scoreRows.length ? `<div style="margin-top:12px;font-weight:800;color:#1e293b">定期テスト</div>${entrySmallTable(['年度','学年','回','国','社','数','理','英','5計'], scoreRows)}` : ''}
+    ${reportRows.length ? `<div style="margin-top:12px;font-weight:800;color:#1e293b">通知表</div>${entrySmallTable(['年度','学年','学期','国','社','数','理','英','音','美','体','技'], reportRows)}` : ''}
+    ${wishRows.length ? `<div style="margin-top:12px;font-weight:800;color:#1e293b">志望校</div>${entrySmallTable(['区分','学校名','学科'], wishRows)}` : ''}
+    ${entryInfoRow('AIメモ', ai.notes)}
+  `;
+}
+
 async function openEntryInfoModal() {
   const sid = document.getElementById('cmpStudent').value;
   const body = document.getElementById('entryInfoModalBody');
   const title = document.getElementById('entryInfoTitle');
+  const guardianBtn = document.getElementById('entryGuardian2Btn');
   if (!sid) { toast('生徒を選択してください'); return; }
   currentEntryInfoStudentId = sid;
+  currentEntryGuardian2 = null;
+  if (guardianBtn) guardianBtn.style.display = 'none';
   const st = students.find(s => String(s.id) === String(sid)) || {};
   title.textContent = `入塾時情報：${st.name || sid}`;
   body.innerHTML = '<div style="color:#64748b">読み込み中...</div>';
@@ -1778,6 +1848,11 @@ async function openEntryInfoModal() {
   if (!d) {
     body.innerHTML = '<div style="color:#94a3b8">入塾時情報はまだ登録されていません。</div>';
     return;
+  }
+  const ai = parseEntryAiData(d.ocrMemo);
+  if (ai && ai.guardian2 && Object.values(ai.guardian2).some(Boolean)) {
+    currentEntryGuardian2 = ai.guardian2;
+    if (guardianBtn) guardianBtn.style.display = '';
   }
   const familyRows = (d.family || []).map(f => {
     const cells = [f.name, f.relation, f.job, f.workplace, f.grade].map(x => htmlEsc(x || ''));
@@ -1798,7 +1873,8 @@ async function openEntryInfoModal() {
   const newBadge = d.ocrMemo && String(d.ocrMemo).indexOf('NEW:') === 0
     ? `<div style="display:inline-flex;align-items:center;background:#fee2e2;color:#991b1b;border-radius:999px;padding:4px 10px;font-weight:800;margin-bottom:10px">NEW 原本確認待ち</div>`
     : '';
-  const detailHtml = `
+  const aiHtml = renderEntryAiSummary(ai);
+  const normalHtml = `
     ${newBadge}
     ${entryInfoRow('状態メモ', d.ocrMemo)}
     ${entryInfoRow('部活動', d.club)}
@@ -1810,6 +1886,9 @@ async function openEntryInfoModal() {
     ${entryInfoRow('ご家庭からの要望・希望', d.familyRequest)}
     ${entryInfoRow('保護者署名日', d.signatureDate)}
     ${entryInfoRow('保護者署名氏名', d.signatureName)}
+  `;
+  const detailHtml = `
+    ${aiHtml || normalHtml}
     ${(pdfLink || imageLinks) ? `<div style="margin-top:14px">${pdfLink}${pdfLink && imageLinks ? '　' : ''}${imageLinks}</div>` : ''}
   `.trim();
 
@@ -1818,6 +1897,34 @@ async function openEntryInfoModal() {
 
 function closeEntryInfoModal() {
   document.getElementById('entryInfoModal').classList.remove('show');
+}
+
+async function applyEntryGuardian2ToMaster() {
+  const sid = currentEntryInfoStudentId || document.getElementById('cmpStudent')?.value;
+  const g = currentEntryGuardian2 || {};
+  if (!sid) { toast('生徒を選択してください'); return; }
+  if (!Object.values(g).some(Boolean)) { toast('転記できる保護者2情報がありません'); return; }
+  const ok = confirm(
+    '保護者2情報を生徒マスタ Z〜AD列へ転記します。\n\n' +
+    '氏名: ' + (g.name || '') + '\n' +
+    'フリガナ: ' + (g.kana || '') + '\n' +
+    '続柄: ' + (g.relation || '') + '\n' +
+    '携帯: ' + (g.mobile || '') + '\n' +
+    'メール: ' + (g.email || '') + '\n\n' +
+    'よろしいですか？'
+  );
+  if (!ok) return;
+  const r = await api({
+    action: 'applyEntryGuardian2ToMaster',
+    studentId: sid,
+    guardian2Name: g.name || '',
+    guardian2Kana: g.kana || '',
+    guardian2Relation: g.relation || '',
+    guardian2Mobile: g.mobile || '',
+    guardian2Email: g.email || ''
+  });
+  if (!r.success) { toast(r.error || '転記に失敗しました'); return; }
+  toast('保護者2情報を生徒マスタへ転記しました');
 }
 
 async function editCurrentEntryInfo() {
