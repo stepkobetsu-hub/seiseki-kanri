@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.4</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.5</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -486,13 +486,15 @@ tr:hover td{background:#f8fafc}
     <div id="aTab_wish" style="display:none">
       <div class="card">
         <div class="cardHead">🏫 志望校一覧</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
-          <input id="wishSearch" type="text" placeholder="氏名で検索" oninput="loadAllWishes()" style="padding:6px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:.82rem;flex:1;min-width:120px">
-          <select id="wishCampus" onchange="loadAllWishes()" style="font-size:.76rem;padding:6px;border:1px solid #e2e8f0;border-radius:8px">
+        <div class="filterRow" style="margin-bottom:12px">
+          <select id="wishCampus" onchange="filterWishStudents()">
             <option value="">全校舎</option><option>神領</option><option>大手</option>
           </select>
-          <select id="wishGrade" onchange="loadAllWishes()" style="font-size:.76rem;padding:6px;border:1px solid #e2e8f0;border-radius:8px">
+          <select id="wishGrade" onchange="filterWishStudents()">
             <option value="">全学年</option><option>中1</option><option>中2</option><option>中3</option>
+          </select>
+          <select id="wishStudent" onchange="loadAllWishes()" style="min-width:160px">
+            <option value="">生徒を選択（全員）</option>
           </select>
         </div>
         <div style="overflow-x:auto">
@@ -1182,13 +1184,42 @@ async function saveWishResult(studentId, key, value) {
   event.target.style.color = value==='合格' ? '#10b981' : value==='不合格' ? '#ef4444' : '#94a3b8';
 }
 
+let _allWishes = [];
+
+async function filterWishStudents() {
+  const campus = document.getElementById('wishCampus').value;
+  const grade  = document.getElementById('wishGrade').value;
+  const sel = document.getElementById('wishStudent');
+  const prev = sel.value;
+  const filtered = _allWishes.filter(w =>
+    (!campus || w.campus === campus) &&
+    (!grade || w.grade === grade)
+  );
+  sel.innerHTML = '<option value="">生徒を選択（全員）</option>' +
+    filtered.map(w => `<option value="${w.studentId}">${w.name}（${w.grade}）</option>`).join('');
+  if (prev && filtered.find(w => String(w.studentId) === prev)) sel.value = prev;
+  renderWishTable(filtered);
+}
+
 async function loadAllWishes() {
   const campus = document.getElementById('wishCampus').value;
   const grade  = document.getElementById('wishGrade').value;
-  const search = (document.getElementById('wishSearch')?.value || '').trim();
-  const r = await api({ action: 'getAllWishes', campus, grade });
-  let wishes = r.wishes || [];
-  if (search) wishes = wishes.filter(w => w.name && w.name.includes(search));
+  const sid    = document.getElementById('wishStudent')?.value;
+  if (_allWishes.length === 0) {
+    const r = await api({ action: 'getAllWishes' });
+    _allWishes = r.wishes || [];
+    filterWishStudents();
+    return;
+  }
+  let wishes = _allWishes.filter(w =>
+    (!campus || w.campus === campus) &&
+    (!grade  || w.grade  === grade)
+  );
+  if (sid) wishes = wishes.filter(w => String(w.studentId) === sid);
+  renderWishTable(wishes);
+}
+
+function renderWishTable(wishes) {
   const tbody = document.getElementById('wishBody');
   if (!wishes.length) {
     tbody.innerHTML = '<tr><td colspan="27" class="noData">データなし</td></tr>';
@@ -1380,7 +1411,7 @@ async function loadCompare(overrideSid) {
     const r = w.results || {};
     const badge = (val, type) => {
       if (type==='result') {
-        if (!val||val==='-') return '<span style="font-size:.7rem;color:#94a3b8;margin-left:4px">ー</span>';
+        if (!val||val==='-') return '';
         const c = val==='合格'?'#10b981':'#ef4444';
         const bg = val==='合格'?'#dcfce7':'#fee2e2';
         return `<span style="font-size:.7rem;font-weight:700;color:${c};background:${bg};padding:1px 6px;border-radius:4px;margin-left:4px">${val}</span>`;
@@ -1389,7 +1420,7 @@ async function loadCompare(overrideSid) {
         if (!val) return '';
         return `<span style="font-size:.7rem;color:#1a56a0;background:#dbeafe;padding:1px 5px;border-radius:4px;margin-left:4px">${val}</span>`;
       }
-      if (type==='enroll' && val) return '<span style="font-size:.7rem;color:#fff;background:#1a56a0;padding:1px 6px;border-radius:4px;margin-left:4px">✓進学先</span>';
+      if (type==='enroll' && val) return '<span style="font-size:.7rem;font-weight:700;color:#ef4444;margin-left:4px">進学先</span>';
       return '';
     };
     const wishItem = (label, color, name, dept, key) => {
