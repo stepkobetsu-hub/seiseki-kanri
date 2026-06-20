@@ -1855,8 +1855,6 @@ function renderEntryAiSummary(ai, masterInfo) {
 
   return `
     ${guardianTransferred ? '' : '<div style="display:inline-flex;align-items:center;background:#fee2e2;color:#991b1b;border-radius:999px;padding:4px 10px;font-weight:800;margin-bottom:10px">AI読取確認待ち</div>'}
-    ${entryInfoRow('生徒番号', ai.studentId)}
-    ${entryInfoRow('生徒氏名', ai.studentName)}
     ${guardianTransferred ? '' : `
       <div style="margin-top:12px;font-weight:800;color:#1e293b">保護者2（手書き追加分・未転記）</div>
       ${guardianRows.length ? entrySmallTable(['氏名','フリガナ','続柄','携帯','メール'], guardianRows) : '<div style="color:#94a3b8">保護者2（手書き追加分）は読み取れていません。</div>'}
@@ -1886,7 +1884,7 @@ async function openEntryInfoModal() {
   currentEntryGuardian2 = null;
   if (guardianBtn) guardianBtn.style.display = 'none';
   const st = students.find(s => String(s.id) === String(sid)) || {};
-  title.textContent = `入塾時情報：${st.name || sid}`;
+  title.textContent = `入塾時情報：${st.name || '生徒'}（No.${sid}）`;
   body.innerHTML = '<div style="color:#64748b">読み込み中...</div>';
   document.getElementById('entryInfoModal').classList.add('show');
 
