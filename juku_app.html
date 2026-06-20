@@ -1471,8 +1471,8 @@ function updateResultColor(sel) {
 
 async function loadWish() {
   try {
-    const r = await api({ action: 'getWish', studentId: me.id });
-    const w = r.wish;
+    const wr = await api({ action: 'getWish', studentId: me.id });
+    const w = wr.wish;
     if (!w) return;
     ['pub1name','pub1dept','pub2name','pub2dept','pub3name','pub3dept',
      'pri1name','pri1dept','pri2name','pri2dept','pri3name','pri3dept'].forEach(id => {
