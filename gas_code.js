@@ -934,7 +934,7 @@ function uploadEntryPdf(data) {
   if (!data.studentId) return { success: false, error: '生徒IDがありません' };
   if (!data.pdfData) return { success: false, error: 'PDFデータがありません' };
 
-  const match = String(data.pdfData).match(/^data:application\/pdf;base64,(.+)$/);
+  const match = String(data.pdfData).match(/^data:application\/pdf(?:;[^,]*)?;base64,(.+)$/);
   if (!match) return { success: false, error: 'PDFデータの形式が正しくありません' };
 
   const bytes = Utilities.base64Decode(match[1]);
