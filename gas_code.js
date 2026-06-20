@@ -78,6 +78,7 @@ function route(e) {
       // 通知表
       case 'getReport':          result = getReport(data); break;
       case 'saveReport':         result = saveReport(data); break;
+      case 'deleteReport':       result = deleteReport(data); break;
       case 'getReports':         result = getReports(data); break;
       case 'getAllReports':      result = getAllReports(data); break;
       // 同期
@@ -546,6 +547,20 @@ function getReports(data) {
   }
   result.sort((a, b) => a.year !== b.year ? a.year - b.year : 0);
   return { success: true, data: result };
+}
+
+function deleteReport(data) {
+  const sh = getOrCreateSheet('通知表データ', REPORT_COLS);
+  const rows = sh.getDataRange().getValues();
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (String(rows[i][0]) === String(data.studentId) &&
+        String(rows[i][5]) === String(data.year) &&
+        rows[i][6] === data.semester) {
+      sh.deleteRow(i + 1);
+      return { success: true };
+    }
+  }
+  return { success: false, error: '通知表データが見つかりません' };
 }
 
 function saveReport(data) {

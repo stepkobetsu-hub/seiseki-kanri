@@ -305,7 +305,7 @@ tr:hover td{background:var(--primary-lt)}
           <thead><tr>
             <th>年度</th><th>学期</th>
             <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
-            <th>音</th><th>美</th><th>体</th><th>技</th>
+            <th>音</th><th>美</th><th>体</th><th>技</th><th>操作</th>
           </tr></thead>
           <tbody id="rpHistBody2"></tbody>
         </table>
@@ -590,7 +590,7 @@ tr:hover td{background:var(--primary-lt)}
           <thead><tr>
             <th>年度</th><th>学期</th>
             <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
-            <th>音</th><th>美</th><th>体</th><th>技</th>
+            <th>音</th><th>美</th><th>体</th><th>技</th><th>操作</th>
           </tr></thead>
           <tbody id="rpHistBody"></tbody>
         </table>
@@ -1772,7 +1772,7 @@ async function saveReport() {
 async function renderReportHistory() {
   const r = await api({ action: 'getReports', studentId: me.id });
   myReports = r.data || [];
-  const noData = '<tr><td colspan="11" class="noData">データなし</td></tr>';
+  const noData = '<tr><td colspan="12" class="noData">データなし</td></tr>';
   const rows = myReports.map(d => `
     <tr>
       <td>${d.year}</td><td>${d.semester}</td>
@@ -1780,6 +1780,10 @@ async function renderReportHistory() {
       <td>${d.rp_sci||'-'}</td><td>${d.rp_eng||'-'}</td>
       <td>${d.rp_mus||'-'}</td><td>${d.rp_art||'-'}</td>
       <td>${d.rp_pe||'-'}</td><td>${d.rp_tech||'-'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-ghost btn-sm" onclick="jumpReportEdit('${d.year}','${d.semester}')">編集</button>
+        <button class="btn btn-sm" onclick="deleteReport('${d.year}','${d.semester}')" style="background:#fee2e2;color:#ef4444;border-color:#fca5a5;margin-left:4px">削除</button>
+      </td>
     </tr>`).join('') || noData;
   // 通知表タブの履歴
   const tbody = document.getElementById('rpHistBody');
@@ -1789,6 +1793,29 @@ async function renderReportHistory() {
   if (tbody2) tbody2.innerHTML = rows;
   // グラフタブの通知表グラフ
   drawStudentReportChart();
+}
+
+function jumpReportEdit(year, semester) {
+  sTabs('report', 1);
+  document.getElementById('rpYear').value = year;
+  document.getElementById('rpSemester').value = semester;
+  loadReport();
+}
+
+async function deleteReport(year, semester) {
+  if (!confirm(`${year}年度 ${semester}の通知表データを削除しますか？\nこの操作は元に戻せません。`)) return;
+  try {
+    const r = await api({ action: 'deleteReport', studentId: me.id, year, semester });
+    if (r.success) {
+      myReports = myReports.filter(d => !(String(d.year) === String(year) && d.semester === semester));
+      renderReportHistory();
+      alert('削除しました');
+    } else {
+      alert('削除に失敗しました: ' + (r.error || ''));
+    }
+  } catch(e) {
+    alert('通信エラー: ' + e.message);
+  }
 }
 
 function drawStudentReportChart() {
