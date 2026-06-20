@@ -301,6 +301,7 @@ tr:hover td{background:#f8fafc}
             <option value="">生徒を選択</option>
           </select>
           <select id="cmpYear" onchange="loadCompare()"></select>
+          <button id="cmpEntryBtn" class="btn btn-ghost btn-sm" onclick="openEntryInfoModal()" disabled>入塾時情報</button>
         </div>
       </div>
       <!-- 志望校 -->
@@ -635,6 +636,16 @@ tr:hover td{background:#f8fafc}
     <div id="syncModalBody" class="syncModalBody"></div>
     <div class="modalFoot" id="syncModalFoot">
       <!-- ボタンはJS側で動的に生成 -->
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="entryInfoModal">
+  <div class="modal" style="max-width:760px">
+    <h3 id="entryInfoTitle" style="margin-bottom:12px">入塾時情報</h3>
+    <div id="entryInfoModalBody" style="font-size:.84rem;color:#334155;line-height:1.7"></div>
+    <div class="modalFoot" style="margin-top:16px">
+      <button class="btn btn-ghost btn-sm" onclick="closeEntryInfoModal()">閉じる</button>
     </div>
   </div>
 </div>
@@ -1624,10 +1635,12 @@ function filterCmpStudents() {
   sel.innerHTML = '<option value="">生徒を選択</option>' + list.map(s =>
     `<option value="${s.id}">${s.name}（${s.grade}）</option>`).join('');
   if (prev) sel.value = prev;
+  updateCmpEntryButton();
 }
 async function loadCompare(overrideSid) {
   const sid = overrideSid ? String(overrideSid) : document.getElementById('cmpStudent').value;
   const year = document.getElementById('cmpYear').value;
+  updateCmpEntryButton(sid);
   if (!sid) return;
   // 志望校を取得して表示
   const wishCard = document.getElementById('cmpWishCard');
@@ -1719,6 +1732,87 @@ async function loadCompare(overrideSid) {
       <td style="padding:3px 4px;text-align:center;font-weight:700">${rp9!=='' ? rp9 : '-'}</td>
     </tr>`;
   }).join('');
+}
+
+function htmlEsc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function updateCmpEntryButton(sid) {
+  const btn = document.getElementById('cmpEntryBtn');
+  if (!btn) return;
+  const selected = sid || document.getElementById('cmpStudent')?.value || '';
+  btn.disabled = !selected;
+}
+
+function entryInfoRow(label, value) {
+  if (value === '' || value == null) return '';
+  return `<div style="display:grid;grid-template-columns:130px 1fr;gap:8px;padding:7px 0;border-bottom:1px solid #edf2f7">
+    <div style="color:#64748b;font-weight:600">${label}</div>
+    <div style="white-space:pre-wrap">${htmlEsc(value)}</div>
+  </div>`;
+}
+
+async function openEntryInfoModal() {
+  const sid = document.getElementById('cmpStudent').value;
+  const body = document.getElementById('entryInfoModalBody');
+  const title = document.getElementById('entryInfoTitle');
+  if (!sid) { toast('生徒を選択してください'); return; }
+  const st = students.find(s => String(s.id) === String(sid)) || {};
+  title.textContent = `入塾時情報：${st.name || sid}`;
+  body.innerHTML = '<div style="color:#64748b">読み込み中...</div>';
+  document.getElementById('entryInfoModal').classList.add('show');
+
+  const r = await api({ action: 'getEntrySheetData', studentId: sid });
+  if (!r.success) {
+    body.innerHTML = `<div style="color:#ef4444">${htmlEsc(r.error || '読み込みに失敗しました')}</div>`;
+    return;
+  }
+  const d = r.data;
+  if (!d) {
+    body.innerHTML = '<div style="color:#94a3b8">入塾時情報はまだ登録されていません。</div>';
+    return;
+  }
+  const familyRows = (d.family || []).map(f => {
+    const cells = [f.name, f.relation, f.job, f.workplace, f.grade].map(x => htmlEsc(x || ''));
+    return `<tr><td>${cells[0]}</td><td>${cells[1]}</td><td>${cells[2]}</td><td>${cells[3]}</td><td>${cells[4]}</td></tr>`;
+  }).join('');
+  const familyTable = familyRows ? `
+    <div style="margin-top:12px;font-weight:700;color:#1e293b">家族情報</div>
+    <div style="overflow-x:auto;margin-top:6px">
+      <table style="font-size:.78rem">
+        <thead><tr><th>氏名</th><th>続柄</th><th>職業</th><th>勤務先・学校名</th><th>学年</th></tr></thead>
+        <tbody>${familyRows}</tbody>
+      </table>
+    </div>` : '';
+  const imageLinks = [d.imageUrl1, d.imageUrl2].filter(Boolean).map((url, i) =>
+    `<a href="${htmlEsc(url)}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:600">原本画像${i + 1}</a>`
+  ).join('　');
+
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px">
+      ${entryInfoRow('生徒ID', d.studentId)}
+      ${entryInfoRow('氏名', d.name)}
+      ${entryInfoRow('校舎', d.campus)}
+      ${entryInfoRow('学年', d.grade)}
+      ${entryInfoRow('中学校', d.school)}
+      ${entryInfoRow('部活動', d.club)}
+      ${entryInfoRow('ニックネーム', d.nickname)}
+      ${entryInfoRow('通塾方法', d.commuteMethod)}
+      ${entryInfoRow('保護者署名日', d.signatureDate)}
+      ${entryInfoRow('保護者署名氏名', d.signatureName)}
+    </div>
+    ${entryInfoRow('現在の習い事', d.currentLessons)}
+    ${entryInfoRow('過去の習い事', d.pastLessons)}
+    ${entryInfoRow('要望・希望', d.familyRequest)}
+    ${familyTable}
+    ${imageLinks ? `<div style="margin-top:14px">${imageLinks}</div>` : ''}
+    ${entryInfoRow('更新日時', d.updatedAt)}
+  `;
+}
+
+function closeEntryInfoModal() {
+  document.getElementById('entryInfoModal').classList.remove('show');
 }
 const CMP_SUBS = [
   { key:'jpn',    label:'国語',    color:'#6366f1', avgKey:'avg_jpn' },
