@@ -1793,6 +1793,7 @@ async function openEntryInfoModal() {
   const imageLinks = [d.imageUrl1, d.imageUrl2].filter(Boolean).map((url, i) =>
     `<a href="${htmlEsc(url)}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:600">原本画像${i + 1}</a>`
   ).join('　');
+  const pdfLink = d.pdfUrl ? `<a href="${htmlEsc(d.pdfUrl)}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:600">原本PDF</a>` : '';
   const detailHtml = `
     ${entryInfoRow('部活動', d.club)}
     ${entryInfoRow('現在通っている習い事や塾', d.currentLessons)}
@@ -1803,7 +1804,7 @@ async function openEntryInfoModal() {
     ${entryInfoRow('ご家庭からの要望・希望', d.familyRequest)}
     ${entryInfoRow('保護者署名日', d.signatureDate)}
     ${entryInfoRow('保護者署名氏名', d.signatureName)}
-    ${imageLinks ? `<div style="margin-top:14px">${imageLinks}</div>` : ''}
+    ${(pdfLink || imageLinks) ? `<div style="margin-top:14px">${pdfLink}${pdfLink && imageLinks ? '　' : ''}${imageLinks}</div>` : ''}
   `.trim();
 
   body.innerHTML = detailHtml || '<div style="color:#94a3b8">保護者署名欄より下の情報はまだ登録されていません。</div>';

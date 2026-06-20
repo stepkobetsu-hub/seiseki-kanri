@@ -95,6 +95,7 @@ function route(e) {
       case 'saveEntrySheetData':  result = saveEntrySheetData(data); break;
       case 'importEntrySheet':    result = importEntrySheet(data); break;
       case 'uploadEntryImage':    result = uploadEntryImage(data); break;
+      case 'uploadEntryPdf':      result = uploadEntryPdf(data); break;
       default: result = { success: false, error: '不明なアクション: ' + data.action };
     }
   } catch(err) {
@@ -762,7 +763,7 @@ const ENTRY_INFO_COLS = [
   '生徒ID','氏名','校舎','学年','中学校',
   '部活動','現在通っている習い事や塾','過去に通っていた習い事や塾','通塾方法','ニックネーム',
   '家族情報JSON','ご家庭からの要望','保護者署名日','保護者署名氏名',
-  '原本画像URL1','原本画像URL2','OCRメモ','登録日時','更新日時'
+  '原本画像URL1','原本画像URL2','OCRメモ','PDF URL','登録日時','更新日時'
 ];
 
 const ENTRY_MASTER_MAP = {
@@ -799,8 +800,8 @@ function saveEntrySheetData(data) {
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]) === String(data.studentId)) {
       mergeEntryInfoRow_(row, rows[i]);
-      row[17] = rows[i][17] || now;
-      row[18] = now;
+      row[18] = rows[i][18] || now;
+      row[19] = now;
       sh.getRange(i + 1, 1, 1, row.length).setValues([row]);
       return { success: true, message: '入塾時情報を更新しました' };
     }
@@ -851,12 +852,12 @@ function buildEntryInfoRow_(d, student, created, updated) {
     student.id, student.name, student.campus, student.grade, student.school,
     d.club || '', d.currentLessons || '', d.pastLessons || '', d.commuteMethod || '', d.nickname || '',
     JSON.stringify(d.family || []), d.familyRequest || '', d.signatureDate || '', d.signatureName || '',
-    d.imageUrl1 || '', d.imageUrl2 || '', d.ocrMemo || '', created, updated
+    d.imageUrl1 || '', d.imageUrl2 || '', d.ocrMemo || '', d.pdfUrl || '', created, updated
   ];
 }
 
 function mergeEntryInfoRow_(next, prev) {
-  for (let i = 5; i <= 16; i++) {
+  for (let i = 5; i <= 17; i++) {
     if ((next[i] === '' || next[i] == null || next[i] === '[]') && prev[i] !== '' && prev[i] != null) {
       next[i] = prev[i];
     }
@@ -866,11 +867,15 @@ function mergeEntryInfoRow_(next, prev) {
 function rowToEntryInfo(r) {
   let family = [];
   try { family = r[10] ? JSON.parse(r[10]) : []; } catch(e) {}
+  const hasPdfCol = r.length >= 20;
   return {
     studentId: r[0], name: r[1], campus: r[2], grade: r[3], school: r[4],
     club: r[5], currentLessons: r[6], pastLessons: r[7], commuteMethod: r[8], nickname: r[9],
     family, familyRequest: r[11], signatureDate: r[12], signatureName: r[13],
-    imageUrl1: r[14], imageUrl2: r[15], ocrMemo: r[16], createdAt: r[17], updatedAt: r[18]
+    imageUrl1: r[14], imageUrl2: r[15], ocrMemo: r[16],
+    pdfUrl: hasPdfCol ? r[17] : '',
+    createdAt: hasPdfCol ? r[18] : r[17],
+    updatedAt: hasPdfCol ? r[19] : r[18]
   };
 }
 
@@ -925,8 +930,30 @@ function uploadEntryImage(data) {
   return { success: true, url: file.getUrl(), fileId: file.getId(), name: file.getName() };
 }
 
+function uploadEntryPdf(data) {
+  if (!data.studentId) return { success: false, error: '生徒IDがありません' };
+  if (!data.pdfData) return { success: false, error: 'PDFデータがありません' };
+
+  const match = String(data.pdfData).match(/^data:application\/pdf;base64,(.+)$/);
+  if (!match) return { success: false, error: 'PDFデータの形式が正しくありません' };
+
+  const bytes = Utilities.base64Decode(match[1]);
+  const folder = getOrCreateDriveFolder_('入塾書類PDF');
+  const safeName = String(data.name || '').replace(/[\\/:*?"<>|]/g, '');
+  const stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+  const fileName = [data.studentId, safeName, 'entry_sheet', stamp].filter(Boolean).join('_') + '.pdf';
+  const file = folder.createFile(Utilities.newBlob(bytes, 'application/pdf', fileName));
+  return { success: true, url: file.getUrl(), fileId: file.getId(), name: file.getName() };
+}
+
 function getOrCreateDriveFolder_(name) {
   const it = DriveApp.getFoldersByName(name);
   if (it.hasNext()) return it.next();
   return DriveApp.createFolder(name);
+}
+
+function authorizeDrive() {
+  getOrCreateDriveFolder_('入塾書類画像');
+  getOrCreateDriveFolder_('入塾書類PDF');
+  return 'Drive権限の確認が完了しました';
 }
