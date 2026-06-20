@@ -211,6 +211,7 @@ tr:hover td{background:#f8fafc}
     <div class="sideItem" onclick="aNav('compare',this)"><span class="ico">📊</span> 成績×通知表</div>
     <div class="sideSection">管理</div>
     <div class="sideItem" onclick="aNav('students',this)"><span class="ico">👥</span> 生徒一覧</div>
+    <div class="sideItem" onclick="aNav('meetings',this)"><span class="ico">🗒️</span> 面談・メモ</div>
     <div class="sideItem" onclick="aNav('schools',this)"><span class="ico">🏫</span> 学校</div>
     <div class="sideItem" onclick="aNav('report',this)"><span class="ico">📒</span> 通知表</div>
     <div class="sideSection">システム</div>
@@ -338,6 +339,15 @@ tr:hover td{background:#f8fafc}
         </div>
       </div>
       <!-- ① 得点推移 -->
+      <div id="cmpMeetingCard" class="card" style="display:none">
+        <div class="cardHead" style="justify-content:flex-start">
+          <span>🗒️ 面談・メモ</span>
+          <button class="btn btn-ghost btn-sm" onclick="openMeetingForCurrentStudent()">この生徒にメモを追加</button>
+        </div>
+        <div id="cmpMeetingBody" style="font-size:.82rem;color:#334155;line-height:1.7"></div>
+      </div>
+
+      <!-- ① 得点推移 -->
       <div class="card">
         <div class="cardHead">① 📈 得点推移（折れ線）</div>
         <div style="margin-bottom:10px">
@@ -412,6 +422,47 @@ tr:hover td{background:#f8fafc}
           <button class="btn btn-outline btn-sm" onclick="printStudentList()">🖨️ 印刷</button>
         </div>
         <div class="listBox" id="stuList"></div>
+      </div>
+    </div>
+
+    <!-- 面談・メモ -->
+    <div id="aTab_meetings" style="display:none">
+      <div class="card">
+        <div class="cardHead">🗒️ 面談・メモ 登録</div>
+        <div class="adminGrid">
+          <div>
+            <div class="fld"><label>日付</label><input id="meetDate" type="date"></div>
+            <div class="fld"><label>生徒名</label><select id="meetStudent"><option value="">生徒を選択</option></select></div>
+            <div class="fld"><label>相手</label>
+              <select id="meetCounterpart">
+                <option>父</option><option>母</option><option>本人</option><option>他</option>
+              </select>
+            </div>
+            <div class="fld"><label>担当</label><select id="meetStaff"><option value="">担当を選択</option></select></div>
+          </div>
+          <div>
+            <div class="fld"><label>内容</label><textarea id="meetContent" placeholder="面談・電話・相談内容など" style="min-height:150px"></textarea></div>
+            <button class="btn btn-primary btn-sm" onclick="saveMeetingMemo()">保存する</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearMeetingForm()">入力欄をクリア</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardHead">📋 面談・メモ 一覧</div>
+        <div class="filterRow">
+          <div class="searchWrap"><input id="meetSearch" placeholder="名前・ID・内容で検索" oninput="loadMeetingMemos()"></div>
+          <select id="meetFilterStaff" onchange="loadMeetingMemos()"><option value="">全担当</option></select>
+          <select id="meetFilterCounterpart" onchange="loadMeetingMemos()">
+            <option value="">相手すべて</option><option>父</option><option>母</option><option>本人</option><option>他</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="loadMeetingMemos()">🔄 更新</button>
+        </div>
+        <div class="tblWrap">
+          <table>
+            <thead><tr><th>日付</th><th>生徒</th><th>相手</th><th>担当</th><th>内容</th><th></th></tr></thead>
+            <tbody id="meetBody"><tr><td colspan="6" class="noData">データなし</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -618,6 +669,14 @@ tr:hover td{background:#f8fafc}
         <div class="errMsg" id="passErr" style="min-height:18px"></div>
         <button class="btn btn-primary" onclick="changeAdminPass()" style="width:100%;margin-top:4px">🔑 パスワードを変更する</button>
       </div>
+      <div class="card" style="max-width:520px">
+        <div class="cardHead">👤 面談担当者</div>
+        <div class="fldRow">
+          <input id="newStaffName" placeholder="担当者名を追加">
+          <button class="btn btn-success btn-sm" onclick="addStaffMember()">＋ 追加</button>
+        </div>
+        <div id="staffListBox" class="listBox" style="margin-top:12px"></div>
+      </div>
     </div>
 
   </main>
@@ -658,7 +717,9 @@ let students = [];
 let allScores = [];
 let allReports = [];
 let pendingSync = null;
-const TABS = ['speed','compare','students','schools','report','wish','entry','sync','settings'];
+let staffMembers = [];
+let meetingMemos = [];
+const TABS = ['speed','compare','students','meetings','schools','report','wish','entry','sync','settings'];
 // タブ履歴管理（グローバル宣言）
 let _navHist = [];
 let _navIdx = -1;
@@ -784,6 +845,7 @@ function reloadData() {
     if (sid) loadCompare(sid); else initCompare();
   }
   else if (visibleTab === 'students') loadStudents();
+  else if (visibleTab === 'meetings') initMeetings();
   else if (visibleTab === 'schools') loadSchools();
   else if (visibleTab === 'report') initAdminReportTab();
   else if (visibleTab === 'wish') { _allWishes = []; loadAllWishes(); }
@@ -839,11 +901,13 @@ function aNav(name, el) {
   if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
   if (name === 'speed') loadSpeed();
   if (name === 'students') loadStudents();
+  if (name === 'meetings') initMeetings();
   if (name === 'schools') loadSchools();
   if (name === 'report') initAdminReportTab();
   if (name === 'compare') initCompare();
   if (name === 'wish') loadAllWishes();
   if (name === 'entry') initEntryTab();
+  if (name === 'settings') loadStaffMembers();
   // 履歴に追加
   if (!_navSkip) {
     _navHist.splice(_navIdx + 1);
@@ -1739,6 +1803,7 @@ async function loadCompare(overrideSid) {
   ]);
   cmpScoreData = (scoreRes.scores || []).filter(s => !year || String(s.year) === String(year)).sort((a,b) => a.year !== b.year ? a.year - b.year : a.term - b.term);
   cmpRpData = (rpRes.data || []).filter(d => !year || String(d.year) === String(year));
+  loadCompareMeetings(sid);
   setTimeout(() => drawCompareCharts(), 50);
   // テーブル
   const len = Math.max(cmpScoreData.length, cmpRpData.length);
@@ -2440,6 +2505,190 @@ async function loadSyncLog() {
   document.getElementById('syncLogList').innerHTML = logs.map(l =>
     `<div class="logRow"><span style="color:var(--sub)">${l.time}</span><span class="logType ${l.type}">${l.type}</span><span>${l.detail}</span></div>`
   ).join('') || '<div class="noData">ログなし</div>';
+}
+
+// ===== 面談・メモ =====
+function todayStr() {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
+async function initMeetings() {
+  if (!students.length) {
+    const sr = await api({ action: 'getStudents' });
+    students = sr.students || [];
+  }
+  await loadStaffMembers();
+  populateMeetingStudents();
+  const dateEl = document.getElementById('meetDate');
+  if (dateEl && !dateEl.value) dateEl.value = todayStr();
+  await loadMeetingMemos();
+}
+
+function populateMeetingStudents() {
+  const sel = document.getElementById('meetStudent');
+  if (!sel) return;
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">生徒を選択</option>' + students.map(s =>
+    `<option value="${htmlEsc(s.id)}">${htmlEsc(s.name)}（${htmlEsc(s.grade || '')} / No.${htmlEsc(s.id)}）</option>`
+  ).join('');
+  if (prev) sel.value = prev;
+}
+
+async function loadStaffMembers() {
+  const r = await api({ action: 'getStaffMembers' });
+  staffMembers = r.staff || [];
+  renderStaffOptions();
+  renderStaffSettings();
+}
+
+function renderStaffOptions() {
+  ['meetStaff', 'meetFilterStaff'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const prev = sel.value;
+    const first = id === 'meetFilterStaff' ? '<option value="">全担当</option>' : '<option value="">担当を選択</option>';
+    sel.innerHTML = first + staffMembers.map(n => `<option value="${htmlEsc(n)}">${htmlEsc(n)}</option>`).join('');
+    if (prev) sel.value = prev;
+  });
+}
+
+function renderStaffSettings() {
+  const box = document.getElementById('staffListBox');
+  if (!box) return;
+  box.innerHTML = staffMembers.length ? staffMembers.map(n => `
+    <div class="listRow">
+      <div><strong>${htmlEsc(n)}</strong></div>
+      <button class="btn btn-danger btn-sm" onclick="deleteStaffMember('${htmlEsc(n)}')">削除</button>
+    </div>
+  `).join('') : '<div class="noData">担当者が登録されていません</div>';
+}
+
+async function addStaffMember() {
+  const el = document.getElementById('newStaffName');
+  const name = (el?.value || '').trim();
+  if (!name) { toast('担当者名を入力してください'); return; }
+  const r = await api({ action: 'addStaffMember', name });
+  if (!r.success) { toast(r.error || '追加に失敗しました'); return; }
+  if (el) el.value = '';
+  staffMembers = r.staff || [];
+  renderStaffOptions();
+  renderStaffSettings();
+  toast('担当者を追加しました');
+}
+
+async function deleteStaffMember(name) {
+  if (!confirm(`${name} を担当者マスタから削除しますか？`)) return;
+  const r = await api({ action: 'deleteStaffMember', name });
+  if (!r.success) { toast(r.error || '削除に失敗しました'); return; }
+  staffMembers = r.staff || [];
+  renderStaffOptions();
+  renderStaffSettings();
+  toast('担当者を削除しました');
+}
+
+function clearMeetingForm() {
+  ['meetStudent','meetContent'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const dateEl = document.getElementById('meetDate');
+  if (dateEl) dateEl.value = todayStr();
+  const cp = document.getElementById('meetCounterpart');
+  if (cp) cp.value = '父';
+}
+
+async function saveMeetingMemo() {
+  const payload = {
+    action: 'saveMeetingMemo',
+    date: document.getElementById('meetDate')?.value || '',
+    studentId: document.getElementById('meetStudent')?.value || '',
+    counterpart: document.getElementById('meetCounterpart')?.value || '',
+    content: document.getElementById('meetContent')?.value.trim() || '',
+    staff: document.getElementById('meetStaff')?.value || ''
+  };
+  const r = await api(payload);
+  if (!r.success) { toast(r.error || '保存に失敗しました'); return; }
+  toast('面談メモを保存しました');
+  document.getElementById('meetContent').value = '';
+  await loadMeetingMemos();
+  const sid = document.getElementById('cmpStudent')?.value;
+  if (sid && String(sid) === String(payload.studentId)) loadCompareMeetings(sid);
+}
+
+async function loadMeetingMemos() {
+  const r = await api({
+    action: 'getMeetingMemos',
+    q: document.getElementById('meetSearch')?.value || '',
+    staff: document.getElementById('meetFilterStaff')?.value || '',
+    counterpart: document.getElementById('meetFilterCounterpart')?.value || ''
+  });
+  meetingMemos = r.memos || [];
+  renderMeetingTable(meetingMemos);
+}
+
+function renderMeetingTable(list) {
+  const body = document.getElementById('meetBody');
+  if (!body) return;
+  if (!list.length) {
+    body.innerHTML = '<tr><td colspan="6" class="noData">データなし</td></tr>';
+    return;
+  }
+  body.innerHTML = list.map(m => `
+    <tr>
+      <td style="white-space:nowrap">${htmlEsc(formatEntryValue(m.date))}</td>
+      <td><button onclick="goToCompare('${htmlEsc(m.studentId)}')" style="border:0;background:transparent;color:#1a56a0;font-weight:700;text-decoration:underline;cursor:pointer;padding:0">${htmlEsc(m.name)}</button><div style="color:#94a3b8;font-size:.72rem">No.${htmlEsc(m.studentId)} / ${htmlEsc(m.grade || '')}</div></td>
+      <td>${htmlEsc(m.counterpart || '')}</td>
+      <td>${htmlEsc(m.staff || '')}</td>
+      <td style="white-space:pre-wrap;min-width:260px">${htmlEsc(m.content || '')}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteMeetingMemo('${htmlEsc(m.id)}')">削除</button></td>
+    </tr>
+  `).join('');
+}
+
+async function deleteMeetingMemo(id) {
+  if (!confirm('この面談メモを削除しますか？')) return;
+  const r = await api({ action: 'deleteMeetingMemo', id });
+  if (!r.success) { toast(r.error || '削除に失敗しました'); return; }
+  toast('面談メモを削除しました');
+  await loadMeetingMemos();
+  const sid = document.getElementById('cmpStudent')?.value;
+  if (sid) loadCompareMeetings(sid);
+}
+
+async function loadCompareMeetings(studentId) {
+  const card = document.getElementById('cmpMeetingCard');
+  const body = document.getElementById('cmpMeetingBody');
+  if (!card || !body) return;
+  const r = await api({ action: 'getMeetingMemos', studentId });
+  const list = r.memos || [];
+  if (!list.length) {
+    card.style.display = 'none';
+    body.innerHTML = '';
+    return;
+  }
+  card.style.display = 'block';
+  body.innerHTML = list.slice(0, 5).map(m => `
+    <div style="border-bottom:1px solid #edf2f7;padding:8px 0">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;color:#64748b;font-size:.76rem">
+        <span>${htmlEsc(formatEntryValue(m.date))}</span>
+        <span>相手: ${htmlEsc(m.counterpart || '-')}</span>
+        <span>担当: ${htmlEsc(m.staff || '-')}</span>
+      </div>
+      <div style="white-space:pre-wrap;margin-top:3px">${htmlEsc(m.content || '')}</div>
+    </div>
+  `).join('') + (list.length > 5 ? `<div style="margin-top:8px;color:#64748b;font-size:.76rem">他 ${list.length - 5} 件は「面談・メモ」一覧で確認できます。</div>` : '');
+}
+
+async function openMeetingForCurrentStudent() {
+  const sid = document.getElementById('cmpStudent')?.value;
+  if (!sid) return;
+  const btn = [...document.querySelectorAll('.sideItem')].find(el => el.getAttribute('onclick')?.includes("'meetings'"));
+  if (btn) aNav('meetings', btn);
+  await initMeetings();
+  const sel = document.getElementById('meetStudent');
+  if (sel) sel.value = sid;
+  const content = document.getElementById('meetContent');
+  if (content) content.focus();
 }
 
 // ===== 設定 =====

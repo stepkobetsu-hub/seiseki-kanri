@@ -8,6 +8,8 @@ const DATA_SPREADSHEET_ID   = '1Zq3AbL9Fx_skBUibh2F73kyWlw9Ionh3-dTOtots0D8'; //
 
 const MASTER_SHEET_NAME = '☆マスタ';
 const TARGET_GRADES     = ['中1', '中2', '中3'];
+const MEETING_MEMO_COLS = ['ID','日付','生徒ID','氏名','校舎','学年','中学校','相手','内容','担当','登録日時','更新日時'];
+const STAFF_COLS = ['担当者名','登録日時'];
 
 // ===================================================
 // シート取得 / 初期化
@@ -43,6 +45,9 @@ function ensureSheets() {
     '登録日時','更新日時'
   ]);
   getOrCreateSheet('同期ログ', ['日時','種別','内容']);
+  getOrCreateSheet('面談メモデータ', MEETING_MEMO_COLS);
+  getOrCreateSheet('担当者マスタ', STAFF_COLS);
+  ensureDefaultStaffMembers_();
 }
 
 // ===================================================
@@ -81,6 +86,13 @@ function route(e) {
       case 'deleteReport':       result = deleteReport(data); break;
       case 'getReports':         result = getReports(data); break;
       case 'getAllReports':      result = getAllReports(data); break;
+      // 面談・メモ
+      case 'getMeetingMemos':    result = getMeetingMemos(data); break;
+      case 'saveMeetingMemo':    result = saveMeetingMemo(data); break;
+      case 'deleteMeetingMemo':  result = deleteMeetingMemo(data); break;
+      case 'getStaffMembers':    result = getStaffMembers(); break;
+      case 'addStaffMember':     result = addStaffMember(data); break;
+      case 'deleteStaffMember':  result = deleteStaffMember(data); break;
       // 同期
       case 'syncStudents':       result = syncStudentsFromMaster(data); break;
       case 'applySyncResult':    result = applySyncResult(data); break;
@@ -655,6 +667,117 @@ function rowToReport(row) {
     year: row[5], semester: row[6],
     rp_jpn: row[7], rp_soc: row[8], rp_math: row[9], rp_sci: row[10], rp_eng: row[11],
     rp_mus: row[12], rp_art: row[13], rp_pe: row[14], rp_tech: row[15]
+  };
+}
+
+// ===================================================
+// 面談・メモ
+// ===================================================
+
+function ensureDefaultStaffMembers_() {
+  const sh = getOrCreateSheet('担当者マスタ', STAFF_COLS);
+  if (sh.getLastRow() > 1) return;
+  const now = new Date().toLocaleString('ja-JP');
+  ['加瀬', '大野', '林'].forEach(name => sh.appendRow([name, now]));
+}
+
+function getStaffMembers() {
+  ensureDefaultStaffMembers_();
+  const sh = getOrCreateSheet('担当者マスタ', STAFF_COLS);
+  const rows = sh.getDataRange().getValues();
+  const staff = [];
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][0]) staff.push(String(rows[i][0]));
+  }
+  return { success: true, staff };
+}
+
+function addStaffMember(data) {
+  const name = String(data.name || '').trim();
+  if (!name) return { success: false, error: '担当者名を入力してください' };
+  const sh = getOrCreateSheet('担当者マスタ', STAFF_COLS);
+  const rows = sh.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === name) return getStaffMembers();
+  }
+  sh.appendRow([name, new Date().toLocaleString('ja-JP')]);
+  return getStaffMembers();
+}
+
+function deleteStaffMember(data) {
+  const name = String(data.name || '').trim();
+  if (!name) return { success: false, error: '担当者名を指定してください' };
+  const sh = getOrCreateSheet('担当者マスタ', STAFF_COLS);
+  const rows = sh.getDataRange().getValues();
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (String(rows[i][0]).trim() === name) sh.deleteRow(i + 1);
+  }
+  return getStaffMembers();
+}
+
+function saveMeetingMemo(data) {
+  if (!data.studentId) return { success: false, error: '生徒を選択してください' };
+  if (!data.date) return { success: false, error: '日付を入力してください' };
+  if (!data.content) return { success: false, error: '内容を入力してください' };
+  const st = findStudentById_(data.studentId);
+  if (!st) return { success: false, error: '生徒が見つかりません: ' + data.studentId };
+  const sh = getOrCreateSheet('面談メモデータ', MEETING_MEMO_COLS);
+  const rows = sh.getDataRange().getValues();
+  const now = new Date().toLocaleString('ja-JP');
+  const id = data.id || Utilities.getUuid();
+  const row = [
+    id, data.date, st.id, st.name, st.campus, st.grade, st.school,
+    data.counterpart || '', data.content || '', data.staff || '',
+    now, now
+  ];
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(id)) {
+      row[10] = rows[i][10] || now;
+      sh.getRange(i + 1, 1, 1, row.length).setValues([row]);
+      return { success: true, memo: rowToMeetingMemo_(row) };
+    }
+  }
+  sh.appendRow(row);
+  return { success: true, memo: rowToMeetingMemo_(row) };
+}
+
+function getMeetingMemos(data) {
+  const sh = getOrCreateSheet('面談メモデータ', MEETING_MEMO_COLS);
+  const rows = sh.getDataRange().getValues();
+  const q = String(data.q || '').toLowerCase();
+  const result = [];
+  for (let i = 1; i < rows.length; i++) {
+    if (!rows[i][0]) continue;
+    const m = rowToMeetingMemo_(rows[i]);
+    if (data.studentId && String(m.studentId) !== String(data.studentId)) continue;
+    if (data.staff && m.staff !== data.staff) continue;
+    if (data.counterpart && m.counterpart !== data.counterpart) continue;
+    if (q) {
+      const hay = [m.studentId, m.name, m.counterpart, m.content, m.staff].join(' ').toLowerCase();
+      if (hay.indexOf(q) < 0) continue;
+    }
+    result.push(m);
+  }
+  result.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  return { success: true, memos: result };
+}
+
+function deleteMeetingMemo(data) {
+  const sh = getOrCreateSheet('面談メモデータ', MEETING_MEMO_COLS);
+  const rows = sh.getDataRange().getValues();
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (String(rows[i][0]) === String(data.id)) {
+      sh.deleteRow(i + 1);
+      return { success: true };
+    }
+  }
+  return { success: false, error: '面談メモが見つかりません' };
+}
+
+function rowToMeetingMemo_(r) {
+  return {
+    id: r[0], date: r[1], studentId: r[2], name: r[3], campus: r[4], grade: r[5], school: r[6],
+    counterpart: r[7], content: r[8], staff: r[9], createdAt: r[10], updatedAt: r[11]
   };
 }
 
