@@ -191,6 +191,17 @@ function rowToScore(r) {
 
 function n(v) { if (v === '' || v == null) return ''; const x = Number(v); return isNaN(x) ? '' : x; }
 
+function normalizeGrade(grade) {
+  const s = String(grade || '')
+    .trim()
+    .replace(/[１２３]/g, ch => ({'１':'1','２':'2','３':'3'}[ch]))
+    .replace(/\s+/g, '')
+    .replace(/^中学/, '中')
+    .replace(/年$/, '');
+  const m = s.match(/中?([123])/);
+  return m ? '中' + m[1] : s;
+}
+
 // ===================================================
 // 学校マスタ
 // ===================================================
@@ -624,10 +635,7 @@ function getAllReports(data) {
     if (data.year && String(r.year) !== String(data.year)) continue;
     if (data.semester && r.semester !== data.semester) continue;
     if (data.campus && r.campus !== data.campus) continue;
-    if (data.grade) {
-      const g = data.grade.replace('中','中');
-      if (r.grade !== g && r.grade !== data.grade) continue;
-    }
+    if (data.grade && normalizeGrade(r.grade) !== normalizeGrade(data.grade)) continue;
     result.push(r);
   }
   return { success: true, data: result };
@@ -725,7 +733,7 @@ function getAllWishes(data) {
     if (!rows[i][0]) continue;
     const w = rowToWish(rows[i]);
     if (data.campus && w.campus !== data.campus) continue;
-    if (data.grade && w.grade !== data.grade) continue;
+    if (data.grade && normalizeGrade(w.grade) !== normalizeGrade(data.grade)) continue;
     wishes.push(w);
   }
   return { success: true, wishes };

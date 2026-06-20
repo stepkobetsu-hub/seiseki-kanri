@@ -608,6 +608,17 @@ function getNendo(date) {
 }
 const NOW_YEAR = getNendo();
 
+function normalizeGrade(grade) {
+  const s = String(grade || '')
+    .trim()
+    .replace(/[１２３]/g, ch => ({'１':'1','２':'2','３':'3'}[ch]))
+    .replace(/\s+/g, '')
+    .replace(/^中学/, '中')
+    .replace(/年$/, '');
+  const m = s.match(/中?([123])/);
+  return m ? '中' + m[1] : s;
+}
+
 // ===== API =====
 async function api(data) {
   try {
@@ -809,12 +820,11 @@ async function loadSpeed() {
   window._allScoresFull = _cache.allScores;
 
   // キャッシュから絞り込み（GAS呼び出しなし）
-  const normalize = g => (g||'').replace(/１/g,'1').replace(/２/g,'2').replace(/３/g,'3');
   allScores = _cache.allScores.filter(s => {
     if (year   && String(s.year) !== String(year)) return false;
     if (term   && String(s.term) !== String(term)) return false;
     if (campus && s.campus !== campus) return false;
-    if (grade  && normalize(s.grade) !== normalize(grade)) return false;
+    if (grade  && normalizeGrade(s.grade) !== normalizeGrade(grade)) return false;
     return true;
   });
   const badge = document.getElementById('speedCount');
@@ -890,10 +900,9 @@ function redrawSpeedChart() {
   const campus = document.getElementById('chartCampus').value;
   const grade  = document.getElementById('chartGrade').value;
   const subj   = document.getElementById('chartSubj').value;
-  const normalize = g => (g||'').replace(/１/g,'1').replace(/２/g,'2').replace(/３/g,'3');
   let filtered = allScores;
   if (campus) filtered = filtered.filter(s => s.campus === campus);
-  if (grade)  filtered = filtered.filter(s => normalize(s.grade) === normalize(grade));
+  if (grade)  filtered = filtered.filter(s => normalizeGrade(s.grade) === normalizeGrade(grade));
   // タイトル更新
   const titleEl = document.getElementById('chartTitle');
   if (titleEl) titleEl.textContent = SUBJ_MAP[subj]?.label || subj;
@@ -1095,10 +1104,9 @@ function printStudentList() {
   const q = (document.getElementById('stuSearch').value || '').toLowerCase();
   const grade = document.getElementById('stuGrade').value;
   const campus = document.getElementById('stuCampus').value;
-  const normalize = g => (g||'').replace(/１/g,'1').replace(/２/g,'2').replace(/３/g,'3');
   let list = students;
   if (q) list = list.filter(s => s.name.toLowerCase().includes(q) || String(s.id).includes(q));
-  if (grade) list = list.filter(s => normalize(s.grade) === normalize(grade));
+  if (grade) list = list.filter(s => normalizeGrade(s.grade) === normalizeGrade(grade));
   if (campus) list = list.filter(s => s.campus === campus);
 
   const title = [grade||'全学年', campus||'全校舎'].filter(Boolean).join(' ／ ');
@@ -1155,8 +1163,7 @@ function filterStudents() {
   if (q) list = list.filter(s => s.name.toLowerCase().includes(q) || String(s.id).includes(q));
   if (grade) {
     // 全角・半角どちらでも対応
-    const normalize = g => g.replace(/１/g,'1').replace(/２/g,'2').replace(/３/g,'3');
-    list = list.filter(s => normalize(s.grade||'') === normalize(grade));
+    list = list.filter(s => normalizeGrade(s.grade) === normalizeGrade(grade));
   }
   if (campus) list = list.filter(s => s.campus === campus);
   const box = document.getElementById('stuList');
@@ -1210,7 +1217,7 @@ async function filterWishStudents() {
   const q = (document.getElementById('wishSearch')?.value || '').trim().toLowerCase();
   const filtered = _allWishes.filter(w =>
     (!campus || w.campus === campus) &&
-    (!grade || w.grade === grade) &&
+    (!grade || normalizeGrade(w.grade) === normalizeGrade(grade)) &&
     (!q || String(w.name || '').toLowerCase().includes(q) || String(w.studentId || '').toLowerCase().includes(q))
   );
   renderWishTable(filtered);
@@ -1228,7 +1235,7 @@ async function loadAllWishes() {
   }
   let wishes = _allWishes.filter(w =>
     (!campus || w.campus === campus) &&
-    (!grade  || w.grade  === grade) &&
+    (!grade  || normalizeGrade(w.grade) === normalizeGrade(grade)) &&
     (!q || String(w.name || '').toLowerCase().includes(q) || String(w.studentId || '').toLowerCase().includes(q))
   );
   renderWishTable(wishes);
@@ -1331,16 +1338,17 @@ async function loadAdminReport() {
   const year = document.getElementById('rpAYear').value;
   const semester = document.getElementById('rpASemester').value;
   const campus = document.getElementById('rpACampus').value;
-  const grade = document.getElementById('rpAGrade').value;
-  const r = await api({ action: 'getAllReports', year, semester, campus, grade });
+  const r = await api({ action: 'getAllReports', year, semester, campus });
   allReports = r.data || [];
   filterAdminReport();
 }
 function filterAdminReport() {
   const q = (document.getElementById('rpASearch')?.value || '').trim().toLowerCase();
-  const reports = q
-    ? allReports.filter(d => String(d.name || '').toLowerCase().includes(q) || String(d.studentId || '').toLowerCase().includes(q))
-    : allReports;
+  const grade = document.getElementById('rpAGrade').value;
+  const reports = allReports.filter(d =>
+    (!grade || normalizeGrade(d.grade) === normalizeGrade(grade)) &&
+    (!q || String(d.name || '').toLowerCase().includes(q) || String(d.studentId || '').toLowerCase().includes(q))
+  );
   renderAdminReport(reports);
 }
 function renderAdminReport(reports) {
@@ -1423,11 +1431,7 @@ function filterCmpStudents() {
   const grade = document.getElementById('cmpGrade').value;
   let list = students;
   if (campus) list = list.filter(s => s.campus === campus);
-  if (grade) {
-    const g1 = grade;
-    const g2 = grade.replace('中1','中１').replace('中2','中２').replace('中3','中３');
-    list = list.filter(s => s.grade === g1 || s.grade === g2);
-  }
+  if (grade) list = list.filter(s => normalizeGrade(s.grade) === normalizeGrade(grade));
   const sel = document.getElementById('cmpStudent');
   const prev = sel.value;
   sel.innerHTML = '<option value="">生徒を選択</option>' + list.map(s =>
