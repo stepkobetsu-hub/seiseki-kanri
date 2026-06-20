@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.6</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.7</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -1781,6 +1781,72 @@ async function runSync() {
   document.getElementById('syncModal').classList.add('show');
 }
 function closeSyncModal() { document.getElementById('syncModal').classList.remove('show'); }
+
+// ===== 編集モーダル =====
+let _editSc = null, _editRp = null, _editSid = null;
+
+function openEditModal(sc, rp) {
+  _editSc = sc; _editRp = rp;
+  _editSid = sc.studentId || (rp && rp.studentId);
+  const modal = document.getElementById('editModal');
+  const body  = document.getElementById('editModalBody');
+  const fld = (id, label, val) =>
+    `<div class="fld"><label style="font-size:.78rem">${label}</label><input id="em_${id}" type="number" value="${val??''}" style="padding:7px 10px;border:1px solid #e2e8f0;border-radius:8px;width:100%;box-sizing:border-box;font-size:.85rem"></div>`;
+  const sec = (title, bg) =>
+    `<div style="font-weight:700;font-size:.82rem;color:#1e293b;margin:12px 0 6px;padding:6px 10px;background:${bg};border-radius:6px">${title}</div>`;
+
+  body.innerHTML = `
+    ${sec('📝 テスト成績（' + (sc.year||'') + '年度 第' + (sc.term||'') + '回）','#eef2ff')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      ${fld('jpn','国語',sc.jpn)} ${fld('soc','社会',sc.soc)}
+      ${fld('math','数学',sc.math)} ${fld('sci','理科',sc.sci)}
+      ${fld('eng','英語',sc.eng)} ${fld('rank5','5科順位',sc.rank5)}
+      ${fld('mus','音楽',sc.mus)} ${fld('art','美術',sc.art)}
+      ${fld('pe','体育',sc.pe)} ${fld('tech','技術家庭',sc.tech)}
+      ${fld('rank9','9科順位',sc.rank9)}
+      ${fld('avg_jpn','平均 国語',sc.avg_jpn)} ${fld('avg_soc','平均 社会',sc.avg_soc)}
+      ${fld('avg_math','平均 数学',sc.avg_math)} ${fld('avg_sci','平均 理科',sc.avg_sci)}
+      ${fld('avg_eng','平均 英語',sc.avg_eng)} ${fld('avg_total5','平均 5科計',sc.avg_total5)}
+    </div>
+    ${rp && rp.year ? `
+    ${sec('📒 通知表（' + (rp.year||'') + '年度 ' + (rp.semester||'') + '）','#fef9ee')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      ${fld('rp_jpn','国語',rp.rp_jpn)} ${fld('rp_soc','社会',rp.rp_soc)}
+      ${fld('rp_math','数学',rp.rp_math)} ${fld('rp_sci','理科',rp.rp_sci)}
+      ${fld('rp_eng','英語',rp.rp_eng)} ${fld('rp_mus','音楽',rp.rp_mus)}
+      ${fld('rp_art','美術',rp.rp_art)} ${fld('rp_pe','体育',rp.rp_pe)}
+      ${fld('rp_tech','技術家庭',rp.rp_tech)}
+    </div>` : ''}
+  `;
+  modal.style.display = 'flex';
+}
+
+async function saveEditModal() {
+  const g = id => { const el = document.getElementById('em_'+id); return el ? el.value : ''; };
+  const sc = _editSc, rp = _editRp;
+  if (sc && sc.year) {
+    await api({ action:'saveScore', studentId:_editSid,
+      name:sc.name, campus:sc.campus, grade:sc.grade, school:sc.school||'',
+      year:sc.year, term:sc.term,
+      jpn:g('jpn'), soc:g('soc'), math:g('math'), sci:g('sci'), eng:g('eng'),
+      rank5:g('rank5'), mus:g('mus'), art:g('art'), pe:g('pe'), tech:g('tech'), rank9:g('rank9'),
+      avg_jpn:g('avg_jpn'), avg_soc:g('avg_soc'), avg_math:g('avg_math'),
+      avg_sci:g('avg_sci'), avg_eng:g('avg_eng'), avg_total5:g('avg_total5')
+    });
+  }
+  if (rp && rp.year) {
+    await api({ action:'saveReport', studentId:_editSid,
+      year:rp.year, semester:rp.semester,
+      rp_jpn:g('rp_jpn'), rp_soc:g('rp_soc'), rp_math:g('rp_math'),
+      rp_sci:g('rp_sci'), rp_eng:g('rp_eng'), rp_mus:g('rp_mus'),
+      rp_art:g('rp_art'), rp_pe:g('rp_pe'), rp_tech:g('rp_tech')
+    });
+  }
+  document.getElementById('editModal').style.display = 'none';
+  toast('✅ 保存しました');
+  const sid = document.getElementById('cmpStudent').value;
+  if (sid) loadCompare(sid);
+}
 async function applySync(deleteOld) {
   if (!pendingSync) return;
   closeSyncModal();
