@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.5</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.6</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -502,22 +502,22 @@ tr:hover td{background:#f8fafc}
             <thead><tr style="background:#f1f5f9">
               <th style="padding:5px 8px;text-align:left">氏名</th>
               <th style="padding:5px 4px">学年</th>
-              <th style="padding:5px 4px;background:#eef2ff" colspan="4">公立1</th>
-              <th style="padding:5px 4px;background:#eef2ff" colspan="4">公立2</th>
-              <th style="padding:5px 4px;background:#eef2ff" colspan="4">公立3</th>
-              <th style="padding:5px 4px;background:#fef9ee" colspan="4">私立1</th>
-              <th style="padding:5px 4px;background:#fef9ee" colspan="4">私立2</th>
-              <th style="padding:5px 4px;background:#fef9ee" colspan="4">私立3</th>
+              <th style="padding:5px 4px;background:#dde8ff;border-left:3px solid #6366f1" colspan="4">公立 第1志望</th>
+              <th style="padding:5px 4px;background:#eef2ff;border-left:2px solid #a5b4fc" colspan="4">公立 第2志望</th>
+              <th style="padding:5px 4px;background:#f5f7ff;border-left:2px solid #c7d2fe" colspan="4">公立 第3志望</th>
+              <th style="padding:5px 4px;background:#fde68a;border-left:3px solid #f59e0b" colspan="4">私立 第1志望</th>
+              <th style="padding:5px 4px;background:#fef9ee;border-left:2px solid #fcd34d" colspan="4">私立 第2志望</th>
+              <th style="padding:5px 4px;background:#fffdf5;border-left:2px solid #fde68a" colspan="4">私立 第3志望</th>
               <th style="padding:5px 4px">更新日</th>
             </tr>
             <tr style="background:#f8fafc;font-size:.68rem;color:#94a3b8">
               <th></th><th></th>
-              <th>高校名</th><th>入試</th><th>合否</th><th>進学</th>
-              <th>高校名</th><th>入試</th><th>合否</th><th>進学</th>
-              <th>高校名</th><th>入試</th><th>合否</th><th>進学</th>
-              <th>高校名</th><th>入試</th><th>合否</th><th>進学</th>
-              <th>高校名</th><th>入試</th><th>合否</th><th>進学</th>
-              <th>高校名</th><th>入試</th><th>合否</th><th>進学</th>
+              <th style="border-left:3px solid #6366f1">高校名</th><th>入試</th><th>合否</th><th>進学</th>
+              <th style="border-left:2px solid #a5b4fc">高校名</th><th>入試</th><th>合否</th><th>進学</th>
+              <th style="border-left:2px solid #c7d2fe">高校名</th><th>入試</th><th>合否</th><th>進学</th>
+              <th style="border-left:3px solid #f59e0b">高校名</th><th>入試</th><th>合否</th><th>進学</th>
+              <th style="border-left:2px solid #fcd34d">高校名</th><th>入試</th><th>合否</th><th>進学</th>
+              <th style="border-left:2px solid #fde68a">高校名</th><th>入試</th><th>合否</th><th>進学</th>
               <th></th>
             </tr></thead>
             <tbody id="wishBody"><tr><td colspan="27" class="noData">データなし</td></tr></tbody>
@@ -685,6 +685,8 @@ function reloadData() {
   else if (visibleTab === 'students') loadStudents();
   else if (visibleTab === 'schools') loadSchools();
   else if (visibleTab === 'report') initAdminReportTab();
+  else if (visibleTab === 'wish') { _allWishes = []; loadAllWishes(); }
+  else if (visibleTab === 'sync') loadSyncLog();
   else loadSpeed();
 }
 
@@ -1226,7 +1228,7 @@ function renderWishTable(wishes) {
     return;
   }
   const res = w => w.results || {};
-  const tdName = (v, bg) => `<td style="padding:3px 5px;text-align:left${bg?';background:'+bg:''};font-size:.75rem">${v||'-'}</td>`;
+  const tdName = (v, bg, border) => `<td style="padding:3px 5px;text-align:left${bg?';background:'+bg:''}${border?';'+border:''};font-size:.75rem">${v||'-'}</td>`;
   const tdType = (r, key, bg) => {
     const v = r[key+'type']||'';
     const c = v==='一般'?'#1a56a0':v==='推薦'?'#7c3aed':'#94a3b8';
@@ -1247,12 +1249,12 @@ function renderWishTable(wishes) {
     return `<tr>
     <td style="padding:4px 8px;font-weight:600">${w.name}</td>
     <td style="padding:4px 4px;text-align:center">${w.grade||'-'}</td>
-    ${tdName(w.pub1name?w.pub1name+(w.pub1dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub1dept+'</span>':''):null,'#f5f7ff')}${tdType(r2,'pub1','#f5f7ff')}${tdResult(r2,'pub1','#f5f7ff')}${tdEnroll(r2,'pub1','#f5f7ff')}
-    ${tdName(w.pub2name?w.pub2name+(w.pub2dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub2dept+'</span>':''):null,'#f5f7ff')}${tdType(r2,'pub2','#f5f7ff')}${tdResult(r2,'pub2','#f5f7ff')}${tdEnroll(r2,'pub2','#f5f7ff')}
-    ${tdName(w.pub3name?w.pub3name+(w.pub3dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub3dept+'</span>':''):null,'#f5f7ff')}${tdType(r2,'pub3','#f5f7ff')}${tdResult(r2,'pub3','#f5f7ff')}${tdEnroll(r2,'pub3','#f5f7ff')}
-    ${tdName(w.pri1name?w.pri1name+(w.pri1dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri1dept+'</span>':''):null,'#fffbf0')}${tdType(r2,'pri1','#fffbf0')}${tdResult(r2,'pri1','#fffbf0')}${tdEnroll(r2,'pri1','#fffbf0')}
-    ${tdName(w.pri2name?w.pri2name+(w.pri2dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri2dept+'</span>':''):null,'#fffbf0')}${tdType(r2,'pri2','#fffbf0')}${tdResult(r2,'pri2','#fffbf0')}${tdEnroll(r2,'pri2','#fffbf0')}
-    ${tdName(w.pri3name?w.pri3name+(w.pri3dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri3dept+'</span>':''):null,'#fffbf0')}${tdType(r2,'pri3','#fffbf0')}${tdResult(r2,'pri3','#fffbf0')}${tdEnroll(r2,'pri3','#fffbf0')}
+    ${tdName(w.pub1name?w.pub1name+(w.pub1dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub1dept+'</span>':''):null,'#dde8ff','border-left:3px solid #6366f1')}${tdType(r2,'pub1','#dde8ff')}${tdResult(r2,'pub1','#dde8ff')}${tdEnroll(r2,'pub1','#dde8ff')}
+    ${tdName(w.pub2name?w.pub2name+(w.pub2dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub2dept+'</span>':''):null,'#eef2ff','border-left:2px solid #a5b4fc')}${tdType(r2,'pub2','#eef2ff')}${tdResult(r2,'pub2','#eef2ff')}${tdEnroll(r2,'pub2','#eef2ff')}
+    ${tdName(w.pub3name?w.pub3name+(w.pub3dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub3dept+'</span>':''):null,'#f5f7ff','border-left:2px solid #c7d2fe')}${tdType(r2,'pub3','#f5f7ff')}${tdResult(r2,'pub3','#f5f7ff')}${tdEnroll(r2,'pub3','#f5f7ff')}
+    ${tdName(w.pri1name?w.pri1name+(w.pri1dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri1dept+'</span>':''):null,'#fde68a','border-left:3px solid #f59e0b')}${tdType(r2,'pri1','#fde68a')}${tdResult(r2,'pri1','#fde68a')}${tdEnroll(r2,'pri1','#fde68a')}
+    ${tdName(w.pri2name?w.pri2name+(w.pri2dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri2dept+'</span>':''):null,'#fef9ee','border-left:2px solid #fcd34d')}${tdType(r2,'pri2','#fef9ee')}${tdResult(r2,'pri2','#fef9ee')}${tdEnroll(r2,'pri2','#fef9ee')}
+    ${tdName(w.pri3name?w.pri3name+(w.pri3dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri3dept+'</span>':''):null,'#fffdf5','border-left:2px solid #fde68a')}${tdType(r2,'pri3','#fffdf5')}${tdResult(r2,'pri3','#fffdf5')}${tdEnroll(r2,'pri3','#fffdf5')}
     <td style="padding:3px 6px;font-size:.68rem;color:#94a3b8;white-space:nowrap">${w.updatedAt?w.updatedAt.slice(0,10):'-'}</td>
   </tr>`;
   }).join('');
