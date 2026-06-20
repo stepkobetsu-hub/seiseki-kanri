@@ -1795,7 +1795,12 @@ async function openEntryInfoModal() {
     `<a href="${htmlEsc(url)}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:600">原本画像${i + 1}</a>`
   ).join('　');
   const pdfLink = d.pdfUrl ? `<a href="${htmlEsc(d.pdfUrl)}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:600">原本PDF</a>` : '';
+  const newBadge = d.ocrMemo && String(d.ocrMemo).indexOf('NEW:') === 0
+    ? `<div style="display:inline-flex;align-items:center;background:#fee2e2;color:#991b1b;border-radius:999px;padding:4px 10px;font-weight:800;margin-bottom:10px">NEW 原本確認待ち</div>`
+    : '';
   const detailHtml = `
+    ${newBadge}
+    ${entryInfoRow('状態メモ', d.ocrMemo)}
     ${entryInfoRow('部活動', d.club)}
     ${entryInfoRow('現在通っている習い事や塾', d.currentLessons)}
     ${entryInfoRow('過去に通っていた習い事や塾', d.pastLessons)}
