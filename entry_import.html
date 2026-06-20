@@ -13,36 +13,33 @@ main{max-width:920px;margin:0 auto;padding:14px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:12px;box-shadow:0 4px 16px rgba(15,23,42,.06)}
 .head{font-weight:800;margin-bottom:10px;color:#0f172a}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 label{display:block;font-size:.78rem;color:var(--sub);font-weight:700;margin:0 0 4px}
-input,textarea,select{width:100%;border:1px solid var(--border);border-radius:7px;padding:10px;font-size:16px;background:#fff;color:var(--text)}
+input,textarea{width:100%;border:1px solid var(--border);border-radius:7px;padding:10px;font-size:16px;background:#fff;color:var(--text)}
 textarea{min-height:82px;resize:vertical;font-family:inherit}
-.json{font-family:Consolas,monospace;font-size:.82rem;min-height:170px}
-.btn{border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-weight:800;cursor:pointer;background:#fff;color:var(--primary)}
+.btn{border:1px solid var(--border);border-radius:8px;padding:11px 14px;font-weight:800;cursor:pointer;background:#fff;color:var(--primary)}
 .primary{background:var(--primary);border-color:var(--primary);color:#fff}
 .ghost{background:#eef4fb}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .preview{width:100%;max-height:240px;object-fit:contain;background:#f8fafc;border:1px dashed var(--border);border-radius:7px;margin-top:8px}
-.msg{font-size:.85rem;color:var(--sub);line-height:1.7}
-.ok{color:var(--ok)}.err{color:var(--err)}
-.small{font-size:.78rem;color:var(--sub)}
-@media(max-width:680px){.grid,.grid3{grid-template-columns:1fr}main{padding:10px}.card{padding:12px}header{font-size:.95rem}}
+.msg{font-size:.9rem;color:var(--sub);line-height:1.7;white-space:pre-wrap}
+.ok{color:var(--ok)}.err{color:var(--err)}.warn{color:var(--warn)}
+.small{font-size:.78rem;color:var(--sub);line-height:1.65}
+.hidden{display:none!important}
+.summary{display:grid;grid-template-columns:160px 1fr;gap:0;border-top:1px solid var(--border)}
+.summary label{margin:0;padding:10px;border-bottom:1px solid var(--border);background:#f8fafc;color:#334155}
+.summary input,.summary textarea{border:0;border-bottom:1px solid var(--border);border-radius:0}
+.familyRow{display:grid;grid-template-columns:1.3fr .8fr 1fr 1.5fr .7fr 40px;gap:6px;margin-bottom:6px}
+.pill{display:inline-flex;align-items:center;border-radius:999px;background:#eef4fb;color:var(--primary);font-size:.78rem;font-weight:800;padding:4px 9px}
+details{margin-top:10px}.raw{font-family:Consolas,monospace;font-size:.78rem;min-height:120px}
+@media(max-width:680px){.grid{grid-template-columns:1fr}main{padding:10px}.card{padding:12px}header{font-size:.95rem}.summary{grid-template-columns:1fr}.summary label{border-bottom:0}.familyRow{grid-template-columns:1fr 1fr}.familyRow button{grid-column:1/-1}}
 </style>
 </head>
 <body>
 <header>入塾書類取込</header>
 <main>
   <div class="card">
-    <div class="head">本人確認</div>
-    <div class="grid">
-      <div><label>生徒ID</label><input id="studentId" inputmode="numeric" placeholder="例: 1000"></div>
-      <div><label>生徒氏名</label><input id="studentName" placeholder="例: 大野智子"></div>
-    </div>
-    <p class="small">取り込み前に確認します。間違いがあれば、その場で各欄を直してから保存できます。</p>
-  </div>
-
-  <div class="card">
-    <div class="head">写真</div>
+    <div class="head">写真を読み取る</div>
+    <p class="small">入塾書類を撮影すると、生徒番号・氏名・保護者2・部活・家族情報などを読み取り、確認カードにまとめます。読み間違いだけカード上で直してください。</p>
     <div class="grid">
       <div>
         <label>エントリーシート</label>
@@ -55,61 +52,73 @@ textarea{min-height:82px;resize:vertical;font-family:inherit}
         <img id="preview2" class="preview" alt="">
       </div>
     </div>
-  </div>
-
-  <div class="card">
-    <div class="head">生徒マスタへ反映する右側保護者欄（Z〜AD列）</div>
-    <p class="small">読み取り結果が入る欄です。違っているところだけ直してください。左側保護者欄や住所は上書きしません。</p>
-    <div class="grid">
-      <div><label>右 保護者氏名</label><input id="guardian2Name"></div>
-      <div><label>右 フリガナ</label><input id="guardian2Kana"></div>
-      <div><label>右 続柄</label><input id="guardian2Relation"></div>
-      <div><label>右 メール</label><input id="guardian2Email" type="email"></div>
-      <div><label>右 携帯電話番号</label><input id="guardian2Mobile" inputmode="tel"></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="head">保護者署名欄より下の情報</div>
-    <p class="small">部活・習い事・家族情報・ご家庭からの要望など、管理画面の「入塾時情報」で見るための欄です。</p>
-    <div class="grid">
-      <div><label>部活動</label><input id="club"></div>
-      <div><label>ニックネーム</label><input id="nickname"></div>
-      <div><label>通塾方法</label><input id="commuteMethod"></div>
-      <div><label>保護者署名日</label><input id="signatureDate"></div>
-      <div><label>保護者署名氏名</label><input id="signatureName"></div>
-    </div>
-    <div style="margin-top:10px">
-      <label>現在通っている習い事や塾</label>
-      <textarea id="currentLessons"></textarea>
-    </div>
-    <div style="margin-top:10px">
-      <label>過去に通っていた習い事や塾</label>
-      <textarea id="pastLessons"></textarea>
-    </div>
-    <div style="margin-top:10px">
-      <label>ご家庭からの要望・希望</label>
-      <textarea id="familyRequest"></textarea>
-    </div>
-    <div style="margin-top:10px">
-      <label>家族情報JSON</label>
-      <p class="small">通常は読み取り結果から入ります。手直しが必要な時だけ編集してください。</p>
-      <textarea id="familyJson" class="json" placeholder='[{"name":"加瀬俊介","relation":"父","job":"社長","workplace":"個別指導ステップ","grade":""}]'></textarea>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="head">OCR結果JSON / 成績・通知表・志望校</div>
-    <textarea id="entryJson" class="json" placeholder='{"scores":[{"year":2026,"term":1,"jpn":58,"soc":77,"math":66,"sci":55,"eng":44,"total5":300}],"reports":[{"year":2026,"semester":"1学期","rp_jpn":5,"rp_soc":5,"rp_math":5,"rp_sci":5,"rp_eng":5}],"wish":{"pub1name":"春日井高校","pub1dept":"ふつう"}}'></textarea>
-    <div class="row" style="margin-top:10px">
-      <button class="btn ghost" onclick="fillFromJson()">読み取り結果を各欄に入れる</button>
-      <button class="btn primary" onclick="submitEntry()">確認して取り込む</button>
+    <div class="row" style="margin-top:12px">
+      <button class="btn primary" onclick="readImages()">写真を読み取る</button>
+      <span id="ocrStatus" class="small"></span>
     </div>
     <div id="msg" class="msg" style="margin-top:10px"></div>
+  </div>
+
+  <div id="resultArea" class="hidden">
+    <div class="card">
+      <div class="head">本人確認カード <span class="pill">読み取り結果</span></div>
+      <div class="summary">
+        <label>生徒ID</label><input id="studentId" inputmode="numeric">
+        <label>生徒氏名</label><input id="studentName">
+      </div>
+      <p class="small">ここが違う場合だけ修正してください。保存時にこの生徒として取り込むか確認します。</p>
+    </div>
+
+    <div class="card">
+      <div class="head">保護者2カード <span class="pill">マスタ Z〜AD列</span></div>
+      <div class="summary">
+        <label>氏名</label><input id="guardian2Name">
+        <label>フリガナ</label><input id="guardian2Kana">
+        <label>続柄</label><input id="guardian2Relation">
+        <label>携帯電話番号</label><input id="guardian2Mobile" inputmode="tel">
+        <label>メール</label><input id="guardian2Email" type="email">
+      </div>
+      <p class="small">入力がある場合だけ、生徒マスタの右側保護者欄へ反映するか確認します。左側保護者欄や住所は上書きしません。</p>
+    </div>
+
+    <div class="card">
+      <div class="head">入塾時情報カード</div>
+      <div class="summary">
+        <label>部活動</label><input id="club">
+        <label>現在通っている習い事や塾</label><textarea id="currentLessons"></textarea>
+        <label>過去に通っていた習い事や塾</label><textarea id="pastLessons"></textarea>
+        <label>通塾方法</label><input id="commuteMethod">
+        <label>ニックネーム</label><input id="nickname">
+        <label>保護者署名日</label><input id="signatureDate">
+        <label>保護者署名氏名</label><input id="signatureName">
+        <label>ご家庭からの要望・希望</label><textarea id="familyRequest"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="head">家族情報カード</div>
+      <div id="familyRows"></div>
+      <button class="btn ghost" onclick="addFamilyRow()">家族を追加</button>
+    </div>
+
+    <div class="card">
+      <div class="head">成績・通知表・志望校カード</div>
+      <p class="small">読み取れた点数や志望校がある場合は、下の内部データに入り、取り込み時に成績管理へ保存されます。</p>
+      <textarea id="entryJson" class="raw"></textarea>
+      <details>
+        <summary class="small">読み取りテキストを見る</summary>
+        <textarea id="ocrText" class="raw" readonly></textarea>
+      </details>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" onclick="submitEntry()">確認して取り込む</button>
+        <button class="btn ghost" onclick="readImages()">もう一度読み取る</button>
+      </div>
+    </div>
   </div>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 
@@ -118,42 +127,153 @@ async function api(data) {
   return await r.json();
 }
 
-function v(id) { return document.getElementById(id).value.trim(); }
-function setv(id, value) { if (value != null) document.getElementById(id).value = value; }
-function msg(text, cls) { const el = document.getElementById('msg'); el.className = 'msg ' + (cls || ''); el.textContent = text; }
+function el(id) { return document.getElementById(id); }
+function v(id) { return (el(id).value || '').trim(); }
+function setv(id, value) { el(id).value = value == null ? '' : value; }
+function msg(text, cls) { const m = el('msg'); m.className = 'msg ' + (cls || ''); m.textContent = text; }
+function setStatus(text) { el('ocrStatus').textContent = text || ''; }
+function fileOf(id) { const input = el(id); return input.files && input.files[0] ? input.files[0] : null; }
 
 function previewImage(input, previewId) {
   const file = input.files && input.files[0];
-  const img = document.getElementById(previewId);
+  const img = el(previewId);
   if (!file) { img.removeAttribute('src'); return; }
   img.src = URL.createObjectURL(file);
 }
 
-function parseJson() {
-  const raw = v('entryJson');
-  if (!raw) return {};
-  return JSON.parse(raw);
+async function readImages() {
+  try {
+    const files = [fileOf('image1'), fileOf('image2')].filter(Boolean);
+    if (!files.length) { msg('先に写真を選んでください。', 'err'); return; }
+    if (!window.Tesseract) { msg('読み取りライブラリを読み込めませんでした。通信状態を確認してください。', 'err'); return; }
+    msg('写真を読み取っています。少し時間がかかります。', '');
+    setStatus('0%');
+    let allText = '';
+    for (let i = 0; i < files.length; i++) {
+      const result = await Tesseract.recognize(files[i], 'jpn+eng', {
+        logger: m => {
+          if (m.status === 'recognizing text') setStatus(Math.round((i / files.length + m.progress / files.length) * 100) + '%');
+        }
+      });
+      allText += '\n\n--- page ' + (i + 1) + ' ---\n' + result.data.text;
+    }
+    setv('ocrText', allText.trim());
+    applyParsedData(parseOcrText(allText));
+    el('resultArea').classList.remove('hidden');
+    msg('読み取りました。カードの内容を確認し、違うところだけ直してください。', 'ok');
+    setStatus('完了');
+  } catch(e) {
+    msg('読み取りに失敗しました: ' + e.message, 'err');
+    setStatus('');
+  }
 }
 
-function fillFromJson() {
-  try {
-    const d = parseJson();
-    if (Array.isArray(d)) {
-      setv('familyJson', JSON.stringify(d, null, 2));
-      msg('家族情報JSONをフォームへ反映しました。', 'ok');
-      return;
+function cleanText(text) {
+  return String(text || '').replace(/[ \t]+/g, ' ').replace(/[|｜]/g, '').replace(/[：]/g, ':');
+}
+
+function pickAfter(text, labels) {
+  const lines = cleanText(text).split(/\n/).map(s => s.trim()).filter(Boolean);
+  for (const line of lines) {
+    for (const label of labels) {
+      const i = line.indexOf(label);
+      if (i >= 0) {
+        const v = line.slice(i + label.length).replace(/^[:\s]+/, '').trim();
+        if (v) return v;
+      }
     }
-    const map = [
-      'guardian2Name','guardian2Kana','guardian2Relation','guardian2Email','guardian2Mobile',
-      'club','nickname','commuteMethod','signatureDate','signatureName',
-      'currentLessons','pastLessons','familyRequest'
-    ];
-    map.forEach(k => setv(k, d[k]));
-    if (d.family) setv('familyJson', JSON.stringify(d.family, null, 2));
-    msg('JSONをフォームへ反映しました。内容を確認して取り込んでください。', 'ok');
-  } catch(e) {
-    msg('JSONの形式を確認してください: ' + e.message, 'err');
   }
+  return '';
+}
+
+function parseOcrText(text) {
+  const t = cleanText(text);
+  const id = (t.match(/生徒番号\D*(\d{3,5})/) || t.match(/生徒ID\D*(\d{3,5})/) || t.match(/\b(1\d{3}|2\d{3}|3\d{3})\b/) || [,''])[1];
+  const emails = t.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/ig) || [];
+  const phones = t.match(/0\d{1,4}[-ー－]?\d{2,4}[-ー－]?\d{3,4}/g) || [];
+  const name = pickAfter(t, ['生徒 氏名','生徒氏名','氏名']) || '';
+  const guardian2Name = pickAfter(t, ['右 保護者氏名','保護者2氏名','保護者 氏名']) || '';
+  const data = {
+    studentId: id,
+    name,
+    guardian2Name,
+    guardian2Kana: pickAfter(t, ['右 フリガナ','保護者2フリガナ','フリガナ']),
+    guardian2Relation: pickAfter(t, ['右 続柄','保護者2続柄','続柄']),
+    guardian2Mobile: phones[1] || phones[0] || '',
+    guardian2Email: emails[1] || emails[0] || '',
+    club: pickAfter(t, ['部活動']),
+    currentLessons: pickAfter(t, ['現在通われている習い事や塾','現在通っている習い事や塾']),
+    pastLessons: pickAfter(t, ['過去に通われていた習い事や塾','過去に通っていた習い事や塾']),
+    commuteMethod: pickAfter(t, ['通塾方法']),
+    nickname: pickAfter(t, ['ニックネーム']),
+    signatureDate: pickAfter(t, ['保護者署名欄','保護者署名日']),
+    signatureName: pickAfter(t, ['保護者氏名','保護者署名氏名']),
+    familyRequest: pickAfter(t, ['ご家庭からのご要望','ご家庭からの要望','ご希望'])
+  };
+  return { data, family: parseFamily(t), extra: parseScoreText(t) };
+}
+
+function parseFamily(text) {
+  const lines = cleanText(text).split(/\n/).map(s => s.trim()).filter(Boolean);
+  const rels = ['父','母','兄','姉','弟','妹','祖父','祖母'];
+  const rows = [];
+  for (const line of lines) {
+    if (!rels.some(r => line.includes(r))) continue;
+    if (line.includes('続柄') || line.includes('保護者')) continue;
+    const parts = line.split(/\s+/).filter(Boolean);
+    const rel = rels.find(r => line.includes(r)) || '';
+    rows.push({ name: parts[0] || '', relation: rel, job: parts[2] || '', workplace: parts.slice(3).join(' '), grade: '' });
+    if (rows.length >= 6) break;
+  }
+  return rows;
+}
+
+function parseScoreText(text) {
+  const nums = String(text || '').match(/\b\d{1,3}\b/g) || [];
+  const extra = {};
+  const fiveScores = nums.map(Number).filter(n => n >= 0 && n <= 100).slice(0, 5);
+  if (fiveScores.length >= 5) {
+    extra.scores = [{ year:new Date().getFullYear(), term:1, jpn:fiveScores[0], soc:fiveScores[1], math:fiveScores[2], sci:fiveScores[3], eng:fiveScores[4], total5:fiveScores.reduce((a,b)=>a+b,0) }];
+  }
+  return extra;
+}
+
+function applyParsedData(parsed) {
+  const d = parsed.data || {};
+  Object.keys(d).forEach(k => { if (el(k)) setv(k, d[k]); });
+  renderFamily(parsed.family || []);
+  setv('entryJson', JSON.stringify(parsed.extra || {}, null, 2));
+}
+
+function renderFamily(rows) {
+  const wrap = el('familyRows');
+  wrap.innerHTML = '';
+  (rows.length ? rows : [{name:'',relation:'',job:'',workplace:'',grade:''}]).forEach(addFamilyRow);
+}
+
+function addFamilyRow(row) {
+  row = row || {name:'',relation:'',job:'',workplace:'',grade:''};
+  const div = document.createElement('div');
+  div.className = 'familyRow';
+  div.innerHTML = '<input placeholder="氏名" value="' + esc(row.name) + '">' +
+    '<input placeholder="続柄" value="' + esc(row.relation) + '">' +
+    '<input placeholder="職業" value="' + esc(row.job) + '">' +
+    '<input placeholder="勤務先・学校名" value="' + esc(row.workplace) + '">' +
+    '<input placeholder="学年" value="' + esc(row.grade) + '">' +
+    '<button class="btn ghost" type="button">削除</button>';
+  div.querySelector('button').onclick = () => div.remove();
+  el('familyRows').appendChild(div);
+}
+
+function esc(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function familyData() {
+  return [...el('familyRows').querySelectorAll('.familyRow')].map(row => {
+    const i = row.querySelectorAll('input');
+    return { name:i[0].value.trim(), relation:i[1].value.trim(), job:i[2].value.trim(), workplace:i[3].value.trim(), grade:i[4].value.trim() };
+  }).filter(f => f.name || f.relation || f.job || f.workplace || f.grade);
 }
 
 async function resizeImage(file) {
@@ -174,36 +294,23 @@ async function resizeImage(file) {
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(img.width * scale);
   canvas.height = Math.round(img.height * scale);
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
   return canvas.toDataURL('image/jpeg', 0.82);
 }
 
 async function uploadImage(inputId, label) {
-  const input = document.getElementById(inputId);
-  const file = input.files && input.files[0];
+  const file = fileOf(inputId);
   if (!file) return '';
   msg(label + 'を保存中...');
-  const imageData = await resizeImage(file);
-  const r = await api({
-    action:'uploadEntryImage',
-    studentId:v('studentId'),
-    name:v('studentName'),
-    label,
-    imageData
-  });
+  const r = await api({ action:'uploadEntryImage', studentId:v('studentId'), name:v('studentName'), label, imageData:await resizeImage(file) });
   if (!r.success) throw new Error(r.error || label + 'の保存に失敗しました');
   return r.url;
 }
 
 async function makePdfDataUrl() {
-  const files = ['image1','image2'].map(id => {
-    const input = document.getElementById(id);
-    return input.files && input.files[0] ? input.files[0] : null;
-  }).filter(Boolean);
+  const files = [fileOf('image1'), fileOf('image2')].filter(Boolean);
   if (!files.length) return '';
   if (!window.jspdf || !window.jspdf.jsPDF) throw new Error('PDF作成ライブラリを読み込めませんでした。通信状態を確認してください。');
-
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
   for (let i = 0; i < files.length; i++) {
@@ -216,79 +323,71 @@ async function makePdfDataUrl() {
       im.src = imageData;
     });
     const pageW = 210, pageH = 297, margin = 8;
-    const maxW = pageW - margin * 2;
-    const maxH = pageH - margin * 2;
-    const ratio = Math.min(maxW / img.width, maxH / img.height);
-    const w = img.width * ratio;
-    const h = img.height * ratio;
-    const x = (pageW - w) / 2;
-    const y = (pageH - h) / 2;
-    pdf.addImage(imageData, 'JPEG', x, y, w, h);
+    const ratio = Math.min((pageW - margin * 2) / img.width, (pageH - margin * 2) / img.height);
+    const w = img.width * ratio, h = img.height * ratio;
+    pdf.addImage(imageData, 'JPEG', (pageW - w) / 2, (pageH - h) / 2, w, h);
   }
   return pdf.output('datauristring');
 }
 
 async function uploadPdf() {
-  const hasImage = ['image1','image2'].some(id => {
-    const input = document.getElementById(id);
-    return input.files && input.files[0];
-  });
-  if (!hasImage) return '';
+  if (![fileOf('image1'), fileOf('image2')].some(Boolean)) return '';
   msg('PDFを作成して保存中...');
-  const pdfData = await makePdfDataUrl();
-  const r = await api({
-    action:'uploadEntryPdf',
-    studentId:v('studentId'),
-    name:v('studentName'),
-    pdfData
-  });
+  const r = await api({ action:'uploadEntryPdf', studentId:v('studentId'), name:v('studentName'), pdfData:await makePdfDataUrl() });
   if (!r.success) throw new Error(r.error || 'PDFの保存に失敗しました');
   return r.url;
 }
 
-function buildPayload(imageUrl1, imageUrl2, pdfUrl) {
+function hasGuardian2() {
+  return ['guardian2Name','guardian2Kana','guardian2Relation','guardian2Mobile','guardian2Email'].some(id => v(id));
+}
+
+function buildPayload(imageUrl1, imageUrl2, pdfUrl, includeGuardian2) {
   let extra = {};
-  try { extra = parseJson(); } catch(e) { throw new Error('OCR結果JSONの形式を確認してください: ' + e.message); }
-  let family = [];
-  const familyRaw = v('familyJson');
-  if (familyRaw) family = JSON.parse(familyRaw);
-  else if (Array.isArray(extra)) { family = extra; extra = {}; }
-  else if (Array.isArray(extra.family)) family = extra.family;
-  const pick = key => v(key) || extra[key] || '';
-  return Object.assign({}, extra, {
+  try { extra = JSON.parse(v('entryJson') || '{}'); } catch(e) { throw new Error('成績・通知表・志望校カードの内部データ形式を確認してください: ' + e.message); }
+  const payload = Object.assign({}, extra, {
     action:'importEntrySheet',
-    studentId:v('studentId') || extra.studentId,
-    name:v('studentName') || extra.name,
-    guardian2Name:pick('guardian2Name'),
-    guardian2Kana:pick('guardian2Kana'),
-    guardian2Relation:pick('guardian2Relation'),
-    guardian2Email:pick('guardian2Email'),
-    guardian2Mobile:pick('guardian2Mobile'),
-    club:pick('club'),
-    nickname:pick('nickname'),
-    commuteMethod:pick('commuteMethod'),
-    signatureDate:pick('signatureDate'),
-    signatureName:pick('signatureName'),
-    currentLessons:pick('currentLessons'),
-    pastLessons:pick('pastLessons'),
-    familyRequest:pick('familyRequest'),
-    imageUrl1:imageUrl1 || extra.imageUrl1 || '',
-    imageUrl2:imageUrl2 || extra.imageUrl2 || '',
-    pdfUrl:pdfUrl || extra.pdfUrl || '',
-    family
+    studentId:v('studentId'),
+    name:v('studentName'),
+    club:v('club'),
+    nickname:v('nickname'),
+    commuteMethod:v('commuteMethod'),
+    signatureDate:v('signatureDate'),
+    signatureName:v('signatureName'),
+    currentLessons:v('currentLessons'),
+    pastLessons:v('pastLessons'),
+    familyRequest:v('familyRequest'),
+    imageUrl1,
+    imageUrl2,
+    pdfUrl,
+    family:familyData()
   });
+  if (includeGuardian2) {
+    payload.guardian2Name = v('guardian2Name');
+    payload.guardian2Kana = v('guardian2Kana');
+    payload.guardian2Relation = v('guardian2Relation');
+    payload.guardian2Mobile = v('guardian2Mobile');
+    payload.guardian2Email = v('guardian2Email');
+  }
+  return payload;
 }
 
 async function submitEntry() {
   try {
-    if (!v('studentId') || !v('studentName')) { msg('生徒IDと氏名を入力してください。', 'err'); return; }
-    if (!confirm('生徒ID: ' + v('studentId') + '\n氏名: ' + v('studentName') + '\n\nこの生徒として取り込みます。\n間違いがあれば「キャンセル」を押して、画面の欄を修正してください。')) return;
+    if (!v('studentId') || !v('studentName')) { msg('生徒IDまたは氏名が読み取れていません。本人確認カードで修正してください。', 'err'); return; }
+    const existing = await api({ action:'getEntrySheetData', studentId:v('studentId') });
+    let note = '';
+    if (existing.success && existing.data) note = '\n\n既存の入塾時情報があります。空欄以外の内容は今回の内容で更新されます。';
+    if (!confirm('生徒ID: ' + v('studentId') + '\n氏名: ' + v('studentName') + '\n\nこの生徒として取り込みます。' + note + '\n\n間違いがあれば「キャンセル」で戻って修正してください。')) return;
+    let includeGuardian2 = false;
+    if (hasGuardian2()) {
+      includeGuardian2 = confirm('右側の保護者2を生徒マスタ Z〜AD列へ入力しますか？\n\n氏名: ' + v('guardian2Name') + '\nフリガナ: ' + v('guardian2Kana') + '\n続柄: ' + v('guardian2Relation') + '\n携帯: ' + v('guardian2Mobile') + '\nメール: ' + v('guardian2Email'));
+    }
     const pdfUrl = await uploadPdf();
     const imageUrl1 = await uploadImage('image1', 'entry_sheet');
     const imageUrl2 = await uploadImage('image2', 'grade_sheet');
     msg('取り込み中...');
-    const payload = buildPayload(imageUrl1, imageUrl2, pdfUrl);
-    const r = await api(payload);
+    const r = await api(buildPayload(imageUrl1, imageUrl2, pdfUrl, includeGuardian2));
     if (!r.success) { msg(r.error || '取り込みに失敗しました。', 'err'); return; }
     msg((r.message || '取り込みました') + '（' + (r.saved || []).join(', ') + '）' + (r.warning ? '\n' + r.warning : ''), 'ok');
   } catch(e) {
