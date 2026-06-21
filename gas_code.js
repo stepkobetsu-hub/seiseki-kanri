@@ -10,13 +10,17 @@ const MASTER_SHEET_NAME = '☆マスタ';
 const TARGET_MASTER_FLAGS = ['1', '0']; // ☆マスタB列: 1=在籍, 0=保留中
 const SCHOOL_MASTER_COLS = ['学校名','年間テスト回数','学期制','登録日時','定期テスト日程JSON','予定表URL','日程メモ'];
 const MEETING_MEMO_COLS = ['ID','日付','生徒ID','氏名','校舎','学年','中学校','相手','内容','担当','登録日時','更新日時'];
-const STAFF_COLS = ['担当者名','メール','登録日時','面談メール通知'];
+const STAFF_COLS = ['担当者名','メール','登録日時','大手町通知','神領通知'];
 const DEFAULT_STAFF_MAILS = {
   '加瀬': 'mintcocoajasmine@gmail.com',
   '大野': 'chloeandnina1@gmail.com',
   '林': '2350.fusa.koto.shou@gmail.com'
 };
-const DEFAULT_MEETING_MAIL_STAFF = ['加瀬', '大野'];
+const DEFAULT_MEETING_MAIL_CAMPUSES = {
+  '加瀬': { ote: true, jinryo: true },
+  '大野': { ote: true, jinryo: false },
+  '林': { ote: true, jinryo: false }
+};
 
 // ===================================================
 // シート取得 / 初期化
@@ -61,6 +65,7 @@ function ensureStaffSheet_() {
   const sh = getOrCreateSheet('担当者マスタ', STAFF_COLS);
   const lastCol = Math.max(sh.getLastColumn(), STAFF_COLS.length);
   const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  const hadSingleNotify = headers[3] === '面談メール通知';
   if (headers[1] === '登録日時' && headers[2] !== '登録日時') {
     const lastRow = sh.getLastRow();
     if (lastRow > 1) {
@@ -77,8 +82,13 @@ function ensureStaffSheet_() {
     const values = sh.getRange(2, 1, lastRow - 1, STAFF_COLS.length).getValues();
     values.forEach((r, idx) => {
       const name = String(r[0] || '').trim();
-      if (name && r[3] === '') {
-        sh.getRange(idx + 2, 4).setValue(DEFAULT_MEETING_MAIL_STAFF.indexOf(name) >= 0 ? '1' : '0');
+      if (name && (r[3] === '' || hadSingleNotify)) {
+        const defaults = DEFAULT_MEETING_MAIL_CAMPUSES[name] || { ote: false, jinryo: false };
+        sh.getRange(idx + 2, 4).setValue(defaults.ote ? '1' : '0');
+      }
+      if (name && (r[4] === '' || hadSingleNotify)) {
+        const defaults = DEFAULT_MEETING_MAIL_CAMPUSES[name] || { ote: false, jinryo: false };
+        sh.getRange(idx + 2, 5).setValue(defaults.jinryo ? '1' : '0');
       }
     });
   }
@@ -764,7 +774,8 @@ function ensureDefaultStaffMembers_() {
     if (rowNo) {
       if (!sh.getRange(rowNo, 2).getValue()) sh.getRange(rowNo, 2).setValue(DEFAULT_STAFF_MAILS[name]);
     } else {
-      sh.appendRow([name, DEFAULT_STAFF_MAILS[name], now, DEFAULT_MEETING_MAIL_STAFF.indexOf(name) >= 0 ? '1' : '0']);
+      const defaults = DEFAULT_MEETING_MAIL_CAMPUSES[name] || { ote: false, jinryo: false };
+      sh.appendRow([name, DEFAULT_STAFF_MAILS[name], now, defaults.ote ? '1' : '0', defaults.jinryo ? '1' : '0']);
     }
   });
 }
@@ -780,7 +791,8 @@ function getStaffMembers() {
       const item = {
         name: String(rows[i][0]),
         email: String(rows[i][1] || ''),
-        notify: String(rows[i][3] || '') === '1'
+        notifyOte: String(rows[i][3] || '') === '1',
+        notifyJinryo: String(rows[i][4] || '') === '1'
       };
       staff.push(item.name);
       staffMembers.push(item);
@@ -792,18 +804,20 @@ function getStaffMembers() {
 function addStaffMember(data) {
   const name = String(data.name || '').trim();
   const email = String(data.email || '').trim();
-  const notify = data.notify === true || String(data.notify || '') === '1';
+  const notifyOte = data.notifyOte === true || String(data.notifyOte || '') === '1' || data.notify === true || String(data.notify || '') === '1';
+  const notifyJinryo = data.notifyJinryo === true || String(data.notifyJinryo || '') === '1';
   if (!name) return { success: false, error: '担当者名を入力してください' };
   const sh = ensureStaffSheet_();
   const rows = sh.getDataRange().getValues();
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]).trim() === name) {
       sh.getRange(i + 1, 2).setValue(email);
-      sh.getRange(i + 1, 4).setValue(notify ? '1' : '0');
+      sh.getRange(i + 1, 4).setValue(notifyOte ? '1' : '0');
+      sh.getRange(i + 1, 5).setValue(notifyJinryo ? '1' : '0');
       return getStaffMembers();
     }
   }
-  sh.appendRow([name, email, new Date().toLocaleString('ja-JP'), notify ? '1' : '0']);
+  sh.appendRow([name, email, new Date().toLocaleString('ja-JP'), notifyOte ? '1' : '0', notifyJinryo ? '1' : '0']);
   return getStaffMembers();
 }
 
@@ -818,23 +832,26 @@ function deleteStaffMember(data) {
   return getStaffMembers();
 }
 
-function getMeetingMailStaff_() {
+function getMeetingMailStaff_(campus) {
   ensureDefaultStaffMembers_();
   const sh = ensureStaffSheet_();
   const rows = sh.getDataRange().getValues();
   const result = [];
+  const campusText = String(campus || '');
+  const isOte = campusText.indexOf('大手') >= 0;
+  const isJinryo = campusText.indexOf('神領') >= 0;
   for (let i = 1; i < rows.length; i++) {
     const name = String(rows[i][0] || '').trim();
     const email = String(rows[i][1] || '').trim();
-    const notify = String(rows[i][3] || '') === '1';
-    if (name && email && notify) result.push({ name, email });
+    const notifyOte = String(rows[i][3] || '') === '1';
+    const notifyJinryo = String(rows[i][4] || '') === '1';
+    if (name && email && ((isOte && notifyOte) || (isJinryo && notifyJinryo))) result.push({ name, email });
   }
   return result;
 }
 
 function getMeetingMemoRecipients_(campus) {
-  if (String(campus || '').indexOf('大手') < 0) return [];
-  const recipients = getMeetingMailStaff_().map(s => s.email);
+  const recipients = getMeetingMailStaff_(campus).map(s => s.email);
   return Array.from(new Set(recipients.filter(Boolean)));
 }
 

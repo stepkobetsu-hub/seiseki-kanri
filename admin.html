@@ -743,15 +743,16 @@ tr:hover td{background:#f8fafc}
         <div class="errMsg" id="passErr" style="min-height:18px"></div>
         <button class="btn btn-primary" onclick="changeAdminPass()" style="width:100%;margin-top:4px">🔑 パスワードを変更する</button>
       </div>
-      <div class="card" style="max-width:520px">
+      <div class="card" style="max-width:760px">
         <div class="cardHead">👤 面談担当者</div>
-        <div class="fldRow">
-          <input id="newStaffName" placeholder="担当者名を追加">
-          <input id="newStaffEmail" placeholder="メールアドレス">
-          <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;color:#334155;white-space:nowrap">
-            <input id="newStaffNotify" type="checkbox"> メール通知先
-          </label>
+        <div style="display:grid;grid-template-columns:minmax(120px,160px) minmax(220px,1fr) auto;gap:10px;align-items:end">
+          <div class="fld" style="margin-bottom:0"><label>担当者名</label><input id="newStaffName" placeholder="例: 佐藤"></div>
+          <div class="fld" style="margin-bottom:0"><label>メールアドレス</label><input id="newStaffEmail" placeholder="example@gmail.com"></div>
           <button class="btn btn-success btn-sm" onclick="addStaffMember()">＋ 追加</button>
+          <div style="grid-column:1/-1;display:flex;gap:14px;flex-wrap:wrap;color:#334155;font-size:.84rem">
+            <label style="display:flex;align-items:center;gap:6px"><input id="newStaffNotifyOte" type="checkbox"> 大手町を通知</label>
+            <label style="display:flex;align-items:center;gap:6px"><input id="newStaffNotifyJinryo" type="checkbox"> 神領を通知</label>
+          </div>
         </div>
         <div id="staffListBox" class="listBox" style="margin-top:12px"></div>
       </div>
@@ -3260,7 +3261,9 @@ function normalizeStaffRecords(r) {
   const records = (r.staffMembers || []).map(s => typeof s === 'string' ? { name: s, email: '', notify: false } : {
     name: s.name || '',
     email: s.email || '',
-    notify: !!s.notify
+    notify: !!s.notify,
+    notifyOte: !!s.notifyOte || !!s.notify,
+    notifyJinryo: !!s.notifyJinryo
   });
   return records.length ? records : (r.staff || []).map(name => ({ name, email: '' }));
 }
@@ -3290,16 +3293,21 @@ function renderStaffSettings() {
   const box = document.getElementById('staffListBox');
   if (!box) return;
   box.innerHTML = staffMemberRecords.length ? staffMemberRecords.map((s, idx) => `
-    <div class="listRow">
-      <div style="display:grid;grid-template-columns:90px minmax(220px,1fr) auto;gap:8px;align-items:center;flex:1">
-        <strong>${htmlEsc(s.name)}</strong>
-        <input id="staffEmail${idx}" value="${htmlEsc(s.email || '')}" placeholder="メールアドレス">
-        <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;color:#334155;white-space:nowrap">
-          <input id="staffNotify${idx}" type="checkbox" ${s.notify ? 'checked' : ''}> 通知ON
+    <div class="listRow" style="display:grid;grid-template-columns:minmax(74px,100px) minmax(220px,1fr) minmax(180px,auto) auto;gap:10px;align-items:center">
+      <strong>${htmlEsc(s.name)}</strong>
+      <input id="staffEmail${idx}" value="${htmlEsc(s.email || '')}" placeholder="メールアドレス" style="width:100%;min-width:0">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;color:#334155;font-size:.82rem">
+        <label style="display:flex;align-items:center;gap:5px;white-space:nowrap">
+          <input id="staffNotifyOte${idx}" type="checkbox" ${s.notifyOte ? 'checked' : ''}> 大手町
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;white-space:nowrap">
+          <input id="staffNotifyJinryo${idx}" type="checkbox" ${s.notifyJinryo ? 'checked' : ''}> 神領
         </label>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="saveStaffMemberSetting(${idx})">保存</button>
-      <button class="btn btn-danger btn-sm" onclick="deleteStaffMemberByIndex(${idx})">削除</button>
+      <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="saveStaffMemberSetting(${idx})">保存</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteStaffMemberByIndex(${idx})">削除</button>
+      </div>
     </div>
   `).join('') : '<div class="noData">担当者が登録されていません</div>';
 }
@@ -3307,16 +3315,19 @@ function renderStaffSettings() {
 async function addStaffMember() {
   const el = document.getElementById('newStaffName');
   const mailEl = document.getElementById('newStaffEmail');
-  const notifyEl = document.getElementById('newStaffNotify');
+  const notifyOteEl = document.getElementById('newStaffNotifyOte');
+  const notifyJinryoEl = document.getElementById('newStaffNotifyJinryo');
   const name = (el?.value || '').trim();
   const email = (mailEl?.value || '').trim();
-  const notify = !!notifyEl?.checked;
+  const notifyOte = !!notifyOteEl?.checked;
+  const notifyJinryo = !!notifyJinryoEl?.checked;
   if (!name) { toast('担当者名を入力してください'); return; }
-  const r = await api({ action: 'addStaffMember', name, email, notify });
+  const r = await api({ action: 'addStaffMember', name, email, notifyOte, notifyJinryo });
   if (!r.success) { toast(r.error || '追加に失敗しました'); return; }
   if (el) el.value = '';
   if (mailEl) mailEl.value = '';
-  if (notifyEl) notifyEl.checked = false;
+  if (notifyOteEl) notifyOteEl.checked = false;
+  if (notifyJinryoEl) notifyJinryoEl.checked = false;
   staffMemberRecords = normalizeStaffRecords(r);
   staffMembers = staffMemberRecords.map(s => s.name);
   renderStaffOptions();
@@ -3328,8 +3339,9 @@ async function saveStaffMemberSetting(idx) {
   const item = staffMemberRecords[idx];
   if (!item) return;
   const email = document.getElementById(`staffEmail${idx}`)?.value.trim() || '';
-  const notify = !!document.getElementById(`staffNotify${idx}`)?.checked;
-  const r = await api({ action: 'addStaffMember', name: item.name, email, notify });
+  const notifyOte = !!document.getElementById(`staffNotifyOte${idx}`)?.checked;
+  const notifyJinryo = !!document.getElementById(`staffNotifyJinryo${idx}`)?.checked;
+  const r = await api({ action: 'addStaffMember', name: item.name, email, notifyOte, notifyJinryo });
   if (!r.success) { toast(r.error || '保存に失敗しました'); return; }
   staffMemberRecords = normalizeStaffRecords(r);
   staffMembers = staffMemberRecords.map(s => s.name);
