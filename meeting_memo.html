@@ -120,7 +120,7 @@ textarea{
 .actions button{min-width:120px}
 .filters{
   display:grid;
-  grid-template-columns:auto 1fr 1fr 1fr 150px 90px;
+  grid-template-columns:auto 1fr 140px 1fr 140px 90px;
   gap:8px;
   margin-bottom:12px;
   align-items:center;
@@ -165,14 +165,17 @@ textarea{
 }
 .memoBtns{
   display:flex;
-  gap:8px;
+  gap:6px;
   flex:0 0 auto;
+  align-items:center;
 }
 .memoBtns button{
-  padding:8px 10px;
-  min-height:36px;
-  font-size:.84rem;
+  padding:5px 10px;
+  min-height:28px;
+  font-size:.78rem;
+  border-radius:6px;
 }
+.memoBtns .btnBack{background:#f1f5f9;color:#475569;border:1px solid #cbd5e1}
 .msg{
   margin-top:10px;
   color:#52667c;
@@ -293,8 +296,9 @@ textarea{
         <button id="filterCampusJinryo" type="button" onclick="selectFilterCampus('神領')">神領</button>
         <button id="filterCampusOte" type="button" onclick="selectFilterCampus('大手')">大手町</button>
       </div>
-      <input id="searchName" placeholder="名前で検索">
-      <input id="searchStaff" placeholder="担当者で検索">
+      <input id="searchName" placeholder="名前で検索" list="studentNameList" autocomplete="off">
+      <datalist id="studentNameList"></datalist>
+      <select id="filterStaff" onchange="renderMemos()"><option value="">担当者すべて</option></select>
       <input id="searchContent" placeholder="内容で検索">
       <select id="filterCounterpart">
         <option value="">相手すべて</option>
@@ -303,7 +307,7 @@ textarea{
         <option value="本人">本人</option>
         <option value="他">他</option>
       </select>
-      <button onclick="renderMemos()">更新</button>
+      <button onclick="loadMemos()">更新</button>
     </div>
     <div id="memoList" class="memoList"></div>
   </section>
@@ -372,7 +376,7 @@ async function init(){
   $('date').value = today();
   selectCampus('');
   $('searchName').addEventListener('input', debounce(renderMemos, 250));
-  $('searchStaff').addEventListener('input', debounce(renderMemos, 250));
+  $('filterStaff').addEventListener('change', renderMemos);
   $('searchContent').addEventListener('input', debounce(renderMemos, 250));
   $('filterCounterpart').addEventListener('change', renderMemos);
   try {
@@ -382,6 +386,9 @@ async function init(){
     ]);
     students = sr.students || [];
     staffMembers = fr.staff || [];
+    // 名前datalistを生成
+    const dl = $('studentNameList');
+    if (dl) dl.innerHTML = students.map(s => `<option value="${esc(s.name)}">`).join('');
     renderStudents();
     renderStaff();
     await loadMemos();
@@ -435,6 +442,8 @@ function renderStudents(){
 
 function renderStaff(){
   $('staff').innerHTML = '<option value="">担当を選択</option>' + staffMembers.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('') + '<option value="他">他</option>';
+  const fs = $('filterStaff');
+  if (fs) fs.innerHTML = '<option value="">担当者すべて</option>' + staffMembers.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
   toggleStaffOther();
 }
 
@@ -525,14 +534,14 @@ async function loadMemos(){
 
 function renderMemos(){
   const qName    = ($('searchName')?.value || '').trim().toLowerCase();
-  const qStaff   = ($('searchStaff')?.value || '').trim().toLowerCase();
+  const qStaff   = ($('filterStaff')?.value || '').trim();
   const qContent = ($('searchContent')?.value || '').trim().toLowerCase();
   const qCounterpart = $('filterCounterpart')?.value || '';
 
   let filtered = (allMemos || memos).filter(m => {
     if (filterCampus && String(m.campus || '') !== filterCampus) return false;
     if (qName    && ![m.name, m.studentId].join(' ').toLowerCase().includes(qName)) return false;
-    if (qStaff   && !(m.staff || '').toLowerCase().includes(qStaff)) return false;
+    if (qStaff   && (m.staff || '') !== qStaff) return false;
     if (qContent && !(m.content || '').toLowerCase().includes(qContent)) return false;
     if (qCounterpart) {
       if (qCounterpart === '他') { if (!String(m.counterpart||'').startsWith('他')) return false; }
@@ -557,8 +566,9 @@ function renderMemos(){
           <div class="meta">${esc(formatDate(m.date))}　${esc(m.counterpart || '')}　担当: ${esc(m.staff || '')}</div>
         </div>
         <div class="memoBtns">
-          <button onclick="editMemo('${esc(m.id)}')">編集</button>
-          <button class="danger" onclick="deleteMemo('${esc(m.id)}')">削除</button>
+          <button class="btnBack" onclick="editMemo('${esc(m.id)}')">編集</button>
+          <button class="btnBack" onclick="window.scrollTo({top:0,behavior:'smooth'});editMemo('${esc(m.id)}')">戻す</button>
+          <button class="danger" style="padding:5px 8px;font-size:.78rem;min-height:28px;border-radius:6px" onclick="deleteMemo('${esc(m.id)}')">削除</button>
         </div>
       </div>
       <div class="content">${esc(m.content || '')}</div>
