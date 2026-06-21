@@ -120,7 +120,7 @@ textarea{
 .actions button{min-width:120px}
 .filters{
   display:grid;
-  grid-template-columns:auto 1fr 150px 150px 90px;
+  grid-template-columns:auto 1fr 1fr 1fr 150px 90px;
   gap:8px;
   margin-bottom:12px;
   align-items:center;
@@ -293,8 +293,9 @@ textarea{
         <button id="filterCampusJinryo" type="button" onclick="selectFilterCampus('神領')">神領</button>
         <button id="filterCampusOte" type="button" onclick="selectFilterCampus('大手')">大手町</button>
       </div>
-      <input id="search" placeholder="名前・ID・内容で検索">
-      <select id="filterStaff"></select>
+      <input id="searchName" placeholder="名前で検索">
+      <input id="searchStaff" placeholder="担当者で検索">
+      <input id="searchContent" placeholder="内容で検索">
       <select id="filterCounterpart">
         <option value="">相手すべて</option>
         <option value="母">母</option>
@@ -302,7 +303,7 @@ textarea{
         <option value="本人">本人</option>
         <option value="他">他</option>
       </select>
-      <button onclick="loadMemos()">更新</button>
+      <button onclick="renderMemos()">更新</button>
     </div>
     <div id="memoList" class="memoList"></div>
   </section>
@@ -314,6 +315,7 @@ const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56W
 let students = [];
 let staffMembers = [];
 let memos = [];
+let allMemos = [];
 let currentCampus = '';
 let currentGradeGroup = '';
 let filterCampus = '';
@@ -369,9 +371,10 @@ async function api(data){
 async function init(){
   $('date').value = today();
   selectCampus('');
-  $('search').addEventListener('input', debounce(loadMemos, 350));
-  $('filterStaff').addEventListener('change', loadMemos);
-  $('filterCounterpart').addEventListener('change', loadMemos);
+  $('searchName').addEventListener('input', debounce(renderMemos, 250));
+  $('searchStaff').addEventListener('input', debounce(renderMemos, 250));
+  $('searchContent').addEventListener('input', debounce(renderMemos, 250));
+  $('filterCounterpart').addEventListener('change', renderMemos);
   try {
     const [sr, fr] = await Promise.all([
       api({ action:'getStudents' }),
@@ -417,7 +420,7 @@ function selectFilterCampus(campus){
     if (!btn) return;
     btn.classList.toggle('primary', filterCampus === value);
   });
-  loadMemos();
+  if (allMemos.length) { renderMemos(); } else { loadMemos(); }
 }
 
 function renderStudents(){
@@ -432,7 +435,6 @@ function renderStudents(){
 
 function renderStaff(){
   $('staff').innerHTML = '<option value="">担当を選択</option>' + staffMembers.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('') + '<option value="他">他</option>';
-  $('filterStaff').innerHTML = '<option value="">全担当</option>' + staffMembers.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
   toggleStaffOther();
 }
 
@@ -513,16 +515,8 @@ function clearForm(keepStudent){
 async function loadMemos(){
   $('memoList').innerHTML = '<div class="msg">読み込み中...</div>';
   try {
-    const r = await api({
-      action:'getMeetingMemos',
-      q:$('search').value,
-      staff:$('filterStaff').value,
-      counterpart:$('filterCounterpart').value
-    });
-    memos = r.memos || [];
-    if (filterCampus) {
-      memos = memos.filter(m => String(m.campus || '') === filterCampus);
-    }
+    const r = await api({ action:'getMeetingMemos' });
+    allMemos = r.memos || [];
     renderMemos();
   } catch (e) {
     $('memoList').innerHTML = '<div class="msg">一覧を読み込めませんでした。</div>';
@@ -530,6 +524,27 @@ async function loadMemos(){
 }
 
 function renderMemos(){
+  const qName    = ($('searchName')?.value || '').trim().toLowerCase();
+  const qStaff   = ($('searchStaff')?.value || '').trim().toLowerCase();
+  const qContent = ($('searchContent')?.value || '').trim().toLowerCase();
+  const qCounterpart = $('filterCounterpart')?.value || '';
+
+  let filtered = (allMemos || memos).filter(m => {
+    if (filterCampus && String(m.campus || '') !== filterCampus) return false;
+    if (qName    && ![m.name, m.studentId].join(' ').toLowerCase().includes(qName)) return false;
+    if (qStaff   && !(m.staff || '').toLowerCase().includes(qStaff)) return false;
+    if (qContent && !(m.content || '').toLowerCase().includes(qContent)) return false;
+    if (qCounterpart) {
+      if (qCounterpart === '他') { if (!String(m.counterpart||'').startsWith('他')) return false; }
+      else if (m.counterpart !== qCounterpart) return false;
+    }
+    return true;
+  });
+
+  // 最新順（日付降順→登録日時降順）
+  filtered.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  memos = filtered;
+
   if (!memos.length) {
     $('memoList').innerHTML = '<div class="msg">面談メモはありません。</div>';
     return;
