@@ -32,11 +32,12 @@ input,select{width:100%;border:1px solid #c9d6e5;border-radius:10px;padding:12px
   <section class="card">
     <div class="grid">
       <div><label>パスワード</label><input id="pass" type="password" value="step123" autocomplete="current-password"></div>
-      <div><label>学校名</label><input id="school" placeholder="例: 南城中"></div>
+      <div><label>学校名</label><select id="school"><option value="">読み込み中...</option></select></div>
       <div><label>学年</label><select id="grade"><option value="">選択</option><option>中1</option><option>中2</option><option>中3</option><option>小学生</option><option>高校生</option></select></div>
       <div><label>科目</label><select id="subject"><option value="">選択</option><option>国語</option><option>社会</option><option>数学</option><option>理科</option><option>英語</option><option>5科</option><option>その他</option></select></div>
       <div><label>年度</label><input id="year" inputmode="numeric" placeholder="例: 2026"></div>
-      <div><label>回・時期</label><input id="testNo" placeholder="例: 1回 / 1学期中間"></div>
+      <div><label>回・時期</label><select id="testNo"><option value="">選択</option><option>第1回</option><option>第2回</option><option>第3回</option><option>第4回</option><option>第5回</option><option>第6回</option></select></div>
+      <div><label>種類</label><select id="kind"><option value="">指定なし</option><option>テストのみ</option><option>テスト＆先生解答</option><option>テスト＆生徒解答</option><option>先生解答のみ</option><option>生徒解答のみ</option></select></div>
     </div>
 
     <div style="margin-top:12px">
@@ -57,16 +58,45 @@ input,select{width:100%;border:1px solid #c9d6e5;border-radius:10px;padding:12px
 <script>
 const GAS_URL='https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec';
 const $=id=>document.getElementById(id);
+let schools=[];
+let db={};
 function value(id){return ($(id)?.value||'').trim()}
 function setMsg(text,ok){$('msg').className='msg '+(ok?'ok':'err');$('msg').textContent=text}
 function cleanName(s){return String(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'').trim()}
 function extOf(name){const m=String(name||'').match(/(\.[^.]+)$/);return m?m[1]:''}
 function baseName(name){return String(name||'file').replace(/\.[^.]+$/,'')}
 function buildFileName(file){
-  const parts=[value('school'),value('grade'),value('subject'),value('year'),value('testNo')].map(cleanName).filter(Boolean);
+  const school=schools.find(s=>String(s.id)===value('school'));
+  const parts=[school?.name||'',value('grade'),value('subject'),value('year'),value('testNo'),value('kind')].map(cleanName).filter(Boolean);
   const original=cleanName(baseName(file.name))||'file';
   const prefix=parts.length?parts.join('_')+'_':'';
   return prefix+original+extOf(file.name);
+}
+function currentNendo(){
+  const now=new Date();
+  return now.getMonth()<3?now.getFullYear()-1:now.getFullYear();
+}
+function dbKey(sid,year,grade,exam,subject){return `${sid}||${year}||${grade}||${exam}||${subject}`}
+function selectedSchool(){return schools.find(s=>String(s.id)===value('school'))}
+async function gasGet(params){
+  const url=GAS_URL+'?'+Object.entries(params).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');
+  const res=await fetch(url);
+  return await res.json();
+}
+async function loadDb(){
+  try{
+    $('year').value=String(currentNendo());
+    setMsg('学校一覧を読み込み中です...',true);
+    const r=await gasGet({action:'load',pass:value('pass')});
+    if(!r.ok) throw new Error(r.error||'読み込みに失敗しました');
+    schools=(r.data&&r.data.schools)||[];
+    db=(r.data&&r.data.db)||{};
+    $('school').innerHTML='<option value="">選択</option>'+schools.map(s=>`<option value="${String(s.id).replace(/"/g,'&quot;')}">${s.name}</option>`).join('');
+    setMsg('学校一覧を読み込みました。',true);
+  }catch(e){
+    $('school').innerHTML='<option value="">読み込み失敗</option>';
+    setMsg('学校一覧を読み込めませんでした。パスワードや通信状態を確認してください。\n'+(e.message||e),false);
+  }
 }
 function toBase64Url(file){
   return new Promise((resolve,reject)=>{
@@ -81,19 +111,59 @@ function toBase64Url(file){
   });
 }
 async function uploadOne(file){
+  const storedName=buildFileName(file);
   const body=new URLSearchParams();
   body.set('action','uploadAll');
   body.set('pass',value('pass'));
-  body.set('fileName',encodeURIComponent(buildFileName(file)));
+  body.set('fileName',storedName);
   body.set('mimeType',file.type||'application/octet-stream');
   body.set('fileData',await toBase64Url(file));
   const res=await fetch(GAS_URL,{method:'POST',body});
   const text=await res.text();
-  try{return JSON.parse(text)}catch(e){throw new Error('GASからJSON以外の応答が返りました: '+text.slice(0,120))}
+  try{
+    const json=JSON.parse(text);
+    if(json.ok) json.storedName=storedName;
+    return json;
+  }catch(e){throw new Error('GASからJSON以外の応答が返りました: '+text.slice(0,120))}
+}
+async function saveDb(){
+  const body=new URLSearchParams();
+  body.set('action','saveFull');
+  body.set('pass',value('pass'));
+  body.set('payload',JSON.stringify({schools,db}));
+  const res=await fetch(GAS_URL,{method:'POST',body});
+  const json=await res.json();
+  if(!json.ok) throw new Error(json.error||'DB登録に失敗しました');
+  return json;
+}
+function registerFile(file,result){
+  const school=selectedSchool();
+  const year=value('year');
+  const grade=value('grade');
+  const subject=value('subject');
+  const exam=value('testNo');
+  if(!school||!year||!grade||!subject||!exam) throw new Error('学校・年度・学年・科目・回を選択してください');
+  const key=dbKey(school.id,year,grade,exam,subject);
+  if(!db[key]) db[key]={files:[],noan:false,stu:false};
+  if(!db[key].files) db[key].files=[];
+  const today=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'});
+  if(!db[key].files.some(x=>x.fileId===result.fileId)){
+    db[key].files.push({
+      name: result.storedName||file.name,
+      url: result.url,
+      fileId: result.fileId,
+      date: today,
+      kind: value('kind'),
+      isNew: true
+    });
+  }
+  db[key].hasNew=true;
 }
 async function uploadFiles(){
   const files=[...($('file').files||[])];
   if(!value('pass')){setMsg('パスワードを入力してください。',false);return}
+  if(!selectedSchool()){setMsg('学校名を選択してください。',false);return}
+  if(!value('year')||!value('grade')||!value('subject')||!value('testNo')){setMsg('年度・学年・科目・回を選択してください。',false);return}
   if(!files.length){setMsg('ファイルを選択してください。',false);return}
   $('submitBtn').disabled=true;
   $('results').classList.add('hidden');
@@ -104,9 +174,12 @@ async function uploadFiles(){
       setMsg(`アップロード中です... ${i+1}/${files.length}`,true);
       const r=await uploadOne(files[i]);
       if(!r.ok) throw new Error(r.error||'アップロードに失敗しました');
-      saved.push({name:buildFileName(files[i]),url:r.url});
+      registerFile(files[i],r);
+      saved.push({name:r.storedName||buildFileName(files[i]),url:r.url});
     }
-    setMsg('アップロードしました。',true);
+    setMsg('DBへ登録中です...',true);
+    await saveDb();
+    setMsg('アップロードして過去問DBへ登録しました。',true);
     $('results').innerHTML='<strong>保存したファイル</strong><br>'+saved.map(x=>`<a href="${x.url}" target="_blank" rel="noopener">${x.name}</a>`).join('<br>');
     $('results').classList.remove('hidden');
     $('file').value='';
@@ -116,6 +189,7 @@ async function uploadFiles(){
     $('submitBtn').disabled=false;
   }
 }
+window.addEventListener('load',loadDb);
 </script>
 </body>
 </html>
