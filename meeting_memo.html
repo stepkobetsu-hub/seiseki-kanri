@@ -120,9 +120,20 @@ textarea{
 .actions button{min-width:120px}
 .filters{
   display:grid;
-  grid-template-columns:1fr 150px 150px 90px;
+  grid-template-columns:auto 1fr 150px 150px 90px;
   gap:8px;
   margin-bottom:12px;
+  align-items:center;
+}
+.campusFilter{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+}
+.campusFilter button{
+  white-space:nowrap;
+  padding:9px 12px;
+  min-height:40px;
 }
 .memoList{
   display:grid;
@@ -189,6 +200,7 @@ textarea{
   .card{padding:13px;border-radius:12px}
   .formGrid,.filters{grid-template-columns:1fr}
   .campusGrid{grid-template-columns:repeat(3,1fr)}
+  .campusFilter button{flex:1}
   .campusGrid button{padding:11px 6px}
   .actions button{flex:1;min-width:0}
   .memoTop{display:block}
@@ -256,6 +268,11 @@ textarea{
   <section class="card">
     <div class="cardTitle">面談メモ一覧</div>
     <div class="filters">
+      <div class="campusFilter">
+        <button id="filterCampusAll" class="primary" type="button" onclick="selectFilterCampus('')">全校舎</button>
+        <button id="filterCampusJinryo" type="button" onclick="selectFilterCampus('神領')">神領</button>
+        <button id="filterCampusOte" type="button" onclick="selectFilterCampus('大手')">大手町</button>
+      </div>
       <input id="search" placeholder="名前・ID・内容で検索">
       <select id="filterStaff"></select>
       <select id="filterCounterpart">
@@ -278,6 +295,7 @@ let students = [];
 let staffMembers = [];
 let memos = [];
 let currentCampus = '';
+let filterCampus = '';
 let editingId = '';
 
 function $(id){ return document.getElementById(id); }
@@ -336,6 +354,16 @@ function selectCampus(campus){
     btn.classList.toggle('primary', currentCampus === value);
   });
   renderStudents();
+}
+
+function selectFilterCampus(campus){
+  filterCampus = campus || '';
+  [['filterCampusAll',''],['filterCampusJinryo','神領'],['filterCampusOte','大手']].forEach(([id,value]) => {
+    const btn = $(id);
+    if (!btn) return;
+    btn.classList.toggle('primary', filterCampus === value);
+  });
+  loadMemos();
 }
 
 function renderStudents(){
@@ -413,6 +441,9 @@ async function loadMemos(){
       counterpart:$('filterCounterpart').value
     });
     memos = r.memos || [];
+    if (filterCampus) {
+      memos = memos.filter(m => String(m.campus || '') === filterCampus);
+    }
     renderMemos();
   } catch (e) {
     $('memoList').innerHTML = '<div class="msg">一覧を読み込めませんでした。</div>';
