@@ -27,7 +27,7 @@ textarea{min-height:96px;resize:vertical}.row{border:1px solid #e4edf7;border-ra
 .entryTable{width:100%;min-width:620px;border-collapse:collapse;table-layout:fixed}
 .entryTable.reportTable{min-width:820px}
 .entryTable .col-grade{width:62px}
-.entryTable .col-term{width:62px}
+.entryTable .col-term{width:80px}
 .entryTable .col-score{width:54px}
 .entryTable .col-action{width:74px}
 .noteWarn{color:#d97706;font-weight:800}
@@ -94,7 +94,7 @@ textarea{min-height:96px;resize:vertical}.row{border:1px solid #e4edf7;border-ra
 
   <section class="card">
     <div class="head">通知表評定（中学生のみ）</div>
-    <p class="small">中学生になってから現在までの成績をご記入ください。※分かる範囲で結構です。<br><br>1〜5で入力してください。<br>※2学期制の場合は、1学期と2学期としてご記入ください。</p>
+    <p class="small">中学生になってから現在までの成績をご記入ください。※分かる範囲で結構です。<br>1〜5で入力してください。<br>※2学期制の場合は、1学期と2学期としてご記入ください。</p>
     <div class="tableWrap">
       <table class="entryTable reportTable">
         <colgroup>
@@ -181,13 +181,7 @@ async function loadStudentGradeOptions(){
   const studentId=val('studentId');
   if(!studentId || loadedGradeStudentId===studentId) return;
   loadedGradeStudentId=studentId;
-  try{
-    const r=await api({action:'getEntryFollowupStudent',studentId,studentName:val('studentName')});
-    if(r.success && r.gradeOptions && r.gradeOptions.length){
-      gradeOptions=r.gradeOptions;
-      refreshGradeSelects();
-    }
-  }catch(e){}
+  // 学年は常に中1〜中3を表示（GAS側の判定は使わない）
 }
 function addScore(){
   $('scoreBox').insertAdjacentHTML('beforeend',`<tr class="score">
