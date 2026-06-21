@@ -750,8 +750,8 @@ tr:hover td{background:#f8fafc}
           <div class="fld" style="margin-bottom:0"><label>メールアドレス</label><input id="newStaffEmail" placeholder="example@gmail.com"></div>
           <button class="btn btn-success btn-sm" onclick="addStaffMember()">＋ 追加</button>
           <div style="grid-column:1/-1;display:flex;gap:14px;flex-wrap:wrap;color:#334155;font-size:.84rem">
-            <label style="display:flex;align-items:center;gap:6px"><input id="newStaffNotifyOte" type="checkbox"> 大手町を通知</label>
-            <label style="display:flex;align-items:center;gap:6px"><input id="newStaffNotifyJinryo" type="checkbox"> 神領を通知</label>
+            <label style="display:flex;align-items:center;gap:6px"><input id="newStaffNotifyOte" type="checkbox"> 大手町の面談内容を受取</label>
+            <label style="display:flex;align-items:center;gap:6px"><input id="newStaffNotifyJinryo" type="checkbox"> 神領の面談内容を受取</label>
           </div>
         </div>
         <div id="staffListBox" class="listBox" style="margin-top:12px"></div>
@@ -3298,10 +3298,10 @@ function renderStaffSettings() {
       <input id="staffEmail${idx}" value="${htmlEsc(s.email || '')}" placeholder="メールアドレス" style="width:100%;min-width:0">
       <div style="display:flex;gap:10px;flex-wrap:wrap;color:#334155;font-size:.82rem">
         <label style="display:flex;align-items:center;gap:5px;white-space:nowrap">
-          <input id="staffNotifyOte${idx}" type="checkbox" ${s.notifyOte ? 'checked' : ''}> 大手町
+          <input id="staffNotifyOte${idx}" type="checkbox" ${s.notifyOte ? 'checked' : ''}> 大手町の面談内容を受取
         </label>
         <label style="display:flex;align-items:center;gap:5px;white-space:nowrap">
-          <input id="staffNotifyJinryo${idx}" type="checkbox" ${s.notifyJinryo ? 'checked' : ''}> 神領
+          <input id="staffNotifyJinryo${idx}" type="checkbox" ${s.notifyJinryo ? 'checked' : ''}> 神領の面談内容を受取
         </label>
       </div>
       <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
