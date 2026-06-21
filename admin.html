@@ -3011,10 +3011,34 @@ function openWishEditModal(w) {
   const modal = document.getElementById('editModal');
   const body  = document.getElementById('editModalBody');
   const results = w.results || {};
+  const deptKind = value => {
+    const v = String(value || '').trim();
+    if (!v) return '';
+    if (v === '普通科' || v === '総合学科') return v;
+    return 'その他';
+  };
+  const deptOther = value => {
+    const v = String(value || '').trim();
+    return v && v !== '普通科' && v !== '総合学科' ? v : '';
+  };
+  const deptInput = (key) => {
+    const value = w[key+'dept'] || '';
+    const kind = deptKind(value);
+    return `<div class="fld">
+      <label style="font-size:.76rem">学科・コース</label>
+      <select id="em_${key}deptKind" onchange="toggleWishDeptOther('${key}')" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px">
+        <option value=""></option>
+        <option value="普通科" ${kind==='普通科'?'selected':''}>普通科</option>
+        <option value="総合学科" ${kind==='総合学科'?'selected':''}>総合学科</option>
+        <option value="その他" ${kind==='その他'?'selected':''}>その他</option>
+      </select>
+      <input id="em_${key}deptOther" value="${htmlEsc(deptOther(value))}" placeholder="学科・コースを入力" style="display:${kind==='その他'?'block':'none'};margin-top:6px;width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px">
+    </div>`;
+  };
   const school = (key, label, bg) => `
     <div style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;background:${bg};display:grid;grid-template-columns:1.2fr 1fr .85fr .85fr .55fr;gap:6px;align-items:end">
       <div class="fld"><label style="font-size:.76rem">${label} 高校名</label><input id="em_${key}name" value="${htmlEsc(w[key+'name']||'')}" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px"></div>
-      <div class="fld"><label style="font-size:.76rem">学科</label><input id="em_${key}dept" value="${htmlEsc(w[key+'dept']||'')}" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px"></div>
+      ${deptInput(key)}
       <div class="fld"><label style="font-size:.76rem">入試</label><select id="em_${key}type" style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px"><option value=""></option><option ${results[key+'type']==='一般'?'selected':''}>一般</option><option ${results[key+'type']==='推薦'?'selected':''}>推薦</option></select></div>
       <div class="fld"><label style="font-size:.76rem">合否</label><select id="em_${key}" style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px"><option value=""></option><option ${results[key]==='合格'?'selected':''}>合格</option><option ${results[key]==='不合格'?'selected':''}>不合格</option></select></div>
       <label style="font-size:.76rem;display:flex;gap:4px;align-items:center;padding-bottom:8px"><input id="em_${key}enroll" type="checkbox" ${results[key+'enroll']?'checked':''}>進学</label>
@@ -3030,6 +3054,12 @@ function openWishEditModal(w) {
       ${school('pri3','私立 第3志望','#fef9ee')}
     </div>`;
   modal.style.display = 'flex';
+}
+
+function toggleWishDeptOther(key) {
+  const kind = document.getElementById('em_' + key + 'deptKind')?.value || '';
+  const other = document.getElementById('em_' + key + 'deptOther');
+  if (other) other.style.display = kind === 'その他' ? 'block' : 'none';
 }
 
 function closeEditModal() {
@@ -3074,6 +3104,11 @@ async function saveEditModal() {
 async function saveWishEditModal() {
   const g = id => { const el = document.getElementById('em_'+id); return el ? el.value : ''; };
   const c = id => !!document.getElementById('em_'+id)?.checked;
+  const deptVal = key => {
+    const kind = g(key + 'deptKind');
+    if (kind === 'その他') return g(key + 'deptOther');
+    return kind;
+  };
   const keys = ['pub1','pub2','pub3','pri1','pri2','pri3'];
   const results = {};
   keys.forEach(key => {
@@ -3084,7 +3119,7 @@ async function saveWishEditModal() {
   const payload = { action:'saveWish', studentId:_editSid, results: JSON.stringify(results) };
   keys.forEach(key => {
     payload[key+'name'] = g(key+'name');
-    payload[key+'dept'] = g(key+'dept');
+    payload[key+'dept'] = deptVal(key);
   });
   const r = await api(payload);
   if (r.success) {

@@ -1658,10 +1658,66 @@ function setExamType(key, value) {
   if (s) { s.style.background = cur==='推薦' ? '#dbeafe' : '#f1f5f9'; s.style.color = cur==='推薦' ? '#1a56a0' : '#64748b'; s.style.fontWeight = cur==='推薦' ? '700' : '400'; }
 }
 
+const WISH_DEPT_IDS = ['pub1dept','pub2dept','pub3dept','pri1dept','pri2dept','pri3dept'];
+function wishDeptKind(value) {
+  const v = String(value || '').trim();
+  if (!v) return '';
+  if (v === '普通科' || v === '総合学科') return v;
+  return 'その他';
+}
+function setupWishDeptControls() {
+  WISH_DEPT_IDS.forEach(id => {
+    const hidden = document.getElementById(id);
+    if (!hidden || document.getElementById(id + 'Kind')) return;
+    hidden.type = 'hidden';
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:grid;grid-template-columns:1fr;gap:6px;margin-top:6px';
+    wrap.innerHTML = `
+      <select id="${id}Kind" onchange="onWishDeptKindChange('${id}')" style="background:#fff">
+        <option value=""></option>
+        <option value="普通科">普通科</option>
+        <option value="総合学科">総合学科</option>
+        <option value="その他">その他</option>
+      </select>
+      <input id="${id}Other" type="text" placeholder="学科・コースを入力" style="display:none;background:#fff">`;
+    hidden.insertAdjacentElement('afterend', wrap);
+    syncWishDeptControlFromHidden(id);
+  });
+}
+function syncWishDeptControlFromHidden(id) {
+  const hidden = document.getElementById(id);
+  const kindEl = document.getElementById(id + 'Kind');
+  const otherEl = document.getElementById(id + 'Other');
+  if (!hidden || !kindEl || !otherEl) return;
+  const v = hidden.value || '';
+  const kind = wishDeptKind(v);
+  kindEl.value = kind;
+  otherEl.value = kind === 'その他' ? v : '';
+  otherEl.style.display = kind === 'その他' ? 'block' : 'none';
+}
+function onWishDeptKindChange(id) {
+  const kind = document.getElementById(id + 'Kind')?.value || '';
+  const otherEl = document.getElementById(id + 'Other');
+  if (otherEl) otherEl.style.display = kind === 'その他' ? 'block' : 'none';
+  syncWishDeptHidden(id);
+}
+function syncWishDeptHidden(id) {
+  const hidden = document.getElementById(id);
+  const kind = document.getElementById(id + 'Kind')?.value || '';
+  const other = document.getElementById(id + 'Other')?.value.trim() || '';
+  if (!hidden) return;
+  hidden.value = kind === 'その他' ? other : kind;
+}
+function syncAllWishDeptHidden() {
+  setupWishDeptControls();
+  WISH_DEPT_IDS.forEach(syncWishDeptHidden);
+}
+
 function updateResultColor(sel) {} // 互換性のため残す
 
 async function loadWish() {
   try {
+    setupWishDeptControls();
     const wr = await api({ action: 'getWish', studentId: me.id });
     const w = wr.wish;
     if (!w) return;
@@ -1670,6 +1726,7 @@ async function loadWish() {
       const el = document.getElementById(id);
       if (el) el.value = w[id] || '';
     });
+    WISH_DEPT_IDS.forEach(syncWishDeptControlFromHidden);
     // 合否を読み込む
     const r = w.results || {};
     ['pub1','pub2','pub3','pri1','pri2','pri3'].forEach(key => {
@@ -1685,6 +1742,7 @@ async function loadWish() {
 }
 
 async function saveWish() {
+  syncAllWishDeptHidden();
   const data = { action: 'saveWish', studentId: me.id };
   ['pub1name','pub1dept','pub2name','pub2dept','pub3name','pub3dept',
    'pri1name','pri1dept','pri2name','pri2dept','pri3name','pri3dept'].forEach(id => {
