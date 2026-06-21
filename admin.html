@@ -213,6 +213,7 @@ tr:hover td{background:#f8fafc}
     <div class="sideItem" onclick="aNav('students',this)"><span class="ico">👥</span> 生徒一覧</div>
     <div class="sideItem" onclick="aNav('meetings',this)"><span class="ico">🗒️</span> 面談・メモ</div>
     <div class="sideItem" onclick="aNav('schools',this)"><span class="ico">🏫</span> 学校</div>
+    <div class="sideItem" onclick="aNav('scores',this)"><span class="ico">🧾</span> テスト成績</div>
     <div class="sideItem" onclick="aNav('report',this)"><span class="ico">📒</span> 通知表</div>
     <div class="sideSection">システム</div>
     <div class="sideItem" onclick="aNav('wish',this)"><span class="ico">🏫</span> 志望校</div>
@@ -312,7 +313,7 @@ tr:hover td{background:#f8fafc}
       <!-- 志望校 -->
       <div id="cmpWishCard" class="card" style="display:none;background:linear-gradient(135deg,#eef2ff,#fef9ee);border:1px solid #e2e8f0">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-          <span style="font-size:.9rem;font-weight:700;color:#1e293b">🏫 志望校</span>
+          <span onclick="goToWishForCurrentStudent()" title="志望校一覧でこの生徒を見る" style="font-size:.9rem;font-weight:700;color:#1e293b;cursor:pointer;text-decoration:underline">🏫 志望校</span>
           <span id="cmpWishDate" style="font-size:.68rem;color:#94a3b8"></span>
         </div>
         <div id="cmpWishBody" style="font-size:.8rem;color:#475569;line-height:2"></div>
@@ -327,8 +328,8 @@ tr:hover td{background:#f8fafc}
         <div class="tblWrap" style="overflow-x:auto">
           <table style="font-size:.72rem;border-collapse:collapse;width:100%">
             <thead><tr>
-              <th colspan="10" style="background:#eef2ff;padding:4px">テスト成績</th>
-              <th colspan="12" style="background:#fef9ee;padding:4px">通知表評定</th>
+              <th colspan="10" onclick="goToScoresForCurrentStudent()" title="テスト成績一覧でこの生徒を見る" style="background:#eef2ff;padding:4px;cursor:pointer;text-decoration:underline">テスト成績</th>
+              <th colspan="12" onclick="goToReportsForCurrentStudent()" title="通知表一覧でこの生徒を見る" style="background:#fef9ee;padding:4px;cursor:pointer;text-decoration:underline">通知表評定</th>
             </tr>
             <tr style="white-space:nowrap">
               <th style="padding:4px 3px">年度・回次</th>
@@ -506,6 +507,43 @@ tr:hover td{background:#f8fafc}
       </div>
     </div>
 
+    <!-- テスト成績 -->
+    <div id="aTab_scores" style="display:none">
+      <div class="card">
+        <div class="cardHead">🧾 テスト成績一覧</div>
+        <div class="filterRow">
+          <div class="searchWrap">
+            <input type="text" id="scASearch" placeholder="名前・IDで検索" oninput="filterAdminScores()">
+          </div>
+          <select id="scAYear"></select>
+          <select id="scATerm">
+            <option value="">全回</option>
+            <option value="1">第1回</option><option value="2">第2回</option><option value="3">第3回</option>
+            <option value="4">第4回</option><option value="5">第5回</option><option value="6">第6回</option>
+          </select>
+          <select id="scACampus" onchange="loadAdminScores()">
+            <option value="">全校舎</option>
+            <option>神領</option><option>大手</option>
+          </select>
+          <select id="scAGrade" onchange="filterAdminScores()">
+            <option value="">全学年</option>
+            <option>中1</option><option>中2</option><option>中3</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="loadAdminScores()">🔄 更新</button>
+        </div>
+        <div class="tblWrap">
+          <table>
+            <thead><tr>
+              <th>氏名</th><th>学年</th><th>学校</th><th>年度</th><th>回</th>
+              <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>5計</th><th>5位</th>
+              <th>音</th><th>美</th><th>体</th><th>技</th><th>9計</th><th>9位</th><th>操作</th>
+            </tr></thead>
+            <tbody id="scABody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- 通知表 -->
     <div id="aTab_report" style="display:none">
       <div class="card">
@@ -535,7 +573,7 @@ tr:hover td{background:#f8fafc}
             <thead><tr>
               <th>氏名</th><th>学年</th><th>学校</th><th>学期</th>
               <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
-              <th>音</th><th>美</th><th>体</th><th>技</th>
+              <th>音</th><th>美</th><th>体</th><th>技</th><th>操作</th>
             </tr></thead>
             <tbody id="rpABody"></tbody>
           </table>
@@ -586,6 +624,7 @@ tr:hover td{background:#f8fafc}
               <th style="padding:5px 4px;background:#fef5d0;border-left:3px solid #d97706" colspan="4">私立 第2志望</th>
               <th style="padding:5px 4px;background:#fef5d0;border-left:3px solid #d97706" colspan="4">私立 第3志望</th>
               <th style="padding:5px 4px">更新日</th>
+              <th style="padding:5px 4px">操作</th>
             </tr>
             <tr style="background:#f8fafc;font-size:.68rem;color:#94a3b8">
               <th></th><th></th>
@@ -595,9 +634,9 @@ tr:hover td{background:#f8fafc}
               <th style="border-left:3px solid #d97706">高校名</th><th>入試</th><th>合否</th><th>進学</th>
               <th style="border-left:3px solid #d97706">高校名</th><th>入試</th><th>合否</th><th>進学</th>
               <th style="border-left:3px solid #d97706">高校名</th><th>入試</th><th>合否</th><th>進学</th>
-              <th></th>
+              <th></th><th></th>
             </tr></thead>
-            <tbody id="wishBody"><tr><td colspan="27" class="noData">データなし</td></tr></tbody>
+            <tbody id="wishBody"><tr><td colspan="28" class="noData">データなし</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -726,6 +765,20 @@ tr:hover td{background:#f8fafc}
   </div>
 </div>
 
+<div class="overlay" id="editModal">
+  <div class="modal" style="max-width:720px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
+      <h3 style="margin:0">編集</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeEditModal()">閉じる</button>
+    </div>
+    <div id="editModalBody"></div>
+    <div class="modalFoot">
+      <button class="btn btn-primary btn-sm" onclick="saveEditModal()">保存する</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeEditModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -737,13 +790,17 @@ let allReports = [];
 let pendingSync = null;
 let staffMembers = [];
 let meetingMemos = [];
+let adminScores = [];
+let renderedAdminScores = [];
+let renderedAdminReports = [];
+let renderedWishes = [];
 let selectedMeetingCampus = '';
 let selectedMeetingListCampus = '';
 let currentMeetingMemoId = '';
 let schoolScheduleHistory = {};
 let schoolAutoSaveTimers = {};
 let activeScheduleCell = null;
-const TABS = ['speed','compare','students','meetings','schools','report','wish','entry','sync','settings'];
+const TABS = ['speed','compare','students','meetings','schools','scores','report','wish','entry','sync','settings'];
 // タブ履歴管理（グローバル宣言）
 let _navHist = [];
 let _navIdx = -1;
@@ -871,6 +928,7 @@ function reloadData() {
   else if (visibleTab === 'students') loadStudents();
   else if (visibleTab === 'meetings') initMeetings();
   else if (visibleTab === 'schools') loadSchools();
+  else if (visibleTab === 'scores') initAdminScoresTab();
   else if (visibleTab === 'report') initAdminReportTab();
   else if (visibleTab === 'wish') { _allWishes = []; loadAllWishes(); }
   else if (visibleTab === 'sync') loadSyncLog();
@@ -927,6 +985,7 @@ function aNav(name, el) {
   if (name === 'students') loadStudents();
   if (name === 'meetings') initMeetings();
   if (name === 'schools') loadSchools();
+  if (name === 'scores') initAdminScoresTab();
   if (name === 'report') initAdminReportTab();
   if (name === 'compare') initCompare();
   if (name === 'wish') loadAllWishes();
@@ -1501,6 +1560,40 @@ async function goToCompare(studentId) {
   await initCompare();
   await loadCompare(studentId);
 }
+function currentCompareStudentId() {
+  return document.getElementById('cmpStudent')?.value || '';
+}
+function navButtonFor(tab) {
+  return [...document.querySelectorAll('.sideItem')].find(el => el.getAttribute('onclick')?.includes(tab));
+}
+function setSearchAfterTabOpen(inputId, value, filterFnName) {
+  setTimeout(() => {
+    const input = document.getElementById(inputId);
+    if (input) input.value = value;
+    if (typeof window[filterFnName] === 'function') window[filterFnName]();
+  }, 350);
+}
+function goToScoresForCurrentStudent() {
+  const sid = currentCompareStudentId();
+  if (!sid) return;
+  const btn = navButtonFor('scores');
+  if (btn) aNav('scores', btn);
+  setSearchAfterTabOpen('scASearch', sid, 'filterAdminScores');
+}
+function goToReportsForCurrentStudent() {
+  const sid = currentCompareStudentId();
+  if (!sid) return;
+  const btn = navButtonFor('report');
+  if (btn) aNav('report', btn);
+  setSearchAfterTabOpen('rpASearch', sid, 'filterAdminReport');
+}
+function goToWishForCurrentStudent() {
+  const sid = currentCompareStudentId();
+  if (!sid) return;
+  const btn = navButtonFor('wish');
+  if (btn) aNav('wish', btn);
+  setSearchAfterTabOpen('wishSearch', sid, 'filterWishStudents');
+}
 
 // ===== 志望校 =====
 async function saveWishResult(studentId, key, value) {
@@ -1543,8 +1636,9 @@ async function loadAllWishes() {
 
 function renderWishTable(wishes) {
   const tbody = document.getElementById('wishBody');
+  renderedWishes = wishes;
   if (!wishes.length) {
-    tbody.innerHTML = '<tr><td colspan="27" class="noData">データなし</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="28" class="noData">データなし</td></tr>';
     return;
   }
   const res = w => w.results || {};
@@ -1564,7 +1658,7 @@ function renderWishTable(wishes) {
     const v = r[key+'enroll'];
     return `<td style="padding:3px 4px;text-align:center${bg?';background:'+bg:''}">${v?'<span style="color:#1a56a0;font-weight:700;font-size:.8rem">✓</span>':'<span style="color:#e2e8f0">ー</span>'}</td>`;
   };
-  tbody.innerHTML = wishes.map(w => {
+  tbody.innerHTML = wishes.map((w, idx) => {
     const r2 = res(w);
     return `<tr>
     <td style="padding:4px 8px;font-weight:600;color:#1a56a0;cursor:pointer;text-decoration:underline" onclick="goToCompare('${htmlEsc(w.studentId)}')" title="成績×通知表へ">${htmlEsc(w.name)}</td>
@@ -1576,6 +1670,7 @@ function renderWishTable(wishes) {
     ${tdName(w.pri2name?w.pri2name+(w.pri2dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri2dept+'</span>':''):null,'#fef5d0','border-left:3px solid #d97706')}${tdType(r2,'pri2','#fef5d0')}${tdResult(r2,'pri2','#fef5d0')}${tdEnroll(r2,'pri2','#fef5d0')}
     ${tdName(w.pri3name?w.pri3name+(w.pri3dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri3dept+'</span>':''):null,'#fef5d0','border-left:3px solid #d97706')}${tdType(r2,'pri3','#fef5d0')}${tdResult(r2,'pri3','#fef5d0')}${tdEnroll(r2,'pri3','#fef5d0')}
     <td style="padding:3px 6px;font-size:.68rem;color:#94a3b8;white-space:nowrap">${w.updatedAt?w.updatedAt.slice(0,10):'-'}</td>
+    <td style="padding:3px 6px;white-space:nowrap"><button class="btn btn-outline btn-sm" onclick="openWishEditModal(renderedWishes[${idx}])">編集</button></td>
   </tr>`;
   }).join('');
 }
@@ -1897,6 +1992,71 @@ async function deleteSchool(idx) {
   else toast('❌ ' + r.error);
 }
 
+// ===== テスト成績（管理者） =====
+async function initAdminScoresTab() {
+  const yrSel = document.getElementById('scAYear');
+  if (yrSel && !yrSel.options.length) {
+    yrSel.innerHTML = '<option value="">全年度</option>';
+    for (let y = NOW_YEAR; y >= NOW_YEAR - 3; y--) {
+      yrSel.innerHTML += `<option value="${y}">${y}年度</option>`;
+    }
+    yrSel.value = String(NOW_YEAR);
+    document.getElementById('scATerm').onchange = loadAdminScores;
+    yrSel.onchange = loadAdminScores;
+  }
+  await loadAdminScores();
+}
+async function loadAdminScores() {
+  const year = document.getElementById('scAYear').value;
+  const term = document.getElementById('scATerm').value;
+  const campus = document.getElementById('scACampus').value;
+  const r = await api({ action: 'getAllScores', year, term, campus });
+  adminScores = r.scores || [];
+  filterAdminScores();
+}
+function filterAdminScores() {
+  const q = (document.getElementById('scASearch')?.value || '').trim().toLowerCase();
+  const grade = document.getElementById('scAGrade').value;
+  const scores = adminScores.filter(d =>
+    (!grade || normalizeGrade(d.grade) === normalizeGrade(grade)) &&
+    (!q || String(d.name || '').toLowerCase().includes(q) || String(d.studentId || '').toLowerCase().includes(q))
+  );
+  renderAdminScores(scores);
+}
+function renderAdminScores(scores) {
+  const tbody = document.getElementById('scABody');
+  renderedAdminScores = scores;
+  if (!tbody) return;
+  if (!scores.length) {
+    tbody.innerHTML = '<tr><td colspan="19" class="noData">データなし</td></tr>';
+    return;
+  }
+  const n = v => (v === '' || v == null) ? '<span style="color:var(--sub)">-</span>' : htmlEsc(v);
+  tbody.innerHTML = scores.map((d, idx) => `
+    <tr>
+      <td style="text-align:left;font-weight:600;color:#1a56a0;cursor:pointer;text-decoration:underline" onclick="goToCompare('${htmlEsc(d.studentId)}')" title="成績×通知表へ">${htmlEsc(d.name)}</td>
+      <td>${n(d.grade)}</td><td>${n(d.school)}</td><td>${n(d.year)}</td><td>第${n(d.term)}回</td>
+      <td>${n(d.jpn)}</td><td>${n(d.soc)}</td><td>${n(d.math)}</td><td>${n(d.sci)}</td><td>${n(d.eng)}</td>
+      <td style="font-weight:700;color:#1a56a0">${n(d.total5)}</td><td>${n(d.rank5)}</td>
+      <td>${n(d.mus)}</td><td>${n(d.art)}</td><td>${n(d.pe)}</td><td>${n(d.tech)}</td>
+      <td>${n(d.total9)}</td><td>${n(d.rank9)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-sm" onclick="openEditModal(renderedAdminScores[${idx}], null)">編集</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteAdminScore(renderedAdminScores[${idx}])">削除</button>
+      </td>
+    </tr>`).join('');
+}
+async function deleteAdminScore(d) {
+  if (!confirm(`${d.name}さんの ${d.year}年度 第${d.term}回テスト成績を削除しますか？`)) return;
+  const r = await api({ action:'deleteScore', studentId:d.studentId, year:d.year, term:d.term });
+  if (r.success) {
+    toast('削除しました');
+    loadAdminScores();
+  } else {
+    toast('削除できませんでした: ' + (r.error || ''));
+  }
+}
+
 // ===== 通知表（管理者） =====
 async function initAdminReportTab() {
   const yrSel = document.getElementById('rpAYear');
@@ -1925,6 +2085,7 @@ function filterAdminReport() {
 }
 function renderAdminReport(reports) {
   const tbody = document.getElementById('rpABody');
+  renderedAdminReports = reports;
   if (!reports.length) {
     tbody.innerHTML = '<tr><td colspan="14" class="noData">データなし</td></tr>';
     document.getElementById('rpAStudent').innerHTML = '<option value="">生徒を選択</option>';
@@ -1934,7 +2095,7 @@ function renderAdminReport(reports) {
     }
     return;
   }
-  tbody.innerHTML = reports.map(d => `
+  tbody.innerHTML = reports.map((d, idx) => `
     <tr>
       <td style="text-align:left;font-weight:600;color:#1a56a0;cursor:pointer;text-decoration:underline" onclick="goToCompare('${htmlEsc(d.studentId)}')" title="成績×通知表へ">${htmlEsc(d.name)}</td>
       <td>${d.grade}</td><td>${d.school}</td><td>${d.semester}</td>
@@ -1942,6 +2103,10 @@ function renderAdminReport(reports) {
       <td>${rpRating(d.rp_sci)}</td><td>${rpRating(d.rp_eng)}</td>
       <td>${rpRating(d.rp_mus)}</td><td>${rpRating(d.rp_art)}</td>
       <td>${rpRating(d.rp_pe)}</td><td>${rpRating(d.rp_tech)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-sm" onclick="openEditModal(null, renderedAdminReports[${idx}])">編集</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteAdminReport(renderedAdminReports[${idx}])">削除</button>
+      </td>
     </tr>`).join('');
   const names = [...new Set(reports.map(d => d.studentId + '|' + d.name + '|' + d.grade))];
   const sel = document.getElementById('rpAStudent');
@@ -1961,6 +2126,16 @@ function rpRating(v) {
   const n = Number(v);
   const cls = ['','r1','r2','r3','r4','r5'][n] || '';
   return `<span class="scoreRating ${cls}">${n}</span>`;
+}
+async function deleteAdminReport(d) {
+  if (!confirm(`${d.name}さんの ${d.year}年度 ${d.semester} 通知表を削除しますか？`)) return;
+  const r = await api({ action:'deleteReport', studentId:d.studentId, year:d.year, semester:d.semester });
+  if (r.success) {
+    toast('削除しました');
+    loadAdminReport();
+  } else {
+    toast('削除できませんでした: ' + (r.error || ''));
+  }
 }
 function drawReportChart() {
   const sid = document.getElementById('rpAStudent').value;
@@ -2716,11 +2891,11 @@ async function runSync() {
 function closeSyncModal() { document.getElementById('syncModal').classList.remove('show'); }
 
 // ===== 編集モーダル =====
-let _editSc = null, _editRp = null, _editSid = null;
+let _editSc = null, _editRp = null, _editSid = null, _editWish = null;
 
 function openEditModal(sc, rp) {
-  _editSc = sc; _editRp = rp;
-  _editSid = sc.studentId || (rp && rp.studentId);
+  _editSc = sc; _editRp = rp; _editWish = null;
+  _editSid = (sc && sc.studentId) || (rp && rp.studentId);
   const modal = document.getElementById('editModal');
   const body  = document.getElementById('editModalBody');
   const fld = (id, label, val) =>
@@ -2729,6 +2904,7 @@ function openEditModal(sc, rp) {
     `<div style="font-weight:700;font-size:.82rem;color:#1e293b;margin:12px 0 6px;padding:6px 10px;background:${bg};border-radius:6px">${title}</div>`;
 
   body.innerHTML = `
+    ${sc && sc.year ? `
     ${sec('📝 テスト成績（' + (sc.year||'') + '年度 第' + (sc.term||'') + '回）','#eef2ff')}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
       ${fld('jpn','国語',sc.jpn)} ${fld('soc','社会',sc.soc)}
@@ -2740,7 +2916,7 @@ function openEditModal(sc, rp) {
       ${fld('avg_jpn','平均 国語',sc.avg_jpn)} ${fld('avg_soc','平均 社会',sc.avg_soc)}
       ${fld('avg_math','平均 数学',sc.avg_math)} ${fld('avg_sci','平均 理科',sc.avg_sci)}
       ${fld('avg_eng','平均 英語',sc.avg_eng)} ${fld('avg_total5','平均 5科計',sc.avg_total5)}
-    </div>
+    </div>` : ''}
     ${rp && rp.year ? `
     ${sec('📒 通知表（' + (rp.year||'') + '年度 ' + (rp.semester||'') + '）','#fef9ee')}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
@@ -2754,15 +2930,50 @@ function openEditModal(sc, rp) {
   modal.style.display = 'flex';
 }
 
+function openWishEditModal(w) {
+  _editSc = null; _editRp = null; _editWish = w; _editSid = w.studentId;
+  const modal = document.getElementById('editModal');
+  const body  = document.getElementById('editModalBody');
+  const results = w.results || {};
+  const school = (key, label, bg) => `
+    <div style="padding:10px;border:1px solid #e2e8f0;border-radius:8px;background:${bg};display:grid;grid-template-columns:1.2fr 1fr .85fr .85fr .55fr;gap:6px;align-items:end">
+      <div class="fld"><label style="font-size:.76rem">${label} 高校名</label><input id="em_${key}name" value="${htmlEsc(w[key+'name']||'')}" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px"></div>
+      <div class="fld"><label style="font-size:.76rem">学科</label><input id="em_${key}dept" value="${htmlEsc(w[key+'dept']||'')}" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px"></div>
+      <div class="fld"><label style="font-size:.76rem">入試</label><select id="em_${key}type" style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px"><option value=""></option><option ${results[key+'type']==='一般'?'selected':''}>一般</option><option ${results[key+'type']==='推薦'?'selected':''}>推薦</option></select></div>
+      <div class="fld"><label style="font-size:.76rem">合否</label><select id="em_${key}" style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px"><option value=""></option><option ${results[key]==='合格'?'selected':''}>合格</option><option ${results[key]==='不合格'?'selected':''}>不合格</option></select></div>
+      <label style="font-size:.76rem;display:flex;gap:4px;align-items:center;padding-bottom:8px"><input id="em_${key}enroll" type="checkbox" ${results[key+'enroll']?'checked':''}>進学</label>
+    </div>`;
+  body.innerHTML = `
+    <div style="font-size:.86rem;font-weight:800;color:#1e293b;margin-bottom:10px">${htmlEsc(w.name||'')}（No.${htmlEsc(w.studentId||'')}） 志望校</div>
+    <div style="display:grid;gap:8px">
+      ${school('pub1','公立 第1志望','#eef2ff')}
+      ${school('pub2','公立 第2志望','#eef2ff')}
+      ${school('pub3','公立 第3志望','#eef2ff')}
+      ${school('pri1','私立 第1志望','#fef9ee')}
+      ${school('pri2','私立 第2志望','#fef9ee')}
+      ${school('pri3','私立 第3志望','#fef9ee')}
+    </div>`;
+  modal.style.display = 'flex';
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').style.display = 'none';
+  _editSc = null; _editRp = null; _editWish = null; _editSid = null;
+}
+
 async function saveEditModal() {
+  if (_editWish) return saveWishEditModal();
   const g = id => { const el = document.getElementById('em_'+id); return el ? el.value : ''; };
+  const sumVals = ids => ids.reduce((sum, id) => sum + (Number(g(id)) || 0), 0);
   const sc = _editSc, rp = _editRp;
   if (sc && sc.year) {
     await api({ action:'saveScore', studentId:_editSid,
       name:sc.name, campus:sc.campus, grade:sc.grade, school:sc.school||'',
       year:sc.year, term:sc.term,
       jpn:g('jpn'), soc:g('soc'), math:g('math'), sci:g('sci'), eng:g('eng'),
+      total5:sumVals(['jpn','soc','math','sci','eng']),
       rank5:g('rank5'), mus:g('mus'), art:g('art'), pe:g('pe'), tech:g('tech'), rank9:g('rank9'),
+      total9:sumVals(['jpn','soc','math','sci','eng','mus','art','pe','tech']),
       avg_jpn:g('avg_jpn'), avg_soc:g('avg_soc'), avg_math:g('avg_math'),
       avg_sci:g('avg_sci'), avg_eng:g('avg_eng'), avg_total5:g('avg_total5')
     });
@@ -2779,6 +2990,35 @@ async function saveEditModal() {
   toast('✅ 保存しました');
   const sid = document.getElementById('cmpStudent').value;
   if (sid) loadCompare(sid);
+  const visibleTab = TABS.find(t => document.getElementById('aTab_' + t)?.style.display !== 'none');
+  if (visibleTab === 'scores') loadAdminScores();
+  if (visibleTab === 'report') loadAdminReport();
+  closeEditModal();
+}
+async function saveWishEditModal() {
+  const g = id => { const el = document.getElementById('em_'+id); return el ? el.value : ''; };
+  const c = id => !!document.getElementById('em_'+id)?.checked;
+  const keys = ['pub1','pub2','pub3','pri1','pri2','pri3'];
+  const results = {};
+  keys.forEach(key => {
+    results[key+'type'] = g(key+'type');
+    results[key] = g(key);
+    results[key+'enroll'] = c(key+'enroll');
+  });
+  const payload = { action:'saveWish', studentId:_editSid, results: JSON.stringify(results) };
+  keys.forEach(key => {
+    payload[key+'name'] = g(key+'name');
+    payload[key+'dept'] = g(key+'dept');
+  });
+  const r = await api(payload);
+  if (r.success) {
+    toast('志望校を保存しました');
+    _allWishes = [];
+    closeEditModal();
+    loadAllWishes();
+  } else {
+    toast('保存できませんでした: ' + (r.error || ''));
+  }
 }
 async function applySync(deleteOld) {
   if (!pendingSync) return;

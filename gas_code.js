@@ -169,8 +169,8 @@ function deleteScore(data) {
   const rows = sh.getDataRange().getValues();
   for (let i = rows.length - 1; i >= 1; i--) {
     if (String(rows[i][0]) === String(data.studentId) &&
-        String(rows[i][4]) === String(data.year) &&
-        String(rows[i][5]) === String(data.term)) {
+        String(rows[i][5]) === String(data.year) &&
+        String(rows[i][6]) === String(data.term)) {
       sh.deleteRow(i + 1);
       return { success: true };
     }
