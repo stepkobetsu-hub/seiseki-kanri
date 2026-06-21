@@ -2256,7 +2256,8 @@ function updateCmpAdmissionDate(sid) {
     if (String(document.getElementById('cmpStudent')?.value || targetId) !== targetId) return;
     const info = Object.assign({ colC: r?.data?.masterColumnC || '' }, r?.data?.masterInfo || {});
     const date = formatEntryValue(info.colC || '');
-    box.textContent = date ? `入塾日: ${date}` : '';
+    const duration = calcEnrollmentDuration(date);
+    box.textContent = date ? `入塾日: ${date}${duration ? `（${duration}通塾）` : ''}` : '';
   }).catch(() => {
     if (String(document.getElementById('cmpStudent')?.value || targetId) === targetId) box.textContent = '';
   });
@@ -2385,6 +2386,23 @@ function formatEntryValue(value) {
   const s = String(value == null ? '' : value);
   if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0, 10);
   return s;
+}
+
+function calcEnrollmentDuration(value) {
+  const s = String(value || '').trim();
+  const m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (!m) return '';
+  const start = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (Number.isNaN(start.getTime())) return '';
+  const today = new Date();
+  let months = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth());
+  if (today.getDate() < start.getDate()) months--;
+  if (months < 0) return '';
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  if (years && rest) return `${years}年${rest}ヶ月`;
+  if (years) return `${years}年`;
+  return `${rest}ヶ月`;
 }
 
 function parseEntryAiData(memo) {
