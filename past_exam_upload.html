@@ -14,6 +14,9 @@ h1{margin:0;font-size:1.45rem;letter-spacing:0}.hero p{margin:8px 0 0;color:#eaf
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 label{display:block;font-size:.82rem;font-weight:800;color:#475569;margin-bottom:5px}
 input,select{width:100%;border:1px solid #c9d6e5;border-radius:10px;padding:12px;font-size:1rem;background:#fff}
+input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:0 0 0 3px rgba(220,38,38,.12)}
+.fieldErr{display:none;margin-top:5px;color:#dc2626;font-size:.78rem;font-weight:800}
+.fieldErr.show{display:block}
 .btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.btn{border:0;border-radius:11px;padding:13px 16px;font-weight:900;cursor:pointer;font-size:1rem}
 .primary{background:#145da0;color:#fff}.ghost{background:#edf5fc;color:#145da0}.submit{width:100%;font-size:1.08rem;padding:15px;margin-top:16px}
 .msg{margin-top:12px;white-space:pre-wrap;font-weight:800;line-height:1.7}.ok{color:#047857}.err{color:#dc2626}
@@ -31,18 +34,19 @@ input,select{width:100%;border:1px solid #c9d6e5;border-radius:10px;padding:12px
 
   <section class="card">
     <div class="grid">
-      <div><label>アップロードする人の苗字</label><input id="teacher" placeholder="例: 加瀬"></div>
-      <div><label>学校名</label><select id="school"><option value="">読み込み中...</option></select></div>
-      <div><label>学年</label><select id="grade"><option value="">選択</option><option>中1</option><option>中2</option><option>中3</option></select></div>
-      <div><label>科目</label><select id="subject"><option value="">選択</option><option>英語</option><option>数学</option><option>国語</option><option>理科</option><option>社会</option></select></div>
-      <div><label>年度</label><input id="year" inputmode="numeric" placeholder="例: 2026"></div>
-      <div><label>回</label><select id="testNo"><option value="">学校を選択してください</option></select></div>
-      <div><label>種類</label><select id="kind"><option value="">指定なし</option><option>テストのみ</option><option>テスト＆先生解答</option><option>テスト＆生徒解答</option><option>先生解答のみ</option><option>生徒解答のみ</option></select></div>
+      <div><label>アップロードする人の苗字</label><input id="teacher" placeholder="例: 加瀬"><div class="fieldErr" data-for="teacher">入力してください</div></div>
+      <div><label>学校名</label><select id="school"><option value="">読み込み中...</option></select><div class="fieldErr" data-for="school">選択してください</div></div>
+      <div><label>学年</label><select id="grade"><option value="">選択</option><option>中1</option><option>中2</option><option>中3</option></select><div class="fieldErr" data-for="grade">選択してください</div></div>
+      <div><label>科目</label><select id="subject"><option value="">選択</option><option>英語</option><option>数学</option><option>国語</option><option>理科</option><option>社会</option></select><div class="fieldErr" data-for="subject">選択してください</div></div>
+      <div><label>年度</label><select id="year"><option value="">選択</option></select><div class="fieldErr" data-for="year">選択してください</div></div>
+      <div><label>回</label><select id="testNo"><option value="">学校を選択してください</option></select><div class="fieldErr" data-for="testNo">選択してください</div></div>
+      <div><label>種類</label><select id="kind"><option value="">選択</option><option>テストのみ</option><option>テスト＆先生解答</option><option>テスト＆生徒解答</option><option>先生解答のみ</option><option>生徒解答のみ</option></select><div class="fieldErr" data-for="kind">選択してください</div></div>
     </div>
 
     <div style="margin-top:12px">
       <label>ファイル</label>
       <input id="file" type="file" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" multiple>
+      <div class="fieldErr" data-for="file">ファイルを選択してください</div>
       <p class="small">PDF、写真、Word、Excelをアップロードできます。複数選択した場合は1つずつ保存します。</p>
     </div>
 
@@ -77,6 +81,12 @@ function currentNendo(){
   const now=new Date();
   return now.getMonth()<3?now.getFullYear()-1:now.getFullYear();
 }
+function updateYearOptions(){
+  const year=currentNendo();
+  const years=[year-2,year-1,year];
+  $('year').innerHTML='<option value="">選択</option>'+years.map(y=>`<option value="${y}">${y}年度</option>`).join('');
+  $('year').value=String(year);
+}
 function dbKey(sid,year,grade,exam,subject){return `${sid}||${year}||${grade}||${exam}||${subject}`}
 function selectedSchool(){return schools.find(s=>String(s.id)===value('school'))}
 function examList(count){return Array.from({length:Number(count)||0},(_,i)=>`第${i+1}回`)}
@@ -96,7 +106,7 @@ async function gasGet(params){
 }
 async function loadDb(){
   try{
-    $('year').value=String(currentNendo());
+    updateYearOptions();
     setMsg('学校一覧を読み込み中です...',true);
     const r=await gasGet({action:'load',pass:PASS});
     if(!r.ok) throw new Error(r.error||'読み込みに失敗しました');
@@ -109,6 +119,33 @@ async function loadDb(){
     $('school').innerHTML='<option value="">読み込み失敗</option>';
     setMsg('学校一覧を読み込めませんでした。通信状態を確認してください。\n'+(e.message||e),false);
   }
+}
+function clearInvalid(id){
+  const el=$(id);
+  if(el) el.classList.remove('invalid');
+  const err=document.querySelector(`.fieldErr[data-for="${id}"]`);
+  if(err) err.classList.remove('show');
+}
+function markInvalid(id,message){
+  const el=$(id);
+  if(el) el.classList.add('invalid');
+  const err=document.querySelector(`.fieldErr[data-for="${id}"]`);
+  if(err){
+    if(message) err.textContent=message;
+    err.classList.add('show');
+  }
+}
+function validateRequired(){
+  const required=['teacher','school','grade','subject','year','testNo','kind'];
+  let ok=true;
+  required.forEach(id=>{
+    clearInvalid(id);
+    if(!value(id)){markInvalid(id); ok=false;}
+  });
+  clearInvalid('file');
+  if(!($('file').files||[]).length){markInvalid('file'); ok=false;}
+  if(!ok) setMsg('赤枠の項目を入力してください。',false);
+  return ok;
 }
 function toBase64Url(file){
   return new Promise((resolve,reject)=>{
@@ -173,10 +210,7 @@ function registerFile(file,result){
 }
 async function uploadFiles(){
   const files=[...($('file').files||[])];
-  if(!value('teacher')){setMsg('アップロードする人の苗字を入力してください。',false);return}
-  if(!selectedSchool()){setMsg('学校名を選択してください。',false);return}
-  if(!value('year')||!value('grade')||!value('subject')||!value('testNo')){setMsg('年度・学年・科目・回を選択してください。',false);return}
-  if(!files.length){setMsg('ファイルを選択してください。',false);return}
+  if(!validateRequired()) return;
   $('submitBtn').disabled=true;
   $('results').classList.add('hidden');
   $('results').innerHTML='';
@@ -202,6 +236,10 @@ async function uploadFiles(){
   }
 }
 $('school').addEventListener('change',updateExamOptions);
+['teacher','school','grade','subject','year','testNo','kind','file'].forEach(id=>{
+  $(id).addEventListener('input',()=>clearInvalid(id));
+  $(id).addEventListener('change',()=>clearInvalid(id));
+});
 window.addEventListener('load',loadDb);
 </script>
 </body>
