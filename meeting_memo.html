@@ -296,7 +296,7 @@ textarea{
         <button id="filterCampusJinryo" type="button" onclick="selectFilterCampus('神領')">神領</button>
         <button id="filterCampusOte" type="button" onclick="selectFilterCampus('大手')">大手町</button>
       </div>
-      <select id="searchName" onchange="renderMemos()"><option value="">生徒名（すべて）</option></select>
+      <input id="searchName" placeholder="名前で検索">
       <select id="filterStaff" onchange="renderMemos()">
         <option value="">担当者すべて</option>
         <option value="加瀬">加瀬</option>
@@ -314,10 +314,7 @@ textarea{
       </select>
       <button onclick="loadMemos()">更新</button>
     </div>
-    <div id="deleteNotice" style="display:none;align-items:center;gap:10px;margin-bottom:10px;font-size:.88rem;color:#475569">
-      <span id="deleteNoticeText"></span>
-      <button style="padding:4px 10px;font-size:.78rem;border-radius:6px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;cursor:pointer" onclick="undoDelete()">戻す</button>
-    </div>
+    <div id="deleteNotice" style="display:none;margin-bottom:10px"></div>
     <div id="memoList" class="memoList"></div>
   </section>
 </main>
@@ -384,7 +381,7 @@ async function api(data){
 async function init(){
   $('date').value = today();
   selectCampus('');
-  $('searchName').addEventListener('change', renderMemos);
+  $('searchName').addEventListener('input', debounce(renderMemos, 250));
   $('filterStaff').addEventListener('change', renderMemos);
   $('searchContent').addEventListener('input', debounce(renderMemos, 250));
   $('filterCounterpart').addEventListener('change', renderMemos);
@@ -557,7 +554,7 @@ function renderMemos(){
 
   let filtered = (allMemos || memos).filter(m => {
     if (filterCampus && String(m.campus || '') !== filterCampus) return false;
-    if (qName    && (m.name || '') !== qName) return false;
+    if (qName    && !(m.name || '').includes(qName)) return false;
     if (qStaff) {
       if (qStaff === '他') { if (['加瀬','大野','林'].includes(m.staff || '')) return false; }
       else if ((m.staff || '') !== qStaff) return false;
@@ -640,7 +637,20 @@ function editMemo(id){
   window.scrollTo({ top:0, behavior:'smooth' });
 }
 
-let lastDeleted = null;
+let deletedHistory = [];
+
+function renderDeleteNotice(){
+  const box = $('deleteNotice');
+  if (!deletedHistory.length){ box.style.display='none'; return; }
+  box.style.display='block';
+  box.innerHTML = deletedHistory.map((item,i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #e8eef5;font-size:.83rem;color:#475569">
+      <span style="flex:1">${esc(item.name)}さん（${esc(formatDate(item.date))}）のメモを削除しました</span>
+      <button style="padding:3px 10px;font-size:.76rem;border-radius:5px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;cursor:pointer" onclick="hardDelete(${i})">完全削除</button>
+      <button style="padding:3px 10px;font-size:.76rem;border-radius:5px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;cursor:pointer" onclick="undoDelete(${i})">戻す</button>
+    </div>
+  `).join('');
+}
 
 async function deleteMemo(id){
   if (!confirm('この面談メモを削除しますか？')) return;
@@ -648,27 +658,29 @@ async function deleteMemo(id){
   try {
     const r = await api({ action:'deleteMeetingMemo', id });
     if (!r.success) throw new Error(r.error || '削除に失敗しました');
-    lastDeleted = target || null;
     if (String(editingId) === String(id)) clearForm();
     allMemos = allMemos.filter(m => String(m.id) !== String(id));
+    if (target) deletedHistory.push(target);
     renderMemos();
-    // 削除通知を表示
-    if (lastDeleted) {
-      $('deleteNoticeText').textContent = `${lastDeleted.name}さん（${formatDate(lastDeleted.date)}）のメモを削除しました`;
-      $('deleteNotice').style.display = 'flex';
-    }
+    renderDeleteNotice();
   } catch (e) {
     showToast(e.message || '削除に失敗しました');
   }
 }
 
-async function undoDelete(){
-  if (!lastDeleted) return;
+function hardDelete(i){
+  deletedHistory.splice(i, 1);
+  renderDeleteNotice();
+}
+
+async function undoDelete(i){
+  const item = deletedHistory[i];
+  if (!item) return;
   try {
-    const r = await api({ action:'saveMeetingMemo', ...lastDeleted });
+    const r = await api({ action:'saveMeetingMemo', ...item });
     if (!r.success) throw new Error(r.error || '復元に失敗しました');
-    lastDeleted = null;
-    $('deleteNotice').style.display = 'none';
+    deletedHistory.splice(i, 1);
+    renderDeleteNotice();
     await loadMemos();
     showToast('削除を取り消しました');
   } catch(e) {
