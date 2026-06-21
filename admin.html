@@ -2350,7 +2350,16 @@ async function loadCompare(overrideSid) {
   tbody.innerHTML = Array.from({length: len}, (_, i) => {
     const sc = cmpScoreData[i] || {};
     const rp = cmpRpData[i] || {};
-    const scLabel = sc.year ? (!year ? sc.year+'年度 第'+sc.term+'回' : '第'+sc.term+'回') : '-';
+    const _cmpSt = students.find(s => String(s.id) === String(sid)) || {};
+    const _cmpGradeRaw = (_cmpSt.grade || '').replace(/１/g,'1').replace(/２/g,'2').replace(/３/g,'3');
+    const _cmpGradeNum = _cmpGradeRaw.includes('中1') ? 1 : _cmpGradeRaw.includes('中2') ? 2 : _cmpGradeRaw.includes('中3') ? 3 : 0;
+    function _cmpGradeFor(y) {
+      if (!_cmpGradeNum || !y) return '';
+      const entryY = NOW_YEAR - _cmpGradeNum + 1;
+      const diff = Number(y) - entryY;
+      return (diff >= 0 && diff <= 2) ? '（中' + (diff + 1) + '）' : '';
+    }
+    const scLabel = sc.year ? (!year ? sc.year+'年度 第'+sc.term+'回'+_cmpGradeFor(sc.year) : '第'+sc.term+'回'+_cmpGradeFor(sc.year)) : '-';
     const rpLabel = rp.year ? (!year ? rp.year+'年度 '+rp.semester : rp.semester) : '-';
     const td = (v, bold) => `<td style="padding:3px 4px;text-align:center${bold?';font-weight:700;color:var(--primary)':''}">${v!==''&&v!=null ? v : '-'}</td>`;
     const tdR = v => `<td style="padding:3px 4px;text-align:center">${rpRating(v)}</td>`;
