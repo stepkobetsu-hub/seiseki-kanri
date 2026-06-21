@@ -298,7 +298,13 @@ textarea{
       </div>
       <input id="searchName" placeholder="名前で検索" list="studentNameList" autocomplete="off">
       <datalist id="studentNameList"></datalist>
-      <select id="filterStaff" onchange="renderMemos()"><option value="">担当者すべて</option></select>
+      <select id="filterStaff" onchange="renderMemos()">
+        <option value="">担当者すべて</option>
+        <option value="加瀬">加瀬</option>
+        <option value="大野">大野</option>
+        <option value="林">林</option>
+        <option value="他">他</option>
+      </select>
       <input id="searchContent" placeholder="内容で検索">
       <select id="filterCounterpart">
         <option value="">相手すべて</option>
@@ -308,6 +314,10 @@ textarea{
         <option value="他">他</option>
       </select>
       <button onclick="loadMemos()">更新</button>
+    </div>
+    <div id="deleteNotice" style="display:none;align-items:center;gap:10px;margin-bottom:10px;font-size:.88rem;color:#475569">
+      <span id="deleteNoticeText"></span>
+      <button style="padding:4px 10px;font-size:.78rem;border-radius:6px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;cursor:pointer" onclick="undoDelete()">戻す</button>
     </div>
     <div id="memoList" class="memoList"></div>
   </section>
@@ -387,8 +397,7 @@ async function init(){
     students = sr.students || [];
     staffMembers = fr.staff || [];
     // 名前datalistを生成
-    const dl = $('studentNameList');
-    if (dl) dl.innerHTML = students.map(s => `<option value="${esc(s.name)}">`).join('');
+    updateNameDatalist();
     renderStudents();
     renderStaff();
     await loadMemos();
@@ -428,6 +437,15 @@ function selectFilterCampus(campus){
     btn.classList.toggle('primary', filterCampus === value);
   });
   if (allMemos.length) { renderMemos(); } else { loadMemos(); }
+  // 名前datalistを校舎で絞る
+  updateNameDatalist();
+}
+
+function updateNameDatalist(){
+  const dl = $('studentNameList');
+  if (!dl) return;
+  const list = filterCampus ? students.filter(s => s.campus === filterCampus) : students;
+  dl.innerHTML = list.map(s => `<option value="${esc(s.name)}">`).join('');
 }
 
 function renderStudents(){
@@ -442,8 +460,6 @@ function renderStudents(){
 
 function renderStaff(){
   $('staff').innerHTML = '<option value="">担当を選択</option>' + staffMembers.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('') + '<option value="他">他</option>';
-  const fs = $('filterStaff');
-  if (fs) fs.innerHTML = '<option value="">担当者すべて</option>' + staffMembers.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
   toggleStaffOther();
 }
 
@@ -541,7 +557,10 @@ function renderMemos(){
   let filtered = (allMemos || memos).filter(m => {
     if (filterCampus && String(m.campus || '') !== filterCampus) return false;
     if (qName    && ![m.name, m.studentId].join(' ').toLowerCase().includes(qName)) return false;
-    if (qStaff   && (m.staff || '') !== qStaff) return false;
+    if (qStaff) {
+      if (qStaff === '他') { if (['加瀬','大野','林'].includes(m.staff || '')) return false; }
+      else if ((m.staff || '') !== qStaff) return false;
+    }
     if (qContent && !(m.content || '').toLowerCase().includes(qContent)) return false;
     if (qCounterpart) {
       if (qCounterpart === '他') { if (!String(m.counterpart||'').startsWith('他')) return false; }
@@ -567,7 +586,6 @@ function renderMemos(){
         </div>
         <div class="memoBtns">
           <button class="btnBack" onclick="editMemo('${esc(m.id)}')">編集</button>
-          <button class="btnBack" onclick="window.scrollTo({top:0,behavior:'smooth'});editMemo('${esc(m.id)}')">戻す</button>
           <button class="danger" style="padding:5px 8px;font-size:.78rem;min-height:28px;border-radius:6px" onclick="deleteMemo('${esc(m.id)}')">削除</button>
         </div>
       </div>
@@ -621,16 +639,39 @@ function editMemo(id){
   window.scrollTo({ top:0, behavior:'smooth' });
 }
 
+let lastDeleted = null;
+
 async function deleteMemo(id){
   if (!confirm('この面談メモを削除しますか？')) return;
+  const target = allMemos.find(m => String(m.id) === String(id));
   try {
     const r = await api({ action:'deleteMeetingMemo', id });
     if (!r.success) throw new Error(r.error || '削除に失敗しました');
-    showToast('削除しました');
+    lastDeleted = target || null;
     if (String(editingId) === String(id)) clearForm();
-    await loadMemos();
+    allMemos = allMemos.filter(m => String(m.id) !== String(id));
+    renderMemos();
+    // 削除通知を表示
+    if (lastDeleted) {
+      $('deleteNoticeText').textContent = `${lastDeleted.name}さん（${formatDate(lastDeleted.date)}）のメモを削除しました`;
+      $('deleteNotice').style.display = 'flex';
+    }
   } catch (e) {
     showToast(e.message || '削除に失敗しました');
+  }
+}
+
+async function undoDelete(){
+  if (!lastDeleted) return;
+  try {
+    const r = await api({ action:'saveMeetingMemo', ...lastDeleted });
+    if (!r.success) throw new Error(r.error || '復元に失敗しました');
+    lastDeleted = null;
+    $('deleteNotice').style.display = 'none';
+    await loadMemos();
+    showToast('削除を取り消しました');
+  } catch(e) {
+    showToast(e.message || '復元に失敗しました');
   }
 }
 
