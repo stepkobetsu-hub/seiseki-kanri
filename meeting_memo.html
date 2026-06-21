@@ -296,8 +296,7 @@ textarea{
         <button id="filterCampusJinryo" type="button" onclick="selectFilterCampus('神領')">神領</button>
         <button id="filterCampusOte" type="button" onclick="selectFilterCampus('大手')">大手町</button>
       </div>
-      <input id="searchName" placeholder="名前で検索" list="studentNameList" autocomplete="off">
-      <datalist id="studentNameList"></datalist>
+      <select id="searchName" onchange="renderMemos()"><option value="">生徒名（すべて）</option></select>
       <select id="filterStaff" onchange="renderMemos()">
         <option value="">担当者すべて</option>
         <option value="加瀬">加瀬</option>
@@ -385,7 +384,7 @@ async function api(data){
 async function init(){
   $('date').value = today();
   selectCampus('');
-  $('searchName').addEventListener('input', debounce(renderMemos, 250));
+  $('searchName').addEventListener('change', renderMemos);
   $('filterStaff').addEventListener('change', renderMemos);
   $('searchContent').addEventListener('input', debounce(renderMemos, 250));
   $('filterCounterpart').addEventListener('change', renderMemos);
@@ -442,10 +441,12 @@ function selectFilterCampus(campus){
 }
 
 function updateNameDatalist(){
-  const dl = $('studentNameList');
-  if (!dl) return;
+  const sel = $('searchName');
+  if (!sel) return;
+  const prev = sel.value;
   const list = filterCampus ? students.filter(s => s.campus === filterCampus) : students;
-  dl.innerHTML = list.map(s => `<option value="${esc(s.name)}">`).join('');
+  sel.innerHTML = '<option value="">生徒名（すべて）</option>' + list.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('');
+  if (list.some(s => s.name === prev)) sel.value = prev;
 }
 
 function renderStudents(){
@@ -549,14 +550,14 @@ async function loadMemos(){
 }
 
 function renderMemos(){
-  const qName    = ($('searchName')?.value || '').trim().toLowerCase();
+  const qName    = ($('searchName')?.value || '').trim();
   const qStaff   = ($('filterStaff')?.value || '').trim();
   const qContent = ($('searchContent')?.value || '').trim().toLowerCase();
   const qCounterpart = $('filterCounterpart')?.value || '';
 
   let filtered = (allMemos || memos).filter(m => {
     if (filterCampus && String(m.campus || '') !== filterCampus) return false;
-    if (qName    && ![m.name, m.studentId].join(' ').toLowerCase().includes(qName)) return false;
+    if (qName    && (m.name || '') !== qName) return false;
     if (qStaff) {
       if (qStaff === '他') { if (['加瀬','大野','林'].includes(m.staff || '')) return false; }
       else if ((m.staff || '') !== qStaff) return false;
