@@ -652,54 +652,44 @@ function renderDeleteNotice(){
   `).join('');
 }
 
-async function deleteMemo(id){
-  if (!confirm('この面談メモを削除しますか？')) return;
+function deleteMemo(id){
   const target = allMemos.find(m => String(m.id) === String(id));
+  if (!target) return;
+  if (String(editingId) === String(id)) clearForm();
+  // GASには触らず画面から隠すだけ
+  allMemos = allMemos.filter(m => String(m.id) !== String(id));
+  deletedHistory.push(target);
+  renderMemos();
+  renderDeleteNotice();
+}
+
+async function hardDelete(i){
+  const item = deletedHistory[i];
+  if (!item) return;
+  if (!confirm(`${item.name}さんのメモを完全に削除します。この操作は取り消せません。よろしいですか？`)) return;
   try {
-    const r = await api({ action:'deleteMeetingMemo', id });
+    const r = await api({ action:'deleteMeetingMemo', id: item.id });
     if (!r.success) throw new Error(r.error || '削除に失敗しました');
-    if (String(editingId) === String(id)) clearForm();
-    allMemos = allMemos.filter(m => String(m.id) !== String(id));
-    if (target) deletedHistory.push(target);
-    renderMemos();
+    deletedHistory.splice(i, 1);
     renderDeleteNotice();
-  } catch (e) {
+    showToast('完全削除しました');
+  } catch(e) {
     showToast(e.message || '削除に失敗しました');
   }
 }
 
-function hardDelete(i){
-  deletedHistory.splice(i, 1);
-  renderDeleteNotice();
-}
-
-async function undoDelete(i){
+function undoDelete(i){
   const item = deletedHistory[i];
   if (!item) return;
-  try {
-    const r = await api({ action:'saveMeetingMemo', ...item });
-    if (!r.success) throw new Error(r.error || '復元に失敗しました');
-    deletedHistory.splice(i, 1);
-    renderDeleteNotice();
-    await loadMemos();
-    showToast('削除を取り消しました');
-  } catch(e) {
-    showToast(e.message || '復元に失敗しました');
-  }
+  // GASには触らず画面に戻すだけ
+  allMemos.push(item);
+  deletedHistory.splice(i, 1);
+  renderMemos();
+  renderDeleteNotice();
+  showToast('元に戻しました');
 }
 
 init();
-
-// 画面を閉じるとき、完全削除されていないものはGASに戻す
-window.addEventListener('beforeunload', () => {
-  deletedHistory.forEach(item => {
-    // sendBeaconで非同期に復元（画面が閉じてもリクエストを飛ばせる）
-    const body = JSON.stringify({ action:'saveMeetingMemo', ...item });
-    navigator.sendBeacon
-      ? navigator.sendBeacon(GAS, new Blob([body], {type:'text/plain'}))
-      : fetch(GAS, {method:'POST', headers:{'Content-Type':'text/plain'}, body, keepalive:true});
-  });
-});
 </script>
 </body>
 </html>
