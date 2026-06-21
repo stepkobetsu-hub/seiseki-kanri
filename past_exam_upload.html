@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>過去問アップロード</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#eef4f8;color:#172033;font-family:"Hiragino Kaku Gothic ProN","Meiryo",sans-serif}
+main{max-width:760px;margin:0 auto;padding:20px 14px 42px}
+.hero{background:#145da0;color:#fff;border-radius:16px;padding:20px;box-shadow:0 14px 30px rgba(20,93,160,.18)}
+h1{margin:0;font-size:1.45rem;letter-spacing:0}.hero p{margin:8px 0 0;color:#eaf4ff;line-height:1.7}
+.card{background:#fff;border:1px solid #dbe7f2;border-radius:14px;margin-top:14px;padding:16px;box-shadow:0 10px 24px rgba(15,35,60,.07)}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+label{display:block;font-size:.82rem;font-weight:800;color:#475569;margin-bottom:5px}
+input,select{width:100%;border:1px solid #c9d6e5;border-radius:10px;padding:12px;font-size:1rem;background:#fff}
+.btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.btn{border:0;border-radius:11px;padding:13px 16px;font-weight:900;cursor:pointer;font-size:1rem}
+.primary{background:#145da0;color:#fff}.ghost{background:#edf5fc;color:#145da0}.submit{width:100%;font-size:1.08rem;padding:15px;margin-top:16px}
+.msg{margin-top:12px;white-space:pre-wrap;font-weight:800;line-height:1.7}.ok{color:#047857}.err{color:#dc2626}
+.small{font-size:.86rem;color:#64748b;line-height:1.7}.result{border-top:1px solid #e2eaf3;margin-top:14px;padding-top:12px}
+.result a{color:#145da0;font-weight:900;word-break:break-all}.hidden{display:none!important}
+@media(max-width:640px){main{padding:14px 10px 34px}.hero{border-radius:0;margin:-14px -10px 0}.grid{grid-template-columns:1fr}.btn{width:100%}.card{border-radius:12px}}
+</style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <h1>過去問アップロード</h1>
+    <p>スマホで使いやすい職員用アップロード画面です。保存先はこれまでの過去問DBと同じです。</p>
+  </section>
+
+  <section class="card">
+    <div class="grid">
+      <div><label>パスワード</label><input id="pass" type="password" value="step123" autocomplete="current-password"></div>
+      <div><label>学校名</label><input id="school" placeholder="例: 南城中"></div>
+      <div><label>学年</label><select id="grade"><option value="">選択</option><option>中1</option><option>中2</option><option>中3</option><option>小学生</option><option>高校生</option></select></div>
+      <div><label>科目</label><select id="subject"><option value="">選択</option><option>国語</option><option>社会</option><option>数学</option><option>理科</option><option>英語</option><option>5科</option><option>その他</option></select></div>
+      <div><label>年度</label><input id="year" inputmode="numeric" placeholder="例: 2026"></div>
+      <div><label>回・時期</label><input id="testNo" placeholder="例: 1回 / 1学期中間"></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label>ファイル</label>
+      <input id="file" type="file" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" multiple>
+      <p class="small">PDF、写真、Word、Excelをアップロードできます。複数選択した場合は1つずつ保存します。</p>
+    </div>
+
+    <button id="submitBtn" class="btn primary submit" onclick="uploadFiles()">アップロードする</button>
+    <div class="btns">
+      <a class="btn ghost" style="text-decoration:none;text-align:center" href="index.html">職員用トップへ戻る</a>
+      <a class="btn ghost" style="text-decoration:none;text-align:center" href="https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec" target="_blank" rel="noopener">過去問DBを開く</a>
+    </div>
+    <div id="msg" class="msg"></div>
+    <div id="results" class="result hidden"></div>
+  </section>
+</main>
+<script>
+const GAS_URL='https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec';
+const $=id=>document.getElementById(id);
+function value(id){return ($(id)?.value||'').trim()}
+function setMsg(text,ok){$('msg').className='msg '+(ok?'ok':'err');$('msg').textContent=text}
+function cleanName(s){return String(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'').trim()}
+function extOf(name){const m=String(name||'').match(/(\.[^.]+)$/);return m?m[1]:''}
+function baseName(name){return String(name||'file').replace(/\.[^.]+$/,'')}
+function buildFileName(file){
+  const parts=[value('school'),value('grade'),value('subject'),value('year'),value('testNo')].map(cleanName).filter(Boolean);
+  const original=cleanName(baseName(file.name))||'file';
+  const prefix=parts.length?parts.join('_')+'_':'';
+  return prefix+original+extOf(file.name);
+}
+function toBase64Url(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=> {
+      const data=String(reader.result||'');
+      const b64=data.split(',')[1]||'';
+      resolve(b64.replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''));
+    };
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+async function uploadOne(file){
+  const body=new URLSearchParams();
+  body.set('action','uploadAll');
+  body.set('pass',value('pass'));
+  body.set('fileName',encodeURIComponent(buildFileName(file)));
+  body.set('mimeType',file.type||'application/octet-stream');
+  body.set('fileData',await toBase64Url(file));
+  const res=await fetch(GAS_URL,{method:'POST',body});
+  const text=await res.text();
+  try{return JSON.parse(text)}catch(e){throw new Error('GASからJSON以外の応答が返りました: '+text.slice(0,120))}
+}
+async function uploadFiles(){
+  const files=[...($('file').files||[])];
+  if(!value('pass')){setMsg('パスワードを入力してください。',false);return}
+  if(!files.length){setMsg('ファイルを選択してください。',false);return}
+  $('submitBtn').disabled=true;
+  $('results').classList.add('hidden');
+  $('results').innerHTML='';
+  try{
+    const saved=[];
+    for(let i=0;i<files.length;i++){
+      setMsg(`アップロード中です... ${i+1}/${files.length}`,true);
+      const r=await uploadOne(files[i]);
+      if(!r.ok) throw new Error(r.error||'アップロードに失敗しました');
+      saved.push({name:buildFileName(files[i]),url:r.url});
+    }
+    setMsg('アップロードしました。',true);
+    $('results').innerHTML='<strong>保存したファイル</strong><br>'+saved.map(x=>`<a href="${x.url}" target="_blank" rel="noopener">${x.name}</a>`).join('<br>');
+    $('results').classList.remove('hidden');
+    $('file').value='';
+  }catch(e){
+    setMsg(e.message||'アップロードに失敗しました。',false);
+  }finally{
+    $('submitBtn').disabled=false;
+  }
+}
+</script>
+</body>
+</html>
