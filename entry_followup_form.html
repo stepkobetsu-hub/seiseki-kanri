@@ -22,6 +22,14 @@ textarea{min-height:96px;resize:vertical}.row{border:1px solid #e4edf7;border-ra
 .primary{background:#155aa5;color:#fff}.ghost{background:#edf4fb;color:#155aa5}.danger{background:#fee2e2;color:#b91c1c}
 .submit{width:100%;font-size:1.08rem;padding:14px;margin-top:16px}.msg{margin-top:12px;white-space:pre-wrap;font-weight:700}.ok{color:#047857}.err{color:#dc2626}
 .small{font-size:.82rem;color:#64748b;line-height:1.6}.hidden{display:none!important}
+.tableWrap{overflow-x:auto;border:1px solid #dbe6f2;border-radius:10px;background:#fff}
+.entryTable{width:100%;min-width:760px;border-collapse:collapse}
+.entryTable.reportTable{min-width:1080px}
+.entryTable th,.entryTable td{border-bottom:1px solid #e4edf7;padding:6px;vertical-align:middle}
+.entryTable th{background:#f3f7fb;color:#334155;font-size:.78rem;white-space:nowrap}
+.entryTable td{background:#fff}.entryTable tr:last-child td{border-bottom:0}
+.entryTable input,.entryTable select{border-radius:6px;padding:7px;font-size:.92rem}
+.entryTable .btn{padding:7px 10px;border-radius:7px;white-space:nowrap}
 @media(max-width:720px){.grid,.grid3,.familyGrid,.subjects,.subjects9{grid-template-columns:1fr}.hero{border-radius:0;margin:-22px -14px 0}.card{border-radius:10px}.btn{width:100%}}
 </style>
 </head>
@@ -29,7 +37,7 @@ textarea{min-height:96px;resize:vertical}.row{border:1px solid #e4edf7;border-ra
 <main>
   <section class="hero">
     <h1>エントリーシート（デジタル版）</h1>
-    <p>※「入塾時情報」「家族情報」は任意です。ご記入できる分だけで結構です。<br>※初回通塾日までにご入力・送信願います。</p>
+    <p>※「入塾時情報」「家族情報」は任意です。ご記入いただける分だけで結構です。<br>※初回通塾日までにご入力・送信願います。</p>
   </section>
 
   <section class="card">
@@ -61,15 +69,29 @@ textarea{min-height:96px;resize:vertical}.row{border:1px solid #e4edf7;border-ra
 
   <section class="card">
     <div class="head">定期テスト得点（中学生のみ）</div>
-    <p class="small">お手数ですがご記入ください。※分かる範囲で結構です。</p>
-    <div id="scoreBox"></div>
+    <p class="small">お手数ですがご記入ください。※分かる範囲で結構です。<br>※50点満点のテストは2倍して記入してください。</p>
+    <div class="tableWrap">
+      <table class="entryTable">
+        <thead>
+          <tr><th>年度</th><th>学年</th><th>回</th><th>国語</th><th>社会</th><th>数学</th><th>理科</th><th>英語</th><th></th></tr>
+        </thead>
+        <tbody id="scoreBox"></tbody>
+      </table>
+    </div>
     <div class="btns"><button class="btn ghost" onclick="addScore()">定期テストを追加</button></div>
   </section>
 
   <section class="card">
     <div class="head">通知表評定（中学生のみ）</div>
-    <p class="small">中学生成績の右側です。1〜5で入力してください。</p>
-    <div id="reportBox"></div>
+    <p class="small">中学生成績の右側です。1〜5で入力してください。<br>※2学期制の場合は、1学期と2学期にご記入ください。<br>※10段階評価は5段階（半分）にしてご記入ください。</p>
+    <div class="tableWrap">
+      <table class="entryTable reportTable">
+        <thead>
+          <tr><th>年度</th><th>学年</th><th>学期</th><th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>音</th><th>美</th><th>体</th><th>技</th><th></th></tr>
+        </thead>
+        <tbody id="reportBox"></tbody>
+      </table>
+    </div>
     <div class="btns"><button class="btn ghost" onclick="addReport()">通知表を追加</button></div>
   </section>
 
@@ -116,7 +138,7 @@ function addFamily(){
       </select><input data-k="gradeJobOther" class="hidden" placeholder="その他（空欄可）" style="margin-top:6px"></div>
       <div><label>勤務先・学校名</label><input data-k="workplace"></div>
     </div>
-    <div class="btns"><button class="btn danger" onclick="this.closest('.row').remove()">削除</button><span style="color:#dc2626;font-weight:800;font-size:.86rem;align-self:center">※50点満点のテストは2倍して記入してください。</span></div>
+    <div class="btns"><button class="btn danger" onclick="this.closest('.row').remove()">削除</button></div>
   </div>`);
 }
 
@@ -127,30 +149,22 @@ function toggleFamilyOther(sel, kind){
   if (sel.value !== 'その他') input.value = '';
 }
 function addScore(){
-  $('scoreBox').insertAdjacentHTML('beforeend',`<div class="row score">
-    <div class="grid3">
-      <div><label>年度</label><input data-k="year" inputmode="numeric" placeholder="例: 2026"></div>
-      <div><label>学年</label><select data-k="grade"><option value="">選択</option><option>中1</option><option>中2</option><option>中3</option></select></div>
-      <div><label>回</label><select data-k="term"><option value="">選択</option><option value="1">1回</option><option value="2">2回</option><option value="3">3回</option><option value="4">4回</option><option value="5">5回</option><option value="6">6回</option></select></div>
-    </div>
-    <div class="subjects" style="margin-top:10px">
-      ${['jpn:国語','soc:社会','math:数学','sci:理科','eng:英語'].map(x=>{const [k,l]=x.split(':');return `<div><label>${l}</label><input data-k="${k}" inputmode="numeric"></div>`}).join('')}
-    </div>
-    <div class="btns"><button class="btn danger" onclick="this.closest('.row').remove()">削除</button><span style="color:#dc2626;font-weight:800;font-size:.86rem;align-self:center">※2学期制の場合は、1学期と2学期にご記入ください。</span></div>
-  </div>`);
+  $('scoreBox').insertAdjacentHTML('beforeend',`<tr class="score">
+    <td><input data-k="year" inputmode="numeric" placeholder="2026"></td>
+    <td><select data-k="grade"><option value="">選択</option><option>中1</option><option>中2</option><option>中3</option></select></td>
+    <td><select data-k="term"><option value="">選択</option><option value="1">1回</option><option value="2">2回</option><option value="3">3回</option><option value="4">4回</option><option value="5">5回</option><option value="6">6回</option></select></td>
+    ${['jpn','soc','math','sci','eng'].map(k=>`<td><input data-k="${k}" inputmode="numeric"></td>`).join('')}
+    <td><button class="btn danger" onclick="this.closest('tr').remove()">削除</button></td>
+  </tr>`);
 }
 function addReport(){
-  $('reportBox').insertAdjacentHTML('beforeend',`<div class="row report">
-    <div class="grid3">
-      <div><label>年度</label><input data-k="year" inputmode="numeric" placeholder="例: 2026"></div>
-      <div><label>学年</label><select data-k="grade"><option value="">選択</option><option>中1</option><option>中2</option><option>中3</option></select></div>
-      <div><label>学期</label><select data-k="semester"><option value="">選択</option><option>1学期</option><option>2学期</option><option>3学期</option></select></div>
-    </div>
-    <div class="subjects9" style="margin-top:10px">
-      ${['rp_jpn:国','rp_soc:社','rp_math:数','rp_sci:理','rp_eng:英','rp_mus:音','rp_art:美','rp_pe:体','rp_tech:技'].map(x=>{const [k,l]=x.split(':');return `<div><label>${l}</label><input data-k="${k}" inputmode="numeric" min="1" max="5"></div>`}).join('')}
-    </div>
-    <div class="btns"><button class="btn danger" onclick="this.closest('.row').remove()">削除</button></div>
-  </div>`);
+  $('reportBox').insertAdjacentHTML('beforeend',`<tr class="report">
+    <td><input data-k="year" inputmode="numeric" placeholder="2026"></td>
+    <td><select data-k="grade"><option value="">選択</option><option>中1</option><option>中2</option><option>中3</option></select></td>
+    <td><select data-k="semester"><option value="">選択</option><option>1学期</option><option>2学期</option><option>3学期</option></select></td>
+    ${['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech'].map(k=>`<td><input data-k="${k}" inputmode="numeric" min="1" max="5"></td>`).join('')}
+    <td><button class="btn danger" onclick="this.closest('tr').remove()">削除</button></td>
+  </tr>`);
 }
 function collectRows(sel){
   return [...document.querySelectorAll(sel)].map(row=>{

@@ -1174,16 +1174,16 @@ function submitEntryFollowupForm(data) {
   }
 
   sendEntryFollowupSubmittedMail_(student, data, result);
-  result.message = '入塾後日入力フォームを保存しました';
+  result.message = 'エントリーシート【デジタル版】を保存しました';
   if (result.errors.length) result.warning = result.errors.join('\n');
   return result;
 }
 
 function sendEntryFollowupSubmittedMail_(student, data, result) {
   const entry = data.entryInfo || {};
-  const subject = '【入塾後日入力フォーム】' + student.name + '（No.' + student.id + '）';
+  const subject = 'エントリーシート【デジタル版】: ' + student.name + '（No.' + student.id + '）';
   const body = [
-    '入塾後日入力フォームが送信されました。',
+    'エントリーシート【デジタル版】が送信されました。',
     '',
     '生徒: ' + student.name + '（No.' + student.id + ' / ' + (student.grade || '') + '）',
     '校舎: ' + (student.campus || ''),
