@@ -161,6 +161,7 @@ function route(e) {
       case 'getEntrySheetData':   result = getEntrySheetData(data); break;
       case 'saveEntrySheetData':  result = saveEntrySheetData(data); break;
       case 'importEntrySheet':    result = importEntrySheet(data); break;
+      case 'submitEntryFollowupForm': result = submitEntryFollowupForm(data); break;
       case 'applyEntryGuardian2ToMaster': result = applyEntryGuardian2ToMaster(data); break;
       case 'applyEntryAiReview': result = applyEntryAiReview(data); break;
       case 'uploadEntryImage':    result = uploadEntryImage(data); break;
@@ -1128,6 +1129,79 @@ function importEntrySheet(data) {
   if (result.masterUpdated === false) result.warning = '生徒マスタ元ファイルに同じ生徒IDが見つからなかったため、右側保護者欄は生徒マスタへ反映していません。成績管理側には保存しました。';
   if (result.errors.length) result.warning = (result.warning ? result.warning + '\n' : '') + result.errors.join('\n');
   return result;
+}
+
+function submitEntryFollowupForm(data) {
+  const student = findStudentById_(data.studentId);
+  if (!student) return { success: false, error: '生徒番号が見つかりません: ' + (data.studentId || '') };
+  if (data.studentName && normalizeName_(data.studentName) && normalizeName_(data.studentName) !== normalizeName_(student.name)) {
+    return { success: false, error: '生徒番号と氏名が一致しません。番号と氏名を確認してください。' };
+  }
+
+  const result = { success: true, saved: [], errors: [] };
+  const entryPayload = Object.assign({}, data.entryInfo || {}, {
+    studentId: student.id,
+    name: student.name,
+    campus: student.campus,
+    grade: student.grade,
+    school: student.school,
+    family: data.family || [],
+    ocrMemo: '保護者フォーム入力'
+  });
+  const entryResult = saveEntrySheetData(entryPayload);
+  if (!entryResult.success) return entryResult;
+  result.saved.push('entryInfo');
+
+  normalizeEntryScores_(data.scores || [], student).forEach(s => {
+    const r = saveScore(Object.assign({}, s, {
+      studentId: student.id, name: student.name, campus: student.campus,
+      grade: s.grade || student.grade, school: s.school || student.school
+    }));
+    if (r.success) result.saved.push('score'); else result.errors.push('定期テスト: ' + (r.error || '保存失敗'));
+  });
+
+  normalizeEntryReports_(data.reports || [], student).forEach(rp => {
+    const r = saveReport(Object.assign({}, rp, {
+      studentId: student.id, name: student.name, campus: student.campus,
+      grade: rp.grade || student.grade, school: rp.school || student.school
+    }));
+    if (r.success) result.saved.push('report'); else result.errors.push('通知表: ' + (r.error || '保存失敗'));
+  });
+
+  if (data.wish && Object.keys(data.wish).some(k => data.wish[k] !== '' && data.wish[k] != null)) {
+    const r = saveWish(Object.assign({}, data.wish, { studentId: student.id }));
+    if (r.success) result.saved.push('wish'); else result.errors.push('志望校: ' + (r.error || '保存失敗'));
+  }
+
+  sendEntryFollowupSubmittedMail_(student, data, result);
+  result.message = '入塾後日入力フォームを保存しました';
+  if (result.errors.length) result.warning = result.errors.join('\n');
+  return result;
+}
+
+function sendEntryFollowupSubmittedMail_(student, data, result) {
+  const entry = data.entryInfo || {};
+  const subject = '【入塾後日入力フォーム】' + student.name + '（No.' + student.id + '）';
+  const body = [
+    '入塾後日入力フォームが送信されました。',
+    '',
+    '生徒: ' + student.name + '（No.' + student.id + ' / ' + (student.grade || '') + '）',
+    '校舎: ' + (student.campus || ''),
+    '学校: ' + (student.school || ''),
+    '',
+    '保存内容:',
+    '- 入塾時情報: ' + ((result.saved || []).indexOf('entryInfo') >= 0 ? 'あり' : 'なし'),
+    '- 定期テスト: ' + (data.scores || []).length + '件',
+    '- 通知表: ' + (data.reports || []).length + '件',
+    '- 志望校: ' + (data.wish && Object.keys(data.wish).some(k => data.wish[k]) ? 'あり' : 'なし'),
+    '',
+    '部活動: ' + (entry.club || ''),
+    'ニックネーム: ' + (entry.nickname || ''),
+    'ご家庭からの要望: ' + (entry.familyRequest || ''),
+    '',
+    result.errors && result.errors.length ? '注意:\n' + result.errors.join('\n') : ''
+  ].join('\n');
+  MailApp.sendEmail({ to: 'mintcocoajasmine@gmail.com', subject, body });
 }
 
 function normalizeEntryScores_(scores, student) {

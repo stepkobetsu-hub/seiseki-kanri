@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>入塾後日入力フォーム</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f3f7fb;color:#172033;font-family:"Hiragino Kaku Gothic ProN","Meiryo",sans-serif}
+main{max-width:980px;margin:0 auto;padding:22px 14px 42px}
+.hero{background:#155aa5;color:#fff;border-radius:14px;padding:20px;box-shadow:0 12px 28px rgba(21,90,165,.18)}
+h1{margin:0;font-size:1.45rem;letter-spacing:0}.hero p{margin:8px 0 0;line-height:1.7;color:#e7f1ff}
+.card{background:#fff;border:1px solid #dbe6f2;border-radius:12px;margin-top:14px;padding:16px;box-shadow:0 8px 22px rgba(23,40,60,.06)}
+.head{font-weight:800;margin-bottom:12px;color:#12345a}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+label{display:block;font-size:.8rem;font-weight:700;color:#51637a;margin-bottom:4px}
+input,textarea,select{width:100%;border:1px solid #c9d6e5;border-radius:8px;padding:10px;font-size:1rem;background:#fff}
+textarea{min-height:96px;resize:vertical}.row{border:1px solid #e4edf7;border-radius:10px;padding:12px;margin-top:10px;background:#fbfdff}
+.subjects{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.subjects9{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:8px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.btn{border:0;border-radius:9px;padding:10px 14px;font-weight:800;cursor:pointer}
+.primary{background:#155aa5;color:#fff}.ghost{background:#edf4fb;color:#155aa5}.danger{background:#fee2e2;color:#b91c1c}
+.submit{width:100%;font-size:1.08rem;padding:14px;margin-top:16px}.msg{margin-top:12px;white-space:pre-wrap;font-weight:700}.ok{color:#047857}.err{color:#dc2626}
+.small{font-size:.82rem;color:#64748b;line-height:1.6}.hidden{display:none!important}
+@media(max-width:720px){.grid,.grid3,.subjects,.subjects9{grid-template-columns:1fr}.hero{border-radius:0;margin:-22px -14px 0}.card{border-radius:10px}.btn{width:100%}}
+</style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <h1>入塾後日入力フォーム</h1>
+    <p>入塾書類の下半分と、中学生成績・志望校の内容をご家庭で入力できます。空欄の項目はそのままで大丈夫です。</p>
+  </section>
+
+  <section class="card">
+    <div class="head">生徒確認</div>
+    <div class="grid">
+      <div><label>生徒番号</label><input id="studentId" inputmode="numeric" placeholder="例: 1001"></div>
+      <div><label>生徒氏名</label><input id="studentName" placeholder="例: 加瀬壮真"></div>
+    </div>
+    <p class="small">生徒番号と氏名が一致しない場合は保存されません。</p>
+  </section>
+
+  <section class="card">
+    <div class="head">入塾時情報</div>
+    <div class="grid">
+      <div><label>部活動</label><input id="club"></div>
+      <div><label>ニックネーム</label><input id="nickname"></div>
+      <div><label>現在通っている習い事や塾</label><input id="currentLessons"></div>
+      <div><label>過去に通っていた習い事や塾</label><input id="pastLessons"></div>
+      <div><label>通塾方法</label><input id="commuteMethod" placeholder="例: 徒歩、送迎、自転車"></div>
+    </div>
+    <div style="margin-top:10px"><label>ご家庭からのご要望・ご希望</label><textarea id="familyRequest"></textarea></div>
+  </section>
+
+  <section class="card">
+    <div class="head">家族情報</div>
+    <div id="familyBox"></div>
+    <div class="btns"><button class="btn ghost" onclick="addFamily()">家族を追加</button></div>
+  </section>
+
+  <section class="card">
+    <div class="head">定期テスト得点</div>
+    <p class="small">中学生成績の左側です。わかる行だけ入力してください。</p>
+    <div id="scoreBox"></div>
+    <div class="btns"><button class="btn ghost" onclick="addScore()">定期テストを追加</button></div>
+  </section>
+
+  <section class="card">
+    <div class="head">通知表評定</div>
+    <p class="small">中学生成績の右側です。1〜5で入力してください。</p>
+    <div id="reportBox"></div>
+    <div class="btns"><button class="btn ghost" onclick="addReport()">通知表を追加</button></div>
+  </section>
+
+  <section class="card">
+    <div class="head">志望校</div>
+    <div class="grid">
+      <div><label>公立 第1志望 学校名</label><input id="pub1name"></div><div><label>学科名</label><input id="pub1dept"></div>
+      <div><label>公立 第2志望 学校名</label><input id="pub2name"></div><div><label>学科名</label><input id="pub2dept"></div>
+      <div><label>私立 第1志望 学校名</label><input id="pri1name"></div><div><label>学科名</label><input id="pri1dept"></div>
+      <div><label>私立 第2志望 学校名</label><input id="pri2name"></div><div><label>学科名</label><input id="pri2dept"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <button id="submitBtn" class="btn primary submit" onclick="submitForm()">送信する</button>
+    <div id="msg" class="msg"></div>
+  </section>
+</main>
+
+<script>
+const GAS='https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
+const $=id=>document.getElementById(id);
+async function api(data){const r=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(data)});return await r.json()}
+function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function val(id){return ($(id)?.value||'').trim()}
+function msg(t,ok){$('msg').className='msg '+(ok?'ok':'err');$('msg').textContent=t}
+
+function addFamily(){
+  const i=document.querySelectorAll('#familyBox .row').length;
+  $('familyBox').insertAdjacentHTML('beforeend',`<div class="row family">
+    <div class="grid3">
+      <div><label>氏名</label><input data-k="name"></div>
+      <div><label>続柄</label><input data-k="relation"></div>
+      <div><label>学年</label><input data-k="grade"></div>
+      <div><label>職業</label><input data-k="job"></div>
+      <div><label>勤務先・学校名</label><input data-k="workplace"></div>
+    </div>
+    <div class="btns"><button class="btn danger" onclick="this.closest('.row').remove()">削除</button></div>
+  </div>`);
+}
+function addScore(){
+  $('scoreBox').insertAdjacentHTML('beforeend',`<div class="row score">
+    <div class="grid3">
+      <div><label>年度</label><input data-k="year" inputmode="numeric" placeholder="例: 2026"></div>
+      <div><label>学年</label><select data-k="grade"><option value="">選択</option><option>中1</option><option>中2</option><option>中3</option></select></div>
+      <div><label>回</label><select data-k="term"><option value="">選択</option><option value="1">1回</option><option value="2">2回</option><option value="3">3回</option><option value="4">4回</option><option value="5">5回</option><option value="6">6回</option></select></div>
+    </div>
+    <div class="subjects" style="margin-top:10px">
+      ${['jpn:国語','soc:社会','math:数学','sci:理科','eng:英語'].map(x=>{const [k,l]=x.split(':');return `<div><label>${l}</label><input data-k="${k}" inputmode="numeric"></div>`}).join('')}
+    </div>
+    <div class="btns"><button class="btn danger" onclick="this.closest('.row').remove()">削除</button></div>
+  </div>`);
+}
+function addReport(){
+  $('reportBox').insertAdjacentHTML('beforeend',`<div class="row report">
+    <div class="grid3">
+      <div><label>年度</label><input data-k="year" inputmode="numeric" placeholder="例: 2026"></div>
+      <div><label>学年</label><select data-k="grade"><option value="">選択</option><option>中1</option><option>中2</option><option>中3</option></select></div>
+      <div><label>学期</label><select data-k="semester"><option value="">選択</option><option>1学期</option><option>2学期</option><option>3学期</option></select></div>
+    </div>
+    <div class="subjects9" style="margin-top:10px">
+      ${['rp_jpn:国','rp_soc:社','rp_math:数','rp_sci:理','rp_eng:英','rp_mus:音','rp_art:美','rp_pe:体','rp_tech:技'].map(x=>{const [k,l]=x.split(':');return `<div><label>${l}</label><input data-k="${k}" inputmode="numeric" min="1" max="5"></div>`}).join('')}
+    </div>
+    <div class="btns"><button class="btn danger" onclick="this.closest('.row').remove()">削除</button></div>
+  </div>`);
+}
+function collectRows(sel){
+  return [...document.querySelectorAll(sel)].map(row=>{
+    const o={}; row.querySelectorAll('[data-k]').forEach(el=>o[el.dataset.k]=(el.value||'').trim());
+    return o;
+  }).filter(o=>Object.values(o).some(Boolean));
+}
+async function submitForm(){
+  const payload={
+    action:'submitEntryFollowupForm',
+    studentId:val('studentId'),
+    studentName:val('studentName'),
+    entryInfo:{club:val('club'),nickname:val('nickname'),currentLessons:val('currentLessons'),pastLessons:val('pastLessons'),commuteMethod:val('commuteMethod'),familyRequest:val('familyRequest')},
+    family:collectRows('#familyBox .family'),
+    scores:collectRows('#scoreBox .score'),
+    reports:collectRows('#reportBox .report'),
+    wish:{pub1name:val('pub1name'),pub1dept:val('pub1dept'),pub2name:val('pub2name'),pub2dept:val('pub2dept'),pri1name:val('pri1name'),pri1dept:val('pri1dept'),pri2name:val('pri2name'),pri2dept:val('pri2dept')}
+  };
+  if(!payload.studentId||!payload.studentName){msg('生徒番号と生徒氏名を入力してください。',false);return}
+  $('submitBtn').disabled=true; msg('送信中です...',true);
+  try{
+    const r=await api(payload);
+    if(!r.success) throw new Error(r.error||'送信に失敗しました');
+    msg('送信ありがとうございました。入力内容を保存しました。',true);
+    $('submitBtn').classList.add('hidden');
+  }catch(e){msg(e.message||'送信に失敗しました。',false);$('submitBtn').disabled=false}
+}
+addFamily();addScore();addReport();
+</script>
+</body>
+</html>
