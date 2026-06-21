@@ -2360,7 +2360,7 @@ async function loadCompare(overrideSid) {
       return (diff >= 0 && diff <= 2) ? '（中' + (diff + 1) + '）' : '';
     }
     const scLabel = sc.year ? (!year ? sc.year+'年度 第'+sc.term+'回'+_cmpGradeFor(sc.year) : '第'+sc.term+'回'+_cmpGradeFor(sc.year)) : '-';
-    const rpLabel = rp.year ? (!year ? rp.year+'年度 '+rp.semester : rp.semester) : '-';
+    const rpLabel = rp.year ? (!year ? rp.year+'年度 '+rp.semester+_cmpGradeFor(rp.year) : rp.semester+_cmpGradeFor(rp.year)) : '-';
     const td = (v, bold) => `<td style="padding:3px 4px;text-align:center${bold?';font-weight:700;color:var(--primary)':''}">${v!==''&&v!=null ? v : '-'}</td>`;
     const tdR = v => `<td style="padding:3px 4px;text-align:center">${rpRating(v)}</td>`;
     // 通知表5科計・9科計を計算

@@ -218,11 +218,14 @@ function validateNumberRows(){
   clearInvalidInputs();
   const errors=[];
   document.querySelectorAll('#scoreBox .score').forEach((row,idx)=>{
-    const gradeEl=row.querySelector('[data-k="grade"]');
-    const termEl=row.querySelector('[data-k="term"]');
-    if(!gradeEl?.value){gradeEl?.classList.add('invalid');errors.push(`定期テスト${idx+1}行目：学年を選択してください。`);}
-    if(!termEl?.value){termEl?.classList.add('invalid');errors.push(`定期テスト${idx+1}行目：回を選択してください。`);}
     const scoreKeys=['jpn','soc','math','sci','eng'];
+    const hasValue=scoreKeys.some(k=>(row.querySelector(`[data-k="${k}"]`)?.value||'').trim()!=='');
+    if(hasValue){
+      const gradeEl=row.querySelector('[data-k="grade"]');
+      const termEl=row.querySelector('[data-k="term"]');
+      if(!gradeEl?.value){gradeEl?.classList.add('invalid');errors.push(`定期テスト${idx+1}行目：学年を選択してください。`);}
+      if(!termEl?.value){termEl?.classList.add('invalid');errors.push(`定期テスト${idx+1}行目：回を選択してください。`);}
+    }
     scoreKeys.forEach(k=>{
       const el=row.querySelector(`[data-k="${k}"]`);
       const v=(el?.value||'').trim();
@@ -235,11 +238,14 @@ function validateNumberRows(){
     });
   });
   document.querySelectorAll('#reportBox .report').forEach((row,idx)=>{
-    const gradeEl=row.querySelector('[data-k="grade"]');
-    const semEl=row.querySelector('[data-k="semester"]');
-    if(!gradeEl?.value){gradeEl?.classList.add('invalid');errors.push(`通知表${idx+1}行目：学年を選択してください。`);}
-    if(!semEl?.value){semEl?.classList.add('invalid');errors.push(`通知表${idx+1}行目：学期を選択してください。`);}
     const reportKeys=['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech'];
+    const hasValue=reportKeys.some(k=>(row.querySelector(`[data-k="${k}"]`)?.value||'').trim()!=='');
+    if(hasValue){
+      const gradeEl=row.querySelector('[data-k="grade"]');
+      const semEl=row.querySelector('[data-k="semester"]');
+      if(!gradeEl?.value){gradeEl?.classList.add('invalid');errors.push(`通知表${idx+1}行目：学年を選択してください。`);}
+      if(!semEl?.value){semEl?.classList.add('invalid');errors.push(`通知表${idx+1}行目：学期を選択してください。`);}
+    }
     reportKeys.forEach(k=>{
       const el=row.querySelector(`[data-k="${k}"]`);
       const v=(el?.value||'').trim();
