@@ -10,7 +10,13 @@ const MASTER_SHEET_NAME = '☆マスタ';
 const TARGET_MASTER_FLAGS = ['1', '0']; // ☆マスタB列: 1=在籍, 0=保留中
 const SCHOOL_MASTER_COLS = ['学校名','年間テスト回数','学期制','登録日時','定期テスト日程JSON','予定表URL','日程メモ'];
 const MEETING_MEMO_COLS = ['ID','日付','生徒ID','氏名','校舎','学年','中学校','相手','内容','担当','登録日時','更新日時'];
-const STAFF_COLS = ['担当者名','登録日時'];
+const STAFF_COLS = ['担当者名','メール','登録日時'];
+const DEFAULT_STAFF_MAILS = {
+  '加瀬': 'mintcocoajasmine@gmail.com',
+  '大野': 'chloeandnina1@gmail.com',
+  '林': '2350.fusa.koto.shou@gmail.com'
+};
+const OTEMACHI_MEETING_MAIL_STAFF = ['加瀬', '大野'];
 
 // ===================================================
 // シート取得 / 初期化
@@ -47,8 +53,26 @@ function ensureSheets() {
   ]);
   getOrCreateSheet('同期ログ', ['日時','種別','内容']);
   getOrCreateSheet('面談メモデータ', MEETING_MEMO_COLS);
-  getOrCreateSheet('担当者マスタ', STAFF_COLS);
+  ensureStaffSheet_();
   ensureDefaultStaffMembers_();
+}
+
+function ensureStaffSheet_() {
+  const sh = getOrCreateSheet('担当者マスタ', STAFF_COLS);
+  const lastCol = Math.max(sh.getLastColumn(), STAFF_COLS.length);
+  const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  if (headers[1] === '登録日時' && headers[2] !== '登録日時') {
+    const lastRow = sh.getLastRow();
+    if (lastRow > 1) {
+      const oldCreated = sh.getRange(2, 2, lastRow - 1, 1).getValues();
+      sh.getRange(2, 3, lastRow - 1, 1).setValues(oldCreated);
+      sh.getRange(2, 2, lastRow - 1, 1).clearContent();
+    }
+  }
+  STAFF_COLS.forEach((name, idx) => {
+    if (sh.getRange(1, idx + 1).getValue() !== name) sh.getRange(1, idx + 1).setValue(name);
+  });
+  return sh;
 }
 
 function ensureSchoolMasterSheet_() {
@@ -716,44 +740,111 @@ function rowToReport(row) {
 // ===================================================
 
 function ensureDefaultStaffMembers_() {
-  const sh = getOrCreateSheet('担当者マスタ', STAFF_COLS);
-  if (sh.getLastRow() > 1) return;
+  const sh = ensureStaffSheet_();
+  const rows = sh.getDataRange().getValues();
   const now = new Date().toLocaleString('ja-JP');
-  ['加瀬', '大野', '林'].forEach(name => sh.appendRow([name, now]));
+  const existing = {};
+  for (let i = 1; i < rows.length; i++) {
+    const name = String(rows[i][0] || '').trim();
+    if (!name) continue;
+    existing[name] = i + 1;
+  }
+  Object.keys(DEFAULT_STAFF_MAILS).forEach(name => {
+    const rowNo = existing[name];
+    if (rowNo) {
+      if (!sh.getRange(rowNo, 2).getValue()) sh.getRange(rowNo, 2).setValue(DEFAULT_STAFF_MAILS[name]);
+    } else {
+      sh.appendRow([name, DEFAULT_STAFF_MAILS[name], now]);
+    }
+  });
 }
 
 function getStaffMembers() {
   ensureDefaultStaffMembers_();
-  const sh = getOrCreateSheet('担当者マスタ', STAFF_COLS);
+  const sh = ensureStaffSheet_();
   const rows = sh.getDataRange().getValues();
   const staff = [];
+  const staffMembers = [];
   for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0]) staff.push(String(rows[i][0]));
+    if (rows[i][0]) {
+      const item = { name: String(rows[i][0]), email: String(rows[i][1] || '') };
+      staff.push(item.name);
+      staffMembers.push(item);
+    }
   }
-  return { success: true, staff };
+  return { success: true, staff, staffMembers };
 }
 
 function addStaffMember(data) {
   const name = String(data.name || '').trim();
+  const email = String(data.email || '').trim();
   if (!name) return { success: false, error: '担当者名を入力してください' };
-  const sh = getOrCreateSheet('担当者マスタ', STAFF_COLS);
+  const sh = ensureStaffSheet_();
   const rows = sh.getDataRange().getValues();
   for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][0]).trim() === name) return getStaffMembers();
+    if (String(rows[i][0]).trim() === name) {
+      sh.getRange(i + 1, 2).setValue(email);
+      return getStaffMembers();
+    }
   }
-  sh.appendRow([name, new Date().toLocaleString('ja-JP')]);
+  sh.appendRow([name, email, new Date().toLocaleString('ja-JP')]);
   return getStaffMembers();
 }
 
 function deleteStaffMember(data) {
   const name = String(data.name || '').trim();
   if (!name) return { success: false, error: '担当者名を指定してください' };
-  const sh = getOrCreateSheet('担当者マスタ', STAFF_COLS);
+  const sh = ensureStaffSheet_();
   const rows = sh.getDataRange().getValues();
   for (let i = rows.length - 1; i >= 1; i--) {
     if (String(rows[i][0]).trim() === name) sh.deleteRow(i + 1);
   }
   return getStaffMembers();
+}
+
+function getStaffEmailMap_() {
+  ensureDefaultStaffMembers_();
+  const sh = ensureStaffSheet_();
+  const rows = sh.getDataRange().getValues();
+  const map = {};
+  for (let i = 1; i < rows.length; i++) {
+    const name = String(rows[i][0] || '').trim();
+    const email = String(rows[i][1] || '').trim();
+    if (name && email) map[name] = email;
+  }
+  return map;
+}
+
+function getMeetingMemoRecipients_(campus, staffName) {
+  if (String(campus || '').indexOf('大手') < 0) return [];
+  const staffMap = getStaffEmailMap_();
+  const recipients = [];
+  OTEMACHI_MEETING_MAIL_STAFF.forEach(name => {
+    if (staffMap[name]) recipients.push(staffMap[name]);
+  });
+  if (staffName && staffMap[staffName]) recipients.push(staffMap[staffName]);
+  return Array.from(new Set(recipients.filter(Boolean)));
+}
+
+function sendMeetingMemoEmail_(memo) {
+  const recipients = getMeetingMemoRecipients_(memo.campus, memo.staff);
+  if (!recipients.length) return { sent: false, skipped: true, reason: '送信先がありません' };
+  const subject = '【面談メモ】' + memo.name + '（No.' + memo.studentId + '）';
+  const body = [
+    '面談メモが登録されました。',
+    '',
+    '日付: ' + (memo.date || ''),
+    '生徒: ' + (memo.name || '') + '（No.' + (memo.studentId || '') + ' / ' + (memo.grade || '') + '）',
+    '校舎: ' + (memo.campus || ''),
+    '学校: ' + (memo.school || ''),
+    '相手: ' + (memo.counterpart || ''),
+    '担当: ' + (memo.staff || ''),
+    '',
+    '内容:',
+    memo.content || ''
+  ].join('\n');
+  MailApp.sendEmail({ to: recipients.join(','), subject, body });
+  return { sent: true, recipients };
 }
 
 function saveMeetingMemo(data) {
@@ -775,11 +866,15 @@ function saveMeetingMemo(data) {
     if (String(rows[i][0]) === String(id)) {
       row[10] = rows[i][10] || now;
       sh.getRange(i + 1, 1, 1, row.length).setValues([row]);
-      return { success: true, memo: rowToMeetingMemo_(row) };
+      const memo = rowToMeetingMemo_(row);
+      const email = data.sendEmail ? sendMeetingMemoEmail_(memo) : null;
+      return { success: true, memo, email };
     }
   }
   sh.appendRow(row);
-  return { success: true, memo: rowToMeetingMemo_(row) };
+  const memo = rowToMeetingMemo_(row);
+  const email = data.sendEmail ? sendMeetingMemoEmail_(memo) : null;
+  return { success: true, memo, email };
 }
 
 function getMeetingMemos(data) {

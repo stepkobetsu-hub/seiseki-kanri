@@ -471,7 +471,8 @@ tr:hover td{background:#f8fafc}
           </div>
           <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
             <div class="fld"><label>内容</label><textarea id="meetContent" placeholder="面談・電話・相談内容など" style="min-height:170px"></textarea></div>
-            <button id="meetSaveBtn" class="btn btn-primary btn-sm" onclick="saveMeetingMemo()">保存する</button>
+            <button id="meetSaveBtn" class="btn btn-primary btn-sm" onclick="saveMeetingMemo(false)">保存する</button>
+            <button id="meetMailSaveBtn" class="btn btn-success btn-sm" onclick="saveMeetingMemo(true)">メール送信して保存</button>
             <button class="btn btn-ghost btn-sm" onclick="clearMeetingForm()">入力欄をクリア</button>
           </div>
         </div>
@@ -745,6 +746,7 @@ tr:hover td{background:#f8fafc}
         <div class="cardHead">👤 面談担当者</div>
         <div class="fldRow">
           <input id="newStaffName" placeholder="担当者名を追加">
+          <input id="newStaffEmail" placeholder="メールアドレス">
           <button class="btn btn-success btn-sm" onclick="addStaffMember()">＋ 追加</button>
         </div>
         <div id="staffListBox" class="listBox" style="margin-top:12px"></div>
@@ -804,6 +806,7 @@ let allScores = [];
 let allReports = [];
 let pendingSync = null;
 let staffMembers = [];
+let staffMemberRecords = [];
 let meetingMemos = [];
 let adminScores = [];
 let renderedAdminScores = [];
@@ -3233,9 +3236,15 @@ function toggleMeetingOther() {
   }
 }
 
+function normalizeStaffRecords(r) {
+  const records = (r.staffMembers || []).map(s => typeof s === 'string' ? { name: s, email: '' } : s);
+  return records.length ? records : (r.staff || []).map(name => ({ name, email: '' }));
+}
+
 async function loadStaffMembers() {
   const r = await api({ action: 'getStaffMembers' });
-  staffMembers = r.staff || [];
+  staffMemberRecords = normalizeStaffRecords(r);
+  staffMembers = staffMemberRecords.map(s => s.name);
   renderStaffOptions();
   renderStaffSettings();
 }
@@ -3254,22 +3263,26 @@ function renderStaffOptions() {
 function renderStaffSettings() {
   const box = document.getElementById('staffListBox');
   if (!box) return;
-  box.innerHTML = staffMembers.length ? staffMembers.map(n => `
+  box.innerHTML = staffMemberRecords.length ? staffMemberRecords.map(s => `
     <div class="listRow">
-      <div><strong>${htmlEsc(n)}</strong></div>
-      <button class="btn btn-danger btn-sm" onclick="deleteStaffMember('${htmlEsc(n)}')">削除</button>
+      <div><strong>${htmlEsc(s.name)}</strong><div style="color:#64748b;font-size:.78rem">${htmlEsc(s.email || 'メール未設定')}</div></div>
+      <button class="btn btn-danger btn-sm" onclick="deleteStaffMember('${htmlEsc(s.name)}')">削除</button>
     </div>
   `).join('') : '<div class="noData">担当者が登録されていません</div>';
 }
 
 async function addStaffMember() {
   const el = document.getElementById('newStaffName');
+  const mailEl = document.getElementById('newStaffEmail');
   const name = (el?.value || '').trim();
+  const email = (mailEl?.value || '').trim();
   if (!name) { toast('担当者名を入力してください'); return; }
-  const r = await api({ action: 'addStaffMember', name });
+  const r = await api({ action: 'addStaffMember', name, email });
   if (!r.success) { toast(r.error || '追加に失敗しました'); return; }
   if (el) el.value = '';
-  staffMembers = r.staff || [];
+  if (mailEl) mailEl.value = '';
+  staffMemberRecords = normalizeStaffRecords(r);
+  staffMembers = staffMemberRecords.map(s => s.name);
   renderStaffOptions();
   renderStaffSettings();
   toast('担当者を追加しました');
@@ -3279,7 +3292,8 @@ async function deleteStaffMember(name) {
   if (!confirm(`${name} を担当者マスタから削除しますか？`)) return;
   const r = await api({ action: 'deleteStaffMember', name });
   if (!r.success) { toast(r.error || '削除に失敗しました'); return; }
-  staffMembers = r.staff || [];
+  staffMemberRecords = normalizeStaffRecords(r);
+  staffMembers = staffMemberRecords.map(s => s.name);
   renderStaffOptions();
   renderStaffSettings();
   toast('担当者を削除しました');
@@ -3297,7 +3311,7 @@ function clearMeetingForm() {
   toggleMeetingOther();
 }
 
-async function saveMeetingMemo() {
+async function saveMeetingMemo(sendEmail) {
   const counterpartBase = document.getElementById('meetCounterpart')?.value || '';
   const other = document.getElementById('meetOther')?.value.trim() || '';
   const counterpart = counterpartBase === '他' && other ? `他: ${other}` : counterpartBase;
@@ -3308,20 +3322,37 @@ async function saveMeetingMemo() {
     studentId: document.getElementById('meetStudent')?.value || '',
     counterpart,
     content: document.getElementById('meetContent')?.value.trim() || '',
-    staff: document.getElementById('meetStaff')?.value || ''
+    staff: document.getElementById('meetStaff')?.value || '',
+    sendEmail: !!sendEmail
   };
-  const r = await api(payload);
-  if (!r.success) { toast(r.error || '保存に失敗しました'); return; }
-  toast(currentMeetingMemoId ? '面談メモを更新しました' : '面談メモを保存しました');
-  currentMeetingMemoId = '';
-  const btn = document.getElementById('meetSaveBtn');
-  if (btn) btn.textContent = '保存する';
-  document.getElementById('meetContent').value = '';
-  const otherEl = document.getElementById('meetOther');
-  if (otherEl) otherEl.value = '';
-  await loadMeetingMemos();
-  const sid = document.getElementById('cmpStudent')?.value;
-  if (sid && String(sid) === String(payload.studentId)) loadCompareMeetings(sid);
+  const saveBtn = document.getElementById('meetSaveBtn');
+  const mailBtn = document.getElementById('meetMailSaveBtn');
+  if (saveBtn) saveBtn.disabled = true;
+  if (mailBtn) mailBtn.disabled = true;
+  try {
+    const r = await api(payload);
+    if (!r.success) { toast(r.error || '保存に失敗しました'); return; }
+    if (sendEmail) {
+      if (r.email?.sent) toast('面談メモを保存し、メール送信しました');
+      else toast('面談メモを保存しました（メール送信なし）');
+    } else {
+      toast(currentMeetingMemoId ? '面談メモを更新しました' : '面談メモを保存しました');
+    }
+    currentMeetingMemoId = '';
+    const btn = document.getElementById('meetSaveBtn');
+    if (btn) btn.textContent = '保存する';
+    document.getElementById('meetContent').value = '';
+    const otherEl = document.getElementById('meetOther');
+    if (otherEl) otherEl.value = '';
+    await loadMeetingMemos();
+    const sid = document.getElementById('cmpStudent')?.value;
+    if (sid && String(sid) === String(payload.studentId)) loadCompareMeetings(sid);
+  } catch (e) {
+    toast(e.message || '保存に失敗しました');
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+    if (mailBtn) mailBtn.disabled = false;
+  }
 }
 
 async function loadMeetingMemos() {

@@ -274,7 +274,8 @@ textarea{
     </div>
 
     <div class="actions">
-      <button id="saveBtn" class="primary" onclick="saveMemo()">保存する</button>
+      <button id="saveBtn" class="primary" onclick="saveMemo(false)">保存する</button>
+      <button id="mailSaveBtn" class="primary" onclick="saveMemo(true)">メール送信して保存</button>
       <button class="ghost" onclick="clearForm()">クリア</button>
     </div>
     <div id="formMsg" class="msg"></div>
@@ -442,7 +443,7 @@ function buildCounterpart(){
   return base === '他' && other ? `他: ${other}` : base;
 }
 
-async function saveMemo(){
+async function saveMemo(sendEmail){
   const payload = {
     action:'saveMeetingMemo',
     id: editingId,
@@ -450,21 +451,28 @@ async function saveMemo(){
     studentId: $('student').value,
     counterpart: buildCounterpart(),
     staff: $('staff').value,
-    content: $('content').value.trim()
+    content: $('content').value.trim(),
+    sendEmail: !!sendEmail
   };
   if (!payload.studentId) { showToast('生徒を選択してください'); return; }
   if (!payload.content) { showToast('内容を入力してください'); return; }
   $('saveBtn').disabled = true;
+  if ($('mailSaveBtn')) $('mailSaveBtn').disabled = true;
   try {
     const r = await api(payload);
     if (!r.success) throw new Error(r.error || '保存に失敗しました');
-    showToast(editingId ? '更新しました' : '保存しました');
+    if (sendEmail) {
+      showToast(r.email && r.email.sent ? '保存し、メール送信しました' : '保存しました（メール送信なし）');
+    } else {
+      showToast(editingId ? '更新しました' : '保存しました');
+    }
     clearForm(true);
     await loadMemos();
   } catch (e) {
     showToast(e.message || '保存に失敗しました');
   } finally {
     $('saveBtn').disabled = false;
+    if ($('mailSaveBtn')) $('mailSaveBtn').disabled = false;
   }
 }
 
