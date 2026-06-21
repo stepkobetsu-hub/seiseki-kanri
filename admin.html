@@ -1598,13 +1598,19 @@ function renderSchoolCard(s, idx) {
     const vals = Array.isArray(schedule[key]) ? schedule[key] : [];
     const cells = Array.from({ length: count }, (_, i) => {
       const val = vals[i] || '';
+      const noTest = /^(なし|無し|テストなし|実施なし|中止)$/.test(String(val).trim());
       const uncertain = !String(val).trim();
       if (uncertain) blankCells++;
-      const style = uncertain
+      const style = noTest
+        ? 'min-width:118px;padding:6px 8px;background:#f1f5f9;border:1px solid #94a3b8;border-radius:7px;color:#334155;font-size:.76rem'
+        : uncertain
         ? 'min-width:118px;padding:6px 8px;background:#fff1f2;border:2px solid #f43f5e;border-radius:7px;color:#991b1b;font-size:.76rem'
         : 'min-width:118px;padding:6px 8px;background:#fff;border:1px solid var(--border2);border-radius:7px;color:#1e293b;font-size:.76rem';
       return `
-        <input id="sch_${idx}_${key}_${i}" value="${htmlEsc(val)}" placeholder="要確認" title="${uncertain ? '日程未確認です' : ''}" style="${style}">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:4px;min-width:118px">
+          <input id="sch_${idx}_${key}_${i}" value="${htmlEsc(val)}" placeholder="要確認" title="${uncertain ? '日程未確認です' : noTest ? '確認済み: テストなし' : ''}" style="${style}">
+          <button class="btn btn-ghost btn-sm" type="button" onclick="markNoSchoolTest(${idx},'${key}',${i})" title="この回はテストなし" style="padding:4px 6px;font-size:.68rem">なし</button>
+        </div>
       `;
     }).join('');
     return `
@@ -1650,6 +1656,16 @@ function renderSchoolCard(s, idx) {
         </div>
       </div>
     </div>`;
+}
+
+function markNoSchoolTest(idx, key, i) {
+  const el = document.getElementById(`sch_${idx}_${key}_${i}`);
+  if (!el) return;
+  el.value = 'テストなし';
+  el.style.background = '#f1f5f9';
+  el.style.border = '1px solid #94a3b8';
+  el.style.color = '#334155';
+  el.title = '確認済み: テストなし';
 }
 
 async function addSchool() {
