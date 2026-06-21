@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>過去問保管DB</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy:#1B3A6B; --navy2:#2a528f;
+  --g1-bg:#e8f3fc; --g1-hd:#c2ddf5; --g1-acc:#3a7fc1; --g1-card:#d4eaf9;
+  --g2-bg:#e4f5ec; --g2-hd:#b8e5cc; --g2-acc:#2d8f5a; --g2-card:#cdf0db;
+  --g3-bg:#fef0e2; --g3-hd:#f8d9b4; --g3-acc:#c96a1a; --g3-card:#fde0bc;
+  --t-noan:#7c3aed; --t-noan-bg:#ede9fe;
+  --t-stu:#059669; --t-stu-bg:#d1fae5;
+  --missing:#f4f5f8; --missing-bd:#d0d4e0;
+  --text:#1a1a2e; --sub:#6b7280; --page-bg:#eef1f8;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Noto Sans JP',sans-serif; background:var(--page-bg); color:var(--text); min-height:100vh; }
+#pageLogin { min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#1B3A6B 0%,#2a528f 100%); padding:20px; box-sizing:border-box; }
+.login-card { background:white; border-radius:20px; padding:clamp(44px,13vw,70px) clamp(24px,6vw,60px); width:min(540px,97vw); box-shadow:0 20px 60px rgba(0,0,0,.3); text-align:center; box-sizing:border-box; }
+.login-logo { font-family:'Noto Serif JP',serif; font-size:clamp(18px,4.8vw,28px); font-weight:700; color:var(--navy); letter-spacing:.02em; margin-bottom:10px; white-space:nowrap; }
+.login-sub  { font-size:clamp(15px,4vw,17px); color:var(--sub); margin-bottom:36px; }
+.login-card input[type=password] { width:100%; border:2px solid #d0d4e0; border-radius:14px; padding:clamp(18px,5vw,22px); font-family:inherit; font-size:clamp(20px,5.5vw,22px); color:var(--text); outline:none; transition:border-color .15s; text-align:center; letter-spacing:.2em; margin-bottom:18px; box-sizing:border-box; }
+.login-card input[type=password]:focus { border-color:var(--navy); }
+.login-card input::placeholder { letter-spacing:normal; font-size:clamp(15px,4vw,17px); }
+.login-submit { width:100%; background:var(--navy); color:white; border:none; padding:clamp(18px,5vw,22px); border-radius:14px; font-family:inherit; font-size:clamp(18px,5vw,22px); font-weight:700; cursor:pointer; transition:opacity .15s; }
+.login-submit:hover { opacity:.85; }
+.login-error { color:#dc2626; font-size:clamp(14px,3.8vw,15px); margin-top:12px; min-height:22px; }
+header { background:var(--navy); color:white; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 16px rgba(27,58,107,.35); position:sticky; top:0; z-index:50; }
+.hd-left { display:flex; align-items:center; gap:12px; }
+.back-btn { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:white; padding:5px 13px; border-radius:20px; font-family:inherit; font-size:13px; cursor:pointer; transition:background .15s; }
+.back-btn:hover { background:rgba(255,255,255,.28); }
+.hd-title { font-family:'Noto Serif JP',serif; font-size:18px; font-weight:700; letter-spacing:.08em; }
+.hd-sub   { font-size:11px; opacity:.6; margin-top:2px; }
+.hd-right { display:flex; align-items:center; gap:10px; }
+.sync-badge { font-size:11px; padding:5px 12px; border-radius:16px; font-weight:500; white-space:nowrap; transition:all .3s; }
+.sync-idle   { background:rgba(255,255,255,.12); color:rgba(255,255,255,.6); }
+.sync-saving { background:rgba(251,191,36,.25);  color:#fde68a; }
+.sync-ok     { background:rgba(52,211,153,.25);  color:#6ee7b7; }
+.sync-error  { background:rgba(239,68,68,.3);    color:#fca5a5; }
+.admin-badge { background:rgba(251,191,36,.3); color:#fde68a; font-size:11px; padding:4px 10px; border-radius:12px; font-weight:700; }
+.page { display:none; }
+.page.active { display:block; }
+#pageTop { padding:24px; }
+.top-bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; flex-wrap:wrap; gap:10px; }
+.top-bar h2 { font-family:'Noto Serif JP',serif; font-size:15px; color:var(--navy); }
+.add-school-btn { background:var(--navy); color:white; border:none; padding:8px 18px; border-radius:20px; font-family:inherit; font-size:13px; font-weight:500; cursor:pointer; transition:opacity .15s; }
+.add-school-btn:hover { opacity:.82; }
+.schools-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+.school-card { background:white; border-radius:12px; overflow:hidden; box-shadow:0 2px 12px rgba(27,58,107,.09); transition:box-shadow .15s,opacity .15s; cursor:grab; }
+.school-card.dragging   { opacity:.45; box-shadow:none; cursor:grabbing; }
+.school-card.drag-target { outline:3px dashed var(--navy2); outline-offset:2px; }
+.school-card-hd { background:var(--navy); color:white; padding:10px 14px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; transition:background .15s; user-select:none; }
+.school-card-hd:hover { background:var(--navy2); }
+.school-card-name  { font-family:'Noto Serif JP',serif; font-size:14px; font-weight:700; letter-spacing:.06em; }
+.school-card-meta  { display:flex; align-items:center; gap:8px; }
+.school-card-total { font-size:11px; opacity:.7; }
+.setting-btn { background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.3); color:white; width:26px; height:26px; border-radius:50%; font-size:13px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition:background .13s; }
+.setting-btn:hover { background:rgba(255,255,255,.38); }
+.year-rows { padding:6px 0; }
+.year-row { display:flex; align-items:center; gap:10px; padding:8px 14px; cursor:pointer; transition:background .12s; border-bottom:1px solid #f0f2f7; }
+.year-row:last-child { border-bottom:none; }
+.year-row:hover { background:#f4f7fc; }
+.yr-label    { font-size:13px; font-weight:700; color:var(--navy); min-width:58px; }
+.yr-bar-wrap { flex:1; height:7px; background:#e8eaf2; border-radius:4px; overflow:hidden; }
+.yr-bar      { height:100%; border-radius:4px; background:var(--navy2); }
+.yr-count    { font-size:11px; color:var(--sub); min-width:58px; text-align:right; white-space:nowrap; }
+.yr-pct      { font-size:11px; font-weight:700; color:var(--navy2); min-width:32px; text-align:right; }
+#pageDetail { padding:18px 24px 48px; }
+.detail-meta { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid #dde2ee; }
+.year-tabs   { display:flex; gap:6px; flex-wrap:wrap; }
+.year-tab { padding:5px 13px; border-radius:16px; font-size:12px; font-weight:500; cursor:pointer; border:1.5px solid #d0d4e0; background:white; color:var(--sub); font-family:inherit; transition:all .13s; }
+.year-tab.active { background:var(--navy); color:white; border-color:var(--navy); }
+.year-tab:hover:not(.active) { border-color:var(--navy); color:var(--navy); }
+.detail-right   { margin-left:auto; display:flex; align-items:center; gap:12px; }
+.detail-summary { font-size:13px; font-weight:700; color:var(--navy); }
+.type-legend { display:flex; gap:6px; }
+.tchip      { padding:2px 9px; border-radius:10px; font-size:11px; font-weight:500; }
+.tchip-noan { background:var(--t-noan-bg); color:var(--t-noan); }
+.tchip-stu  { background:var(--t-stu-bg);  color:var(--t-stu); }
+.grid-wrap { overflow-x:auto; }
+table { border-collapse:separate; border-spacing:0; min-width:760px; width:100%; }
+thead tr.row-grade th { padding:7px 4px 5px; font-family:'Noto Serif JP',serif; font-size:13px; font-weight:700; text-align:center; border-radius:8px 8px 0 0; }
+thead tr.row-grade th.g1 { background:var(--g1-hd); color:var(--g1-acc); }
+thead tr.row-grade th.g2 { background:var(--g2-hd); color:var(--g2-acc); }
+thead tr.row-grade th.g3 { background:var(--g3-hd); color:var(--g3-acc); }
+thead tr.row-grade th.sp { background:transparent; }
+thead tr.row-sub th { padding:4px; font-size:10px; font-weight:500; color:var(--sub); text-align:center; white-space:nowrap; }
+thead tr.row-sub th.g1 { background:var(--g1-bg); }
+thead tr.row-sub th.g2 { background:var(--g2-bg); }
+thead tr.row-sub th.g3 { background:var(--g3-bg); }
+thead tr.row-sub th.sp { background:transparent; }
+th.gap, td.gap { width:7px !important; background:transparent !important; border:none !important; }
+tbody tr.exam-row th.row-lbl { min-width:66px; padding:3px 8px 3px 0; vertical-align:middle; }
+.exam-lbl { font-size:12px; font-weight:700; color:var(--navy); font-family:'Noto Serif JP',serif; white-space:nowrap; }
+tbody tr.exam-row td.g1 { background:var(--g1-bg); padding:3px; }
+tbody tr.exam-row td.g2 { background:var(--g2-bg); padding:3px; }
+tbody tr.exam-row td.g3 { background:var(--g3-bg); padding:3px; }
+tbody tr.gap-row td { height:7px; background:transparent !important; }
+.cell { width:82px; border-radius:7px; cursor:pointer; display:flex; flex-direction:column; align-items:center; transition:transform .13s,box-shadow .13s; overflow:hidden; }
+.cell:hover { transform:translateY(-2px); box-shadow:0 5px 14px rgba(0,0,0,.13); }
+.cell.empty { background:var(--missing); border:2px dashed var(--missing-bd); justify-content:center; gap:2px; padding:7px 0; }
+.cell.empty .ei { font-size:12px; opacity:.2; }
+.cell.empty .el { font-size:9px; color:#bbb; }
+.cell.empty:hover { background:#e8eaf4; border-color:#a8b0cc; }
+.cell.filled { box-shadow:0 3px 12px rgba(0,0,0,.2); border:2px solid transparent; }
+.cell.filled .ftop { display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 4px 3px; width:100%; }
+.cell.filled .fi { font-size:22px; position:relative; display:inline-block; filter:drop-shadow(0 1px 2px rgba(0,0,0,.2)); }
+.new-badge { position:absolute; top:-6px; left:-6px; background:#ef4444; color:white; font-size:8px; font-weight:700; padding:2px 5px; border-radius:99px; box-shadow:0 1px 4px rgba(0,0,0,.3); animation:new-pulse 1s ease-in-out infinite alternate; }
+.card-new-badge { display:inline-block; background:#ef4444; color:white; font-size:10px; font-weight:700; padding:2px 7px; border-radius:99px; margin-left:6px; animation:new-pulse 1s ease-in-out infinite alternate; vertical-align:middle; }
+.year-row.has-new { background:#fff5f5; }
+.year-row.has-new .yr-label { color:#dc2626; font-weight:700; }
+.yr-new { background:#ef4444; color:white; font-size:9px; font-weight:700; padding:1px 6px; border-radius:99px; margin-left:4px; }
+@keyframes new-pulse { from { opacity:1; } to { opacity:.6; } }
+
+.cell.filled .fn { font-size:9px; text-align:center; max-width:76px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; color:white; }
+.cell.filled .fd { font-size:8px; color:rgba(255,255,255,.8); }
+td.g1 .cell.filled { background:var(--g1-acc); border-color:var(--g1-acc); }
+td.g2 .cell.filled { background:var(--g2-acc); border-color:var(--g2-acc); }
+td.g3 .cell.filled { background:var(--g3-acc); border-color:var(--g3-acc); }
+.cell.drag-over { outline:3px solid var(--navy2); outline-offset:-3px; transform:scale(1.06); }
+.cell.empty.drag-over { background:#dce8f8; border-color:var(--navy2); }
+.cell-tags { display:flex; gap:2px; padding:2px 3px 4px; width:100%; justify-content:center; flex-wrap:wrap; }
+.status-badge { display:inline-block; font-size:9px; font-weight:700; padding:2px 7px; border-radius:99px; margin-top:2px; }
+.sb-done     { background:#1a6640; color:white; }
+.sb-student  { background:#2563eb; color:white; }
+.sb-noanswer { background:#6b7280; color:white; }
+.sb-nostudent{ background:#dc2626; color:white; }
+.sb-noteacher{ background:#9333ea; color:white; }
+.tag-btn { font-size:9px; padding:1px 5px; border-radius:5px; border:1px solid; cursor:pointer; font-family:inherit; font-weight:600; line-height:1.5; white-space:nowrap; transition:all .15s; background:transparent; }
+.tag-btn.noan { border-color:rgba(255,255,255,.35); color:rgba(255,255,255,.4); }
+.tag-btn.stu  { border-color:rgba(255,255,255,.35); color:rgba(255,255,255,.4); }
+.cell.empty .tag-btn.noan { border-color:#d8cef5; color:#c4b8ee; }
+.cell.empty .tag-btn.stu  { border-color:#b2ddd0; color:#9dd0c0; }
+.tag-btn.noan.on { background:rgba(255,255,255,.9); border-color:rgba(255,255,255,.9); color:var(--t-noan); }
+.tag-btn.stu.on  { background:rgba(255,255,255,.9); border-color:rgba(255,255,255,.9); color:var(--t-stu); }
+.cell.empty .tag-btn.noan.on { background:var(--t-noan); border-color:var(--t-noan); color:white; }
+.cell.empty .tag-btn.stu.on  { background:var(--t-stu);  border-color:var(--t-stu);  color:white; }
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:100; align-items:center; justify-content:center; }
+.modal-overlay.open { display:flex; }
+.modal { background:white; border-radius:14px; padding:24px; width:420px; max-width:94vw; box-shadow:0 20px 60px rgba(0,0,0,.25); animation:pop .18s ease; }
+@keyframes pop { from{transform:scale(.93);opacity:0} to{transform:scale(1);opacity:1} }
+.modal h3    { font-size:16px; font-weight:700; color:var(--navy); margin-bottom:4px; }
+.modal-sub   { font-size:12px; color:var(--sub); margin-bottom:14px; }
+.modal label { font-size:12px; font-weight:600; color:var(--sub); display:block; margin-bottom:5px; margin-top:12px; }
+.modal input[type=text], .modal select { width:100%; border:1.5px solid #d0d4e0; border-radius:8px; padding:9px 12px; font-family:inherit; font-size:14px; color:var(--text); outline:none; transition:border-color .15s; }
+.modal input:focus, .modal select:focus { border-color:var(--navy); }
+.file-info { background:#f6f8fc; border-radius:8px; padding:11px; font-size:12px; color:#444; display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+.modal-actions { display:flex; gap:8px; margin-top:18px; flex-wrap:wrap; }
+.btn { padding:9px 16px; border-radius:8px; border:none; font-family:inherit; font-size:13px; cursor:pointer; font-weight:500; transition:opacity .15s; display:inline-flex; align-items:center; gap:5px; }
+.btn:hover { opacity:.82; }
+.btn-primary { background:var(--navy); color:white; }
+.btn-danger  { background:#dc2626; color:white; }
+.btn-ghost   { background:#eef1f8; color:var(--text); }
+.btn-dl      { background:#1a73e8; color:white; text-decoration:none; border-radius:10px; padding:8px 24px; font-size:14px; font-weight:700; display:inline-block; }
+.modal-divider { height:1px; background:#eee; margin:16px 0; }
+.drop-zone { border:2px dashed #c0cadd; border-radius:10px; padding:24px 16px; text-align:center; cursor:pointer; transition:all .15s; }
+.drop-zone:hover, .drop-zone.over { border-color:var(--navy2); background:#eef3fc; }
+.drop-zone .dz-icon { font-size:32px; margin-bottom:8px; }
+.drop-zone .dz-text { font-size:14px; color:var(--sub); font-weight:500; }
+.drop-zone .dz-sub  { font-size:11px; color:#bbb; margin-top:4px; }
+.upload-progress { background:#f0f4ff; border-radius:8px; padding:12px; margin-top:10px; display:none; }
+.upload-progress.show { display:block; }
+.progress-bar-wrap { height:6px; background:#dde4f5; border-radius:3px; margin-top:8px; overflow:hidden; }
+.progress-bar { height:100%; background:var(--navy2); border-radius:3px; transition:width .3s; width:0%; }
+.progress-label { font-size:11px; color:var(--sub); margin-top:4px; }
+.toast { position:fixed; bottom:24px; right:24px; background:var(--navy); color:white; padding:10px 18px; border-radius:10px; font-size:13px; box-shadow:0 4px 20px rgba(0,0,0,.2); opacity:0; transform:translateY(10px); transition:all .22s; z-index:200; pointer-events:none; }
+.toast.show { opacity:1; transform:translateY(0); }
+input[type=file] { display:none; }
+</style>
+</head>
+<body>
+
+<div id="pageLogin" style="display:none;">
+  <div class="login-card">
+    <div class="login-logo">過去問保管DB</div>
+    <div class="login-sub">パスワードを入力してください</div>
+    <input type="password" id="passInput" placeholder="パスワード" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-submit" onclick="doLogin()">ログイン</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+<div id="pageMain" style="display:none;">
+  <header>
+    <div class="hd-left">
+      <button class="back-btn" id="backBtn" onclick="goTop()" style="display:none">← 一覧へ</button>
+      <div>
+        <div class="hd-title" id="hTitle">過去問保管DB</div>
+        <div class="hd-sub"   id="hSub">PDF収集・保管</div>
+      </div>
+    </div>
+    <div class="hd-right">
+      <button id="undoBtn" onclick="undo()" title="元に戻す (Ctrl+Z)" style="display:none;background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.5);color:white;padding:6px 12px;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;opacity:0.3;">↩</button>
+
+      <button id="redoBtn" onclick="redo()" title="やり直す (Ctrl+Y)" style="display:none;background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.5);color:white;padding:6px 12px;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;opacity:0.3;">↪</button>
+      <a id="folderBtn" href="https://drive.google.com/drive/folders/1ahjaXDq6Mw28fzzjYe3Re0HjSoypI_cI" target="_blank" style="display:none;background:#f59e0b;color:white;text-decoration:none;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;">📁 提出フォルダ</a>
+      <span id="adminBadge" class="admin-badge" style="display:none">管理者モード</span>
+      <span id="syncStatus" class="sync-badge sync-idle">● 接続中...</span>
+    </div>
+  </header>
+  <div id="pageTop" class="page active">
+    <div class="top-bar">
+      <h2>学校一覧</h2>
+      <button class="add-school-btn" id="addSchoolBtn" onclick="openAddSchool()" style="display:none">＋ 学校を追加</button>
+    </div>
+    <div class="schools-grid" id="schoolsGrid"></div>
+  </div>
+  <div id="pageDetail" class="page">
+    <div class="detail-meta">
+      <div class="year-tabs" id="yearTabs"></div>
+      <div class="detail-right">
+        <div class="type-legend">
+          <span class="tchip" style="background:#d1fae5;color:#1a6640;">✅ 完了</span>
+          <span class="tchip" style="background:#dbeafe;color:#2563eb;">👤 生徒解答</span>
+          <span class="tchip" style="background:#f3f4f6;color:#6b7280;">📄 解答なし</span>
+        </div>
+        <div class="detail-summary" id="detailSummary"></div>
+      </div>
+    </div>
+    <div class="grid-wrap"><table id="mainTable"></table></div>
+  </div>
+</div>
+<div class="modal-overlay" id="pdfModal">
+  <div class="modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+      <h3 id="pdfTitle" style="margin:0;"></h3>
+      <div id="pdfDeleteBtn"></div>
+    </div>
+    <div class="modal-sub" id="pdfSub"></div>
+    <div id="pdfBody"></div>
+    <div class="modal-actions" id="pdfActions"></div>
+  </div>
+</div>
+<div class="modal-overlay" id="schoolModal">
+  <div class="modal">
+    <h3 id="schoolModalTitle"></h3>
+    <div id="schoolModalBody"></div>
+    <div class="modal-actions" id="schoolModalActions"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<input type="file" id="fileInput" accept=".pdf,image/*">
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec';
+const LOGIN_REQUIRED = false; // trueにすると入口のパスワード画面を使います
+const DEFAULT_PASS = 'step123';
+const UPLOAD_FOLDER_URL = 'https://drive.google.com/drive/folders/1ahjaXDq6Mw28fzzjYe3Re0HjSoypI_cI';
+
+const GRADES   = ['中1','中2','中3'];
+const SUBJECTS = ['英語','数学','国語','理科','社会'];
+const GCLS     = ['g1','g2','g3'];
+const DEFAULT_SCHOOLS = [
+  {id:'s1',name:'南城中学',  examCount:5},
+  {id:'s2',name:'高蔵寺中学',examCount:5},
+  {id:'s3',name:'志段味中学',examCount:5},
+  {id:'s4',name:'坂下中学',  examCount:5},
+  {id:'s5',name:'鷹来中学',  examCount:5},
+  {id:'s6',name:'西部中学',  examCount:5},
+  {id:'s7',name:'東部中学',  examCount:5},
+];
+
+let schools=[], db={}, curSchool=null, curYear=null, curCell=null, editSid=null, curPass='', isAdmin=false, isViewOnly=false;
+let undoStack = [], redoStack = [];
+function pushUndo() {
+  try {
+    undoStack.push(JSON.stringify({schools: schools, db: db}));
+    if (undoStack.length > 15) undoStack.shift();
+    redoStack = [];
+    updateUndoButtons();
+  } catch(e) {}
+}
+function undo() {
+  if (!undoStack.length) { showToast('これ以上戻せません'); return; }
+  try {
+    clearTimeout(saveTimer); // 遅延saveをキャンセル
+    redoStack.push(JSON.stringify({schools: schools, db: db}));
+    const state = JSON.parse(undoStack.pop());
+    schools = JSON.parse(JSON.stringify(state.schools));
+    db      = JSON.parse(JSON.stringify(state.db));
+    if (curSchool) curSchool = schools.find(s => s.id === curSchool.id) || null;
+    updateUndoButtons();
+    renderTop();
+    if (curSchool) renderDetail();
+    saveNow();
+    showToast('↩ 元に戻しました');
+  } catch(e) { showToast('⚠ 元に戻せませんでした: ' + e.message); }
+}
+function redo() {
+  if (!redoStack.length) { showToast('これ以上進めません'); return; }
+  try {
+    clearTimeout(saveTimer); // 遅延saveをキャンセル
+    undoStack.push(JSON.stringify({schools: schools, db: db}));
+    const state = JSON.parse(redoStack.pop());
+    schools = JSON.parse(JSON.stringify(state.schools));
+    db      = JSON.parse(JSON.stringify(state.db));
+    if (curSchool) curSchool = schools.find(s => s.id === curSchool.id) || null;
+    updateUndoButtons();
+    renderTop();
+    if (curSchool) renderDetail();
+    saveNow();
+    showToast('↪ やり直しました');
+  } catch(e) { showToast('⚠ やり直せませんでした: ' + e.message); }
+}
+function updateUndoButtons() {
+  const u = document.getElementById('undoBtn');
+  const r = document.getElementById('redoBtn');
+  if (u) u.style.opacity = undoStack.length ? '1' : '0.3';
+  if (r) r.style.opacity = redoStack.length ? '1' : '0.3';
+}
+
+const examList = n => Array.from({length:n},(_,i)=>`第${i+1}回`);
+const totalPY  = s => GRADES.length * s.examCount * SUBJECTS.length;
+const dbKey    = (sid,yr,gr,ex,su) => `${sid}||${yr}||${gr}||${ex}||${su}`;
+const esc      = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const genId    = () => 'sch_' + Date.now();
+
+function currentNendo() {
+  const now = new Date();
+  return now.getMonth() < 3 ? now.getFullYear() - 1 : now.getFullYear();
+}
+const THIS_YEAR = currentNendo();
+const YEARS = Array.from({length:3}, (_,i) => String(THIS_YEAR - i));
+const ARCHIVE_YEARS = Array.from({length:5}, (_,i) => String(THIS_YEAR - 3 - i));
+
+function setSyncStatus(state, msg) {
+  const el = document.getElementById('syncStatus');
+  el.className = 'sync-badge sync-' + state;
+  el.textContent = msg;
+}
+
+async function gasGet(params) {
+  const url = GAS_URL + '?' + Object.entries(params)
+    .map(([k,v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))
+    .join('&');
+  const res = await fetch(url);
+  return await res.json();
+}
+
+function doLogin() {
+  const pass = document.getElementById('passInput').value.trim();
+  if (!pass) return;
+  document.getElementById('loginError').textContent = '';
+  setSyncStatus('idle','● 接続中...');
+  loadFromGAS(pass);
+}
+
+async function loadFromGAS(pass) {
+  try {
+    const json = await gasGet({ action:'load', pass });
+    if (!json.ok) {
+      const loginError = document.getElementById('loginError');
+      if (loginError) loginError.textContent = json.error || '読み込みに失敗しました';
+      showToast('⚠ ' + (json.error || '読み込みに失敗しました'));
+      setSyncStatus('error','⚠ 接続失敗');
+      sessionStorage.removeItem('teiki_pass');
+      return;
+    }
+    curPass = pass;
+    isAdmin = !!json.isAdmin;
+    isViewOnly = !!json.isView;
+    schools = (json.data && json.data.schools) ? json.data.schools : JSON.parse(JSON.stringify(DEFAULT_SCHOOLS));
+    db      = (json.data && json.data.db)      ? json.data.db      : {};
+    curYear = YEARS[0];
+    document.getElementById('pageLogin').style.display = 'none';
+    document.getElementById('pageMain').style.display  = '';
+    document.getElementById('backBtn').style.display   = 'none';
+    if (isAdmin) {
+      document.getElementById('adminBadge').style.display  = '';
+      document.getElementById('addSchoolBtn').style.display = '';
+      document.getElementById('undoBtn').style.display      = '';
+
+      document.getElementById('redoBtn').style.display      = '';
+      document.getElementById('folderBtn').style.display   = '';
+      document.getElementById('folderBtn').href = UPLOAD_FOLDER_URL;
+    }
+    setSyncStatus('ok','✓ 同期済み');
+    setTimeout(() => setSyncStatus('idle','● オンライン'), 3000);
+    // 前回の学校ページを復元
+    try {
+      const sid  = sessionStorage.getItem('teiki_school');
+      const year = sessionStorage.getItem('teiki_year');
+      if (sid && year) {
+        const school = schools.find(s => s.id === sid);
+        if (school) { goDetail(school, String(year)); return; }
+      }
+    } catch(e) {}
+    renderTop();
+  } catch(e) {
+    document.getElementById('loginError').textContent = '接続エラー：' + e.message;
+    setSyncStatus('error','⚠ 接続失敗');
+  }
+}
+
+// ページ読み込み時。通常は自動ログイン、必要になれば入口画面に戻せます。
+window.addEventListener('load', () => {
+  if (LOGIN_REQUIRED) {
+    document.getElementById('pageLogin').style.display = '';
+    document.getElementById('pageMain').style.display  = 'none';
+    return;
+  }
+  document.getElementById('pageLogin').style.display = 'none';
+  document.getElementById('pageMain').style.display  = '';
+  setSyncStatus('idle','● 接続中...');
+  loadFromGAS(DEFAULT_PASS);
+});
+
+let saveTimer = null;
+
+
+async function saveNow() {
+  setSyncStatus('saving','● 保存中...');
+  try {
+    const payload = JSON.stringify({schools, db});
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: 'action=saveFull'
+        + '&pass=' + encodeURIComponent(curPass)
+        + '&payload=' + encodeURIComponent(payload)
+    });
+    const json = await res.json();
+    if (json.ok) {
+      setSyncStatus('ok','✓ 保存済み');
+        setTimeout(() => setSyncStatus('idle','● オンライン'), 2000);
+      showToast('💾 保存しました');
+    } else {
+      throw new Error(json.error || '保存失敗');
+    }
+  } catch(e) {
+    setSyncStatus('error','⚠ 保存失敗: ' + e.message);
+    showToast('⚠ 保存失敗: ' + e.message);
+  }
+}
+
+function save() {
+  clearTimeout(saveTimer);
+  setSyncStatus('saving','● 保存中...');
+  saveTimer = setTimeout(() => saveNow(), 1000);
+}
+
+
+
+async function uploadFile(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async e => {
+      try {
+        const base64 = e.target.result.split(',')[1]
+          .replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+
+        onProgress && onProgress(5);
+
+        const res = await fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'action=uploadAll'
+            + '&pass=' + encodeURIComponent(curPass)
+            + '&fileName=' + encodeURIComponent(file.name)
+            + '&mimeType=' + encodeURIComponent(file.type || 'application/pdf')
+            + '&fileData=' + encodeURIComponent(base64)
+        });
+
+        onProgress && onProgress(90);
+        let json;
+        try { json = await res.json(); } catch(e) { json = {ok:false, error:'レスポンス解析失敗'}; }
+
+        onProgress && onProgress(100);
+        if (json.ok) resolve(json);
+        else reject(new Error(json.error || 'アップロード失敗'));
+      } catch(err) { reject(err); }
+    };
+    reader.onerror = () => reject(new Error('ファイル読み込みエラー'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// 提出ファイルを自動取り込み
+async function importSubmitted() {
+  showToast('📥 提出ファイルを確認中...');
+  try {
+    const res = await gasGet({ action:'importSubmitted', pass:curPass });
+    if (!res.ok) { showToast('⚠ ' + res.error); return; }
+
+    const files = res.files;
+    if (!files.length) { showToast('提出ファイルがありません'); return; }
+
+    // 学校名→IDのマップを作成
+    const schoolMap = {};
+    schools.forEach(s => { schoolMap[s.name] = s.id; });
+
+    // 科目マップ（「中1国語」→{gr:'中1', su:'国語'}）
+    const gradeMap = { '中1':'中1', '中2':'中2', '中3':'中3' };
+    const subMap   = { '国語':'国語', '数学':'数学', '英語':'英語', '理科':'理科', '社会':'社会' };
+
+    let count = 0;
+    let skip  = 0;
+    const trashedIds = [];
+
+    files.forEach(f => {
+      const schoolId = schoolMap[f.school];
+      if (!schoolId) { skip++; return; }
+
+      // 学年と科目を分離（例:「中1国語」→「中1」「国語」）
+      let gr = '', su = '';
+      for (const g of Object.keys(gradeMap)) {
+        if (f.subject.startsWith(g)) {
+          gr = g;
+          su = f.subject.replace(g, '').trim();
+          break;
+        }
+      }
+      if (!gr || !su) { skip++; return; }
+
+      // テスト回を変換（「第1回」→「第1回」）
+      const exam = f.kai;
+      const year = f.nendo;
+
+      const k = dbKey(schoolId, year, gr, exam, su);
+      if (!db[k]) db[k] = { files:[], noan:false, stu:false };
+      if (!db[k].files) db[k].files = [];
+
+      // 同じfileIdが既に登録されていたらスキップ
+      if (db[k].files.some(x => x.fileId === f.fileId)) { skip++; return; }
+
+      db[k].files.push({
+        name:   f.name,
+        url:    f.url,
+        fileId: f.fileId,
+        date:   f.date || new Date().toLocaleDateString('ja-JP'),
+        kind:   f.kind || '',
+        isNew:  true
+      });
+      db[k].hasNew = true;
+      count++;
+      trashedIds.push(f.fileId);
+    });
+
+    if (count > 0) {
+      save();
+      document.getElementById('newFileBadge').style.display = 'none';
+      showToast(`✅ ${count}件を取り込みました${skip ? `（${skip}件はスキップ）` : ''}`);
+      renderTop();
+      if (curSchool) renderDetail();
+      // 取り込んだファイルを「取込済」フォルダへ移動（バックグラウンド）
+      if (trashedIds.length > 0) {
+        fetch(GAS_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'action=trashFiles'
+            + '&pass=' + encodeURIComponent(curPass)
+            + '&fileIds=' + encodeURIComponent(JSON.stringify(trashedIds))
+        }).catch(() => {});
+      }
+    } else {
+      showToast(`新しい提出ファイルはありません（${skip}件はスキップ）`);
+    }
+  } catch(e) {
+    showToast('⚠ エラー：' + e.message);
+  }
+}
+
+function goTop() {
+  try { sessionStorage.removeItem('teiki_school'); sessionStorage.removeItem('teiki_year'); } catch(e) {}
+  document.getElementById('pageTop').classList.add('active');
+  document.getElementById('pageDetail').classList.remove('active');
+  document.getElementById('backBtn').style.display = 'none';
+  document.getElementById('hTitle').textContent = '過去問保管DB';
+  document.getElementById('hSub').textContent   = 'PDF収集・保管';
+  curSchool = null; renderTop();
+}
+
+function countFilled(school, year) {
+  let n = 0;
+  examList(school.examCount).forEach(ex => GRADES.forEach(gr => SUBJECTS.forEach(su => {
+    const item = db[dbKey(school.id, year, gr, ex, su)];
+    if (item && item.files && item.files.length) n++;
+  })));
+  return n;
+}
+
+function renderTop() {
+  const grid = document.getElementById('schoolsGrid');
+  grid.innerHTML = '';
+  if (!schools.length) {
+    grid.innerHTML = '<p style="color:var(--sub);font-size:13px;padding:16px 0;">学校がまだ登録されていません。</p>';
+    return;
+  }
+  schools.forEach(school => {
+    let filledAll = 0;
+    YEARS.forEach(y => { filledAll += countFilled(school, y); });
+    const totalAll = YEARS.length * totalPY(school);
+    const card = document.createElement('div');
+    card.className = 'school-card';
+    card.draggable = isAdmin;
+    card.dataset.sid = school.id;
+    if (isAdmin) {
+      card.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', school.id); setTimeout(() => card.classList.add('dragging'), 0); });
+      card.addEventListener('dragend',   () => { card.classList.remove('dragging'); document.querySelectorAll('.school-card').forEach(c => c.classList.remove('drag-target')); });
+      card.addEventListener('dragover',  e => { e.preventDefault(); document.querySelectorAll('.school-card').forEach(c => c.classList.remove('drag-target')); if (!card.classList.contains('dragging')) card.classList.add('drag-target'); });
+      card.addEventListener('dragleave', e => { if (!card.contains(e.relatedTarget)) card.classList.remove('drag-target'); });
+      card.addEventListener('drop', e => {
+        e.preventDefault(); card.classList.remove('drag-target');
+        const fromId = e.dataTransfer.getData('text/plain');
+        if (fromId === school.id) return;
+        const fi = schools.findIndex(s => s.id === fromId);
+        const ti = schools.findIndex(s => s.id === school.id);
+        if (fi < 0 || ti < 0) return;
+        const [moved] = schools.splice(fi, 1); schools.splice(ti, 0, moved);
+        save(); renderTop();
+      });
+    }
+    const hd = document.createElement('div'); hd.className = 'school-card-hd';
+    if (school.color) hd.style.background = school.color;
+    // この学校に新着があるか確認
+    const schoolHasNew = YEARS.some(y =>
+      examList(school.examCount).some(ex =>
+        GRADES.some(gr => SUBJECTS.some(su => {
+          const item = db[dbKey(school.id, y, gr, ex, su)];
+          return item && item.hasNew;
+        }))
+      )
+    );
+    hd.innerHTML = `<div class="school-card-name">${esc(school.name)}${schoolHasNew ? '<span class="card-new-badge">NEW</span>' : ''}</div>
+      <div class="school-card-meta">
+        <div class="school-card-total">全 ${filledAll}/${totalAll}件　年${school.examCount}回</div>
+        ${isAdmin ? '<button class="setting-btn" title="設定">⚙</button>' : ''}
+      </div>`;
+    if (isAdmin) hd.querySelector('.setting-btn').addEventListener('click', e => { e.stopPropagation(); openEditSchool(school.id); });
+    hd.addEventListener('click', () => goDetail(school, YEARS[0]));
+    card.appendChild(hd);
+    const yrows = document.createElement('div'); yrows.className = 'year-rows';
+    YEARS.forEach(year => {
+      const filled = countFilled(school, year);
+      const total  = totalPY(school);
+      const pct    = Math.round(filled / total * 100);
+      // この年度に新着があるか
+      const yearHasNew = examList(school.examCount).some(ex =>
+        GRADES.some(gr => SUBJECTS.some(su => {
+          const item = db[dbKey(school.id, year, gr, ex, su)];
+          return item && item.hasNew;
+        }))
+      );
+      const row = document.createElement('div');
+      row.className = 'year-row' + (yearHasNew ? ' has-new' : '');
+      row.innerHTML = `<div class="yr-label">${esc(year)}年度${yearHasNew ? '<span class="yr-new">NEW</span>' : ''}</div>
+        <div class="yr-bar-wrap"><div class="yr-bar" style="width:${pct}%"></div></div>
+        <div class="yr-count">${filled}/${total}件</div>
+        <div class="yr-pct">${pct}%</div>`;
+      row.addEventListener('click', () => goDetail(school, year));
+      yrows.appendChild(row);
+    });
+    card.appendChild(yrows); grid.appendChild(card);
+  });
+}
+
+function goDetail(school, year) {
+  curSchool = school; curYear = year;
+  // 更新後に戻れるよう保存
+  try {
+    sessionStorage.setItem('teiki_school', school.id);
+    sessionStorage.setItem('teiki_year', String(year));
+  } catch(e) {}
+  document.getElementById('pageTop').classList.remove('active');
+  document.getElementById('pageDetail').classList.add('active');
+  document.getElementById('backBtn').style.display = '';
+  document.getElementById('hTitle').textContent = school.name;
+  document.getElementById('hSub').textContent   = year + '年度　テスト管理（年' + school.examCount + '回）';
+  renderYearTabs(); renderDetail();
+}
+
+function renderYearTabs() {
+  const wrap = document.getElementById('yearTabs'); wrap.innerHTML = '';
+  YEARS.forEach(y => {
+    const btn = document.createElement('button');
+    btn.className = 'year-tab' + (String(y) === String(curYear) ? ' active' : '');
+    btn.textContent = y + '年度';
+    btn.addEventListener('click', () => { curYear = y; renderYearTabs(); renderDetail(); });
+    wrap.appendChild(btn);
+  });
+  // アーカイブボタン
+  const archBtn = document.createElement('button');
+  archBtn.className = 'year-tab' + (ARCHIVE_YEARS.includes(String(curYear)) ? ' active' : '');
+  archBtn.textContent = '📦 アーカイブ';
+  archBtn.style.fontSize = '11px';
+  archBtn.addEventListener('click', () => {
+    // アーカイブサブメニューを表示
+    showArchiveMenu(archBtn);
+  });
+  wrap.appendChild(archBtn);
+}
+
+function showArchiveMenu(btn) {
+  // 既存のアーカイブメニューを削除
+  const existing = document.getElementById('archiveMenu');
+  if (existing) { existing.remove(); return; }
+  const menu = document.createElement('div');
+  menu.id = 'archiveMenu';
+  menu.style.cssText = 'position:absolute;background:white;border:1.5px solid #d0d4e0;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:100;padding:8px;min-width:120px;';
+  ARCHIVE_YEARS.forEach(y => {
+    const item = document.createElement('button');
+    item.style.cssText = 'display:block;width:100%;text-align:left;padding:8px 12px;border:none;background:none;font-size:14px;cursor:pointer;border-radius:8px;color:#333;';
+    item.textContent = y + '年度';
+    if (String(y) === String(curYear)) item.style.fontWeight = '700';
+    item.addEventListener('click', () => {
+      curYear = y; menu.remove(); renderYearTabs(); renderDetail();
+    });
+    item.addEventListener('mouseenter', () => item.style.background = '#f0f4ff');
+    item.addEventListener('mouseleave', () => item.style.background = 'none');
+    menu.appendChild(item);
+  });
+  // ボタンの下に表示
+  const rect = btn.getBoundingClientRect();
+  menu.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+  menu.style.left = rect.left + 'px';
+  document.body.appendChild(menu);
+  // 外クリックで閉じる
+  setTimeout(() => document.addEventListener('click', () => menu.remove(), {once:true}), 10);
+}
+
+function renderDetail() {
+  const table = document.getElementById('mainTable'); table.innerHTML = '';
+  const exams = examList(curSchool.examCount);
+  const thead = document.createElement('thead');
+  const trG = document.createElement('tr'); trG.className = 'row-grade';
+  const th0 = document.createElement('th'); th0.className = 'sp'; th0.style.minWidth = '66px'; trG.appendChild(th0);
+  GRADES.forEach((gr, gi) => {
+    if (gi > 0) { const g = document.createElement('th'); g.className = 'gap sp'; trG.appendChild(g); }
+    const th = document.createElement('th'); th.className = GCLS[gi]; th.colSpan = SUBJECTS.length; th.textContent = gr; trG.appendChild(th);
+  });
+  thead.appendChild(trG);
+  const trS = document.createElement('tr'); trS.className = 'row-sub';
+  const th0b = document.createElement('th'); th0b.className = 'sp'; trS.appendChild(th0b);
+  GRADES.forEach((gr, gi) => {
+    if (gi > 0) { const g = document.createElement('th'); g.className = 'gap sp'; trS.appendChild(g); }
+    SUBJECTS.forEach(su => { const th = document.createElement('th'); th.className = GCLS[gi]; th.textContent = su; trS.appendChild(th); });
+  });
+  thead.appendChild(trS); table.appendChild(thead);
+  const tbody = document.createElement('tbody');
+  exams.forEach((exam, ei) => {
+    const tr = document.createElement('tr'); tr.className = 'exam-row';
+    const thL = document.createElement('th'); thL.className = 'row-lbl';
+    thL.innerHTML = `<div class="exam-lbl">${esc(exam)}</div>`; tr.appendChild(thL);
+    GRADES.forEach((gr, gi) => {
+      if (gi > 0) { const g = document.createElement('td'); g.className = 'gap'; tr.appendChild(g); }
+      SUBJECTS.forEach(su => {
+        const td = document.createElement('td'); td.className = GCLS[gi];
+        const k = dbKey(curSchool.id, curYear, gr, exam, su);
+        const item = db[k];
+        const files = (item && item.files) || [];
+        const hasFile = files.length > 0;
+        const isNew = !!(item && item.hasNew);
+        const cell = document.createElement('div');
+        cell.className = 'cell ' + (hasFile ? 'filled' : 'empty');
+
+        // ステータスバッジ（ファイルの種類から自動判定）
+        const status = hasFile ? getCellStatus(files, item) : null;
+        const statusEl = document.createElement('div');
+        statusEl.className = 'cell-tags';
+        if (status) {
+          const badge = document.createElement('span');
+          badge.className = 'status-badge ' + status.cls;
+          badge.textContent = status.label;
+          statusEl.appendChild(badge);
+        }
+
+        if (hasFile) {
+          const top = document.createElement('div'); top.className = 'ftop';
+          const newBadge = isNew ? '<span class="new-badge">NEW</span>' : '';
+          if (files.length === 1) {
+            top.innerHTML = `<div class="fi">📄${newBadge}</div><div class="fn">${esc(files[0].name)}</div><div class="fd">${esc(files[0].date)}</div>`;
+          } else {
+            top.innerHTML = `<div class="fi">📄<span class="file-badge">${files.length}</span>${newBadge}</div><div class="fn">${files.length}件のPDF</div><div class="fd">最終：${esc(files[files.length-1].date)}</div>`;
+          }
+          cell.appendChild(top); cell.appendChild(statusEl);
+          cell.addEventListener('click', () => { 
+            if (isNew && !isViewOnly) { 
+              const k2 = dbKey(curSchool.id, curYear, gr, exam, su);
+              if (db[k2]) { db[k2].hasNew = false; save(); }
+            }
+            openFilledModal(gr, exam, su); 
+          });
+        } else {
+          const ei2 = document.createElement('div'); ei2.className = 'ei'; ei2.textContent = isViewOnly ? '' : '＋';
+          const el  = document.createElement('div'); el.className  = 'el'; el.textContent  = '未収集';
+          cell.appendChild(ei2); cell.appendChild(el); cell.appendChild(statusEl);
+          if (!isViewOnly) cell.addEventListener('click', () => openUploadModal(gr, exam, su));
+        }
+        if (!isViewOnly) {
+          cell.addEventListener('dragover', e => { e.preventDefault(); cell.classList.add('drag-over'); });
+          cell.addEventListener('dragleave', e => { if (!cell.contains(e.relatedTarget)) cell.classList.remove('drag-over'); });
+          cell.addEventListener('drop', e => {
+            e.preventDefault(); cell.classList.remove('drag-over');
+            const file = e.dataTransfer.files[0];
+            if (!file) return;
+            openUploadModal(gr, exam, su);
+            setTimeout(() => doUpload(file), 100);
+          });
+        }
+        td.appendChild(cell); tr.appendChild(td);
+      });
+    });
+    tbody.appendChild(tr);
+    if (ei < exams.length - 1) {
+      const gtr = document.createElement('tr'); gtr.className = 'gap-row';
+      const gtd = document.createElement('td'); gtd.colSpan = 1 + GRADES.length * SUBJECTS.length + (GRADES.length - 1);
+      gtr.appendChild(gtd); tbody.appendChild(gtr);
+    }
+  });
+  table.appendChild(tbody);
+  updateSummary();
+}
+
+function updateSummary() {
+  const filled = countFilled(curSchool, curYear);
+  const total  = totalPY(curSchool);
+  document.getElementById('detailSummary').textContent = `収集済み ${filled}/${total}件 (${Math.round(filled/total*100)}%)`;
+}
+
+// ステータスオーバーライドを含めて判定
+function getCellStatus(files, item) {
+  const override = item && item.statusOverride;
+  if (override) {
+    const map = {
+      done:       {label:'✅ 完了', cls:'sb-done'},
+      student:    {label:'👤 生徒解答', cls:'sb-student'},
+      noanswer:   {label:'📄 解答なし', cls:'sb-noanswer'},
+      nostudent:  {label:'⚠ テストなし（生徒解答のみ）', cls:'sb-nostudent'},
+      noteacher:  {label:'⚠ テストなし（先生解答のみ）', cls:'sb-noteacher'},
+    };
+    return map[override] || getFileStatus(files);
+  }
+  return getFileStatus(files);
+}
+
+// ファイルリストからステータスを判定
+function getFileStatus(files) {
+  if (!files || !files.length) return null;
+  let hasTest = false, hasTeacher = false, hasStudent = false;
+  files.forEach(f => {
+    const name = f.name || '';
+    // ファイル名の種類部分を抽出（_テストのみ_ など）
+    if (name.includes('テストのみ') || name.includes('テスト＆')) hasTest = true;
+    if (name.includes('テスト＆先生解答') || name.includes('先生解答のみ')) hasTeacher = true;
+    if (name.includes('テスト＆生徒解答') || name.includes('生徒解答のみ')) hasStudent = true;
+    // 種類フィールドなしの古いファイルはテストとして扱う
+    const hasKind = name.includes('テストのみ') || name.includes('テスト＆') || 
+                    name.includes('先生解答のみ') || name.includes('生徒解答のみ');
+    if (!hasKind) hasTest = true;
+  });
+  if (hasTest && hasTeacher) return {label:'✅ 完了', cls:'sb-done'};
+  if (hasTest && hasStudent)  return {label:'👤 生徒解答', cls:'sb-student'};
+  if (hasTest)                return {label:'📄 解答なし', cls:'sb-noanswer'};
+  if (hasStudent && hasTeacher) return {label:'⚠ テストなし（先生解答のみ）', cls:'sb-noteacher'};
+  if (hasStudent)             return {label:'⚠ テストなし（生徒解答のみ）', cls:'sb-nostudent'};
+  if (hasTeacher)             return {label:'⚠ テストなし（先生解答のみ）', cls:'sb-noteacher'};
+  return null;
+}
+
+function toggleTag(gr, exam, su, tag) {
+  const k = dbKey(curSchool.id, curYear, gr, exam, su);
+  if (!db[k]) db[k] = { files:[], noan:false, stu:false };
+  db[k][tag] = !db[k][tag];
+  if (!db[k].noan && !db[k].stu && (!db[k].files || !db[k].files.length)) delete db[k];
+  save();
+  renderDetail();
+}
+
+function openUploadModal(gr, exam, su) {
+  curCell = { gr, exam, su };
+  document.getElementById('pdfTitle').textContent = 'PDFをアップロード';
+  document.getElementById('pdfSub').textContent   = `${curSchool.name} ${curYear}年度 ${gr} ${exam} ${su}`;
+  document.getElementById('pdfBody').innerHTML = `
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div class="dz-icon">📂</div>
+      <div class="dz-text">タップ または ドラッグ＆ドロップ</div>
+      <div class="dz-sub">PDF・画像ファイルに対応</div>
+    </div>
+    <div class="upload-progress" id="uploadProgress">
+      <div style="font-size:12px;font-weight:600;color:var(--navy)" id="uploadLabel">アップロード中...</div>
+      <div class="progress-bar-wrap"><div class="progress-bar" id="progressBar"></div></div>
+      <div class="progress-label" id="progressLabel">0%</div>
+    </div>`;
+  document.getElementById('pdfActions').innerHTML = `<button class="btn btn-ghost" onclick="closePdfModal()">キャンセル</button>`;
+  const dz = document.getElementById('dropZone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('over'); const f = e.dataTransfer.files[0]; if (f) doUpload(f); });
+  document.getElementById('pdfModal').classList.add('open');
+}
+
+function openFilledModal(gr, exam, su) {
+  curCell = { gr, exam, su };
+  const k    = dbKey(curSchool.id, curYear, gr, exam, su);
+  const item  = db[k];
+  const files = (item && item.files) || [];
+  document.getElementById('pdfTitle').textContent = '登録済みPDF';
+  document.getElementById('pdfSub').textContent   = `${curSchool.name} ${curYear}年度 ${gr} ${exam} ${su}`;
+  // 削除ボタンはタイトル行の右側に（管理者のみ）
+  const delBtn = document.getElementById('pdfDeleteBtn');
+  if (delBtn) delBtn.innerHTML = '';
+
+  // ファイルの自動チェックは削除（誤動作の原因）
+
+  if (delBtn) delBtn.innerHTML = '';
+
+  const listHTML = files.map((f, i) => `
+    <div class="file-info" style="position:relative;">
+      ${f.isNew ? '<span style="position:absolute;top:-6px;left:-6px;background:#ef4444;color:white;font-size:9px;font-weight:700;padding:2px 6px;border-radius:99px;animation:new-pulse 1s ease-in-out infinite alternate;">NEW</span>' : ''}
+      <span style="font-size:20px;flex-shrink:0;">📄</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(f.name)}</div>
+        <div style="color:#888;font-size:10px;margin-top:1px">${(()=>{ const kl=['テストのみ','テスト＆先生解答','テスト＆生徒解答','先生解答のみ','生徒解答のみ']; const k=f.kind||(kl.find(x=>f.name.includes(x))||''); const dateMatch=f.name.match(/(\d{4}-\d{2}-\d{2})/); const d=dateMatch?dateMatch[1]:(f.date||''); return k ? esc(k)+'：'+d : '登録：'+d; })()}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">
+        ${f.url ? `<a href="${esc(f.url)}" target="_blank" class="btn-dl" onclick="markFileRead(${i})">開く</a>` : ''}
+        ${isAdmin ? `<button onclick="deleteSingleFile(${i})" style="background:#dc2626;border:none;color:white;padding:6px 10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">削除</button>` : ''}
+      </div>
+    </div>`).join('');
+  document.getElementById('pdfBody').innerHTML = listHTML || '<div style="color:#aaa;font-size:13px;">（ファイルなし）</div>';
+  // ステータス手動オーバーライド（管理者のみ）
+  const overrideKey = 'override_' + k;
+  const currentOverride = db[k] && db[k].statusOverride;
+  const statusOptions = [
+    {v:'', l:'自動判定'},
+    {v:'done', l:'✅ 完了'},
+    {v:'student', l:'👤 生徒解答'},
+    {v:'noanswer', l:'📄 解答なし'},
+    {v:'nostudent', l:'⚠ テストなし（生徒解答のみ）'},
+    {v:'noteacher', l:'⚠ テストなし（先生解答のみ）'},
+  ];
+  const overrideHTML = isAdmin ? `
+    <div style="margin-bottom:12px;padding:10px 12px;background:#f6f8fc;border-radius:10px;">
+      <div style="font-size:11px;color:#888;font-weight:600;margin-bottom:6px;">ステータスを手動で変更</div>
+      <select id="statusOverride" onchange="setStatusOverride('${esc(gr)}','${esc(exam)}','${esc(su)}')" style="width:100%;padding:8px;border:1.5px solid #d0d4e0;border-radius:8px;font-size:13px;font-family:inherit;">
+        ${statusOptions.map(o => `<option value="${o.v}"${(currentOverride||'')===o.v?' selected':''}>${o.l}</option>`).join('')}
+      </select>
+    </div>` : '';
+  document.getElementById('pdfBody').innerHTML = overrideHTML + listHTML || '<div style="color:#aaa;font-size:13px;">（ファイルなし）</div>';
+  document.getElementById('pdfActions').innerHTML = `
+    ${!isViewOnly ? `<button class="btn btn-primary" onclick="openUploadModal('${esc(gr)}','${esc(exam)}','${esc(su)}')">＋ PDFを追加</button>` : ''}
+    <button class="btn btn-ghost"   onclick="closePdfModal()">閉じる</button>`;
+  document.getElementById('pdfModal').classList.add('open');
+}
+
+function markFileRead(idx) {
+  if (!curCell || !curSchool) return;
+  const { gr, exam, su } = curCell;
+  const k = dbKey(curSchool.id, curYear, gr, exam, su);
+  if (!db[k] || !db[k].files || !db[k].files[idx]) return;
+  if (db[k].files[idx].isNew) {
+    db[k].files[idx].isNew = false;
+    // その学校・年度の全ファイルのNEWが消えたらhasNewもfalseに
+    const allRead = db[k].files.every(f => !f.isNew);
+    if (allRead) {
+      // この年度の全セルをチェック
+      const yearDone = examList(curSchool.examCount).every(ex =>
+        GRADES.every(g => SUBJECTS.every(s => {
+          const item = db[dbKey(curSchool.id, curYear, g, ex, s)];
+          return !item || !item.files || item.files.every(f => !f.isNew);
+        }))
+      );
+      if (yearDone) {
+        examList(curSchool.examCount).forEach(ex =>
+          GRADES.forEach(g => SUBJECTS.forEach(s => {
+            const kk = dbKey(curSchool.id, curYear, g, ex, s);
+            if (db[kk]) db[kk].hasNew = false;
+          }))
+        );
+      }
+    }
+    save();
+    renderTop();
+    renderDetail();
+    openFilledModal(gr, exam, su);
+  }
+}
+
+function setStatusOverride(gr, exam, su) {
+  const val = document.getElementById('statusOverride').value;
+  const k = dbKey(curSchool.id, curYear, gr, exam, su);
+  if (!db[k]) db[k] = {files:[], statusOverride:''};
+  db[k].statusOverride = val;
+  save();
+  renderDetail();
+  showToast('ステータスを更新しました');
+}
+
+function closePdfModal() { document.getElementById('pdfModal').classList.remove('open'); curCell = null; }
+document.getElementById('pdfModal').addEventListener('click', e => { if (e.target === e.currentTarget) closePdfModal(); });
+
+async function doUpload(file) {
+  if (!curCell) return;
+  const { gr, exam, su } = curCell;
+  const prog = document.getElementById('uploadProgress');
+  const bar  = document.getElementById('progressBar');
+  const lbl  = document.getElementById('progressLabel');
+  const ulbl = document.getElementById('uploadLabel');
+  if (prog) prog.classList.add('show');
+  try {
+    const result = await uploadFile(file, pct => {
+      if (bar) bar.style.width = pct + '%';
+      if (lbl) lbl.textContent = pct + '%';
+    });
+    const k     = dbKey(curSchool.id, curYear, gr, exam, su);
+    const today = new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'});
+    pushUndo();
+    if (!db[k]) db[k] = { files:[], noan:false, stu:false };
+    if (!db[k].files) db[k].files = [];
+    // ファイル名から種類を抽出
+    const kindList = ['テストのみ','テスト＆先生解答','テスト＆生徒解答','先生解答のみ','生徒解答のみ'];
+    const fileKind = kindList.find(k => file.name.includes(k)) || '';
+    db[k].files.push({ name: file.name, url: result.url, fileId: result.fileId, date: today, kind: fileKind, isNew: true });
+    save();
+    showToast(`✅ ${gr} ${exam} ${su} に登録しました`);
+    closePdfModal(); renderDetail();
+  } catch(e) {
+    if (ulbl) ulbl.textContent = '⚠ 失敗：' + e.message;
+    if (bar)  bar.style.background = '#dc2626';
+    showToast('⚠ アップロードに失敗しました');
+  }
+}
+
+document.getElementById('fileInput').addEventListener('change', function() {
+  if (!this.files.length || !curCell) return;
+  doUpload(this.files[0]); this.value = '';
+});
+
+async function deleteSingleFile(idx) {
+  if (!isAdmin || !curCell) return;
+  const { gr, exam, su } = curCell;
+  const k = dbKey(curSchool.id, curYear, gr, exam, su);
+  if (!db[k] || !db[k].files || !db[k].files[idx]) return;
+  const f = db[k].files[idx];
+  if (!confirm('「' + f.name + '」を削除しますか？')) return;
+  pushUndo();
+  // Driveからは削除しない（Undoで復活できるように）
+  db[k].files.splice(idx, 1);
+  if (!db[k].files.length && !db[k].noan && !db[k].stu) delete db[k];
+  save();
+  showToast('🗑 削除しました');
+  renderDetail();
+  closePdfModal();
+}
+
+function schoolFormHTML(name, count, color='#1B3A6B') {
+  const colors = [
+    {v:'#1B3A6B',l:'紺'},  {v:'#2d8f5a',l:'緑'},
+    {v:'#c96a1a',l:'橙'},  {v:'#9333ea',l:'紫'},
+    {v:'#dc2626',l:'赤'},  {v:'#0891b2',l:'水色'},
+  ];
+  const colorBtns = colors.map(c =>
+    `<button type="button" onclick="selectColor('${c.v}')" id="clr_${c.v.replace('#','')}"
+      data-color="${c.v}"
+      style="width:40px;height:40px;border-radius:50%;background:${c.v};border:3px solid ${c.v===color?'white':'transparent'};cursor:pointer;transition:all .15s;box-shadow:${c.v===color?'0 0 0 3px #333':'none'};display:flex;align-items:center;justify-content:center;color:white;font-size:18px;"
+      title="${c.l}">${c.v===color?'✓':''}</button>`
+  ).join('');
+  return `<label>学校名</label>
+    <input type="text" id="sName" value="${esc(name)}" placeholder="例：南城中学" maxlength="20">
+    <label style="margin-top:14px">年間テスト回数</label>
+    <select id="sCount">${[3,4,5,6].map(n=>`<option value="${n}"${n===count?' selected':''}>${n}回</option>`).join('')}</select>
+    <label style="margin-top:14px">カラー</label>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;" id="colorPicker">${colorBtns}</div>
+    <input type="hidden" id="sColor" value="${color}">
+    <div style="font-size:11px;color:var(--sub);margin-top:10px;">※回数変更後もPDFデータは保持されます</div>`;
+}
+
+function selectColor(v) {
+  document.getElementById('sColor').value = v;
+  document.querySelectorAll('#colorPicker button').forEach(b => {
+    const isSelected = b.dataset.color === v;
+    b.style.border      = '3px solid ' + (isSelected ? 'white' : 'transparent');
+    b.style.boxShadow   = isSelected ? '0 0 0 3px #333' : 'none';
+    b.textContent       = isSelected ? '✓' : '';
+  });
+}
+
+function openAddSchool() {
+  if (!isAdmin) return;
+  editSid = null;
+  document.getElementById('schoolModalTitle').textContent = '学校を追加';
+  document.getElementById('schoolModalBody').innerHTML = schoolFormHTML('', 5);
+  document.getElementById('schoolModalActions').innerHTML = `
+    <button class="btn btn-primary" onclick="saveSchool()">追加する</button>
+    <button class="btn btn-ghost"   onclick="closeSchoolModal()">キャンセル</button>`;
+  document.getElementById('schoolModal').classList.add('open');
+}
+
+function openEditSchool(sid) {
+  if (!isAdmin) return;
+  const s = schools.find(x => x.id === sid); if (!s) return;
+  editSid = sid;
+  document.getElementById('schoolModalTitle').textContent = '学校の設定';
+  document.getElementById('schoolModalBody').innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+      <button onclick="deleteSchool('${sid}')" style="background:none;border:1px solid #dc2626;color:#dc2626;padding:4px 10px;border-radius:8px;font-size:11px;cursor:pointer;">🗑 削除</button>
+    </div>` + schoolFormHTML(s.name, s.examCount, s.color||'#1B3A6B');
+  document.getElementById('schoolModalActions').innerHTML = `
+    <button class="btn btn-primary" onclick="saveSchool()">保存する</button>
+    <button class="btn btn-ghost"   onclick="closeSchoolModal()">キャンセル</button>`;
+  document.getElementById('schoolModal').classList.add('open');
+}
+
+function saveSchool() {
+  const name  = document.getElementById('sName').value.trim();
+  const count = parseInt(document.getElementById('sCount').value);
+  const color = document.getElementById('sColor').value || '#1B3A6B';
+  if (!name) { showToast('⚠ 学校名を入力してください'); return; }
+  pushUndo();
+  if (editSid) {
+    const idx = schools.findIndex(s => s.id === editSid);
+    if (idx >= 0) { schools[idx].name = name; schools[idx].examCount = count; schools[idx].color = color; }
+    showToast('✅ 学校情報を更新しました');
+  } else {
+    schools.push({ id: genId(), name, examCount: count, color });
+    showToast('✅ 学校を追加しました');
+  }
+  save(); closeSchoolModal(); renderTop();
+}
+
+function deleteSchool(sid) {
+  if (!confirm('この学校のすべてのデータを削除します。よろしいですか？')) return;
+  pushUndo();
+  schools = schools.filter(s => s.id !== sid);
+  Object.keys(db).forEach(k => { if (k.startsWith(sid + '||')) delete db[k]; });
+  save(); closeSchoolModal(); showToast('🗑 学校を削除しました'); renderTop();
+}
+
+function closeSchoolModal() { document.getElementById('schoolModal').classList.remove('open'); editSid = null; }
+document.getElementById('schoolModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeSchoolModal(); });
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
