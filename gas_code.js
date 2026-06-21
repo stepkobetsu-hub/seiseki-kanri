@@ -1138,6 +1138,8 @@ function submitEntryFollowupForm(data) {
   if (data.studentName && normalizeName_(data.studentName) && normalizeName_(data.studentName) !== normalizeName_(student.name)) {
     return { success: false, error: '生徒番号と氏名が一致しません。番号と氏名を確認してください。' };
   }
+  const validationErrors = validateEntryFollowupNumbers_(data);
+  if (validationErrors.length) return { success: false, error: validationErrors.join('\n') };
 
   const result = { success: true, saved: [], errors: [] };
   const entryPayload = Object.assign({}, data.entryInfo || {}, {
@@ -1190,6 +1192,33 @@ function getEntryFollowupStudent(data) {
   const prefix = String(student.grade || '').indexOf('高') >= 0 ? '高' : String(student.grade || '').indexOf('小') >= 0 ? '小' : '中';
   const gradeOptions = prefix === '中' && n ? Array.from({ length: Math.min(n, 3) }, (_, i) => '中' + (i + 1)) : ['中1','中2','中3'];
   return { success: true, studentId: student.id, name: student.name, grade: student.grade, gradeOptions };
+}
+
+function validateEntryFollowupNumbers_(data) {
+  const errors = [];
+  const scoreKeys = ['jpn','soc','math','sci','eng'];
+  (data.scores || []).forEach((row, idx) => {
+    scoreKeys.forEach(k => {
+      const v = row && row[k];
+      if (v === '' || v == null) return;
+      const s = String(v).trim().replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+      if (!/^\d+$/.test(s) || Number(s) < 0 || Number(s) > 100) {
+        errors.push('定期テスト' + (idx + 1) + '行目は、0〜100の整数で入力してください。');
+      }
+    });
+  });
+  const reportKeys = ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech'];
+  (data.reports || []).forEach((row, idx) => {
+    reportKeys.forEach(k => {
+      const v = row && row[k];
+      if (v === '' || v == null) return;
+      const s = String(v).trim().replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+      if (!/^\d+$/.test(s) || Number(s) < 1 || Number(s) > 5) {
+        errors.push('通知表' + (idx + 1) + '行目は、1〜5の整数で入力してください。');
+      }
+    });
+  });
+  return Array.from(new Set(errors));
 }
 
 function sendEntryFollowupSubmittedMail_(student, data, result) {

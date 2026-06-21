@@ -16,6 +16,7 @@ h1{margin:0;font-size:1.45rem;letter-spacing:0}.hero p{margin:8px 0 0;line-heigh
 .familyGrid{display:grid;grid-template-columns:1.1fr 1fr 1.2fr 1.4fr;gap:10px;align-items:end}
 label{display:block;font-size:.8rem;font-weight:700;color:#51637a;margin-bottom:4px}
 input,textarea,select{width:100%;border:1px solid #c9d6e5;border-radius:8px;padding:10px;font-size:1rem;background:#fff}
+input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:0 0 0 3px rgba(220,38,38,.12)}
 textarea{min-height:96px;resize:vertical}.row{border:1px solid #e4edf7;border-radius:10px;padding:12px;margin-top:10px;background:#fbfdff}
 .subjects{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}.subjects9{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:8px}
 .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.btn{border:0;border-radius:9px;padding:10px 14px;font-weight:800;cursor:pointer}
@@ -93,7 +94,7 @@ textarea{min-height:96px;resize:vertical}.row{border:1px solid #e4edf7;border-ra
 
   <section class="card">
     <div class="head">通知表評定（中学生のみ）</div>
-    <p class="small">中学生になってから現在までの成績をご記入ください。※分かる範囲で結構です。<br><br>1〜5で入力してください。<br>※2学期制の場合は、1学期と2学期としてご記入ください。<br><br>※10段階評価は5段階（半分）にしてご記入ください。</p>
+    <p class="small">中学生になってから現在までの成績をご記入ください。※分かる範囲で結構です。<br><br>1〜5で入力してください。<br>※2学期制の場合は、1学期と2学期としてご記入ください。</p>
     <div class="tableWrap">
       <table class="entryTable reportTable">
         <colgroup>
@@ -210,6 +211,46 @@ function collectRows(sel){
     return o;
   }).filter(o=>Object.values(o).some(Boolean));
 }
+function clearInvalidInputs(){
+  document.querySelectorAll('.invalid').forEach(el=>el.classList.remove('invalid'));
+}
+function isWholeNumberText(v){
+  return /^\d+$/.test(String(v||'').trim().replace(/[０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0)));
+}
+function numberTextValue(v){
+  return Number(String(v||'').trim().replace(/[０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0)));
+}
+function validateNumberRows(){
+  clearInvalidInputs();
+  const errors=[];
+  const scoreKeys=['jpn','soc','math','sci','eng'];
+  document.querySelectorAll('#scoreBox .score').forEach((row,idx)=>{
+    scoreKeys.forEach(k=>{
+      const el=row.querySelector(`[data-k="${k}"]`);
+      const v=(el?.value||'').trim();
+      if(!v) return;
+      const n=numberTextValue(v);
+      if(!isWholeNumberText(v) || n<0 || n>100){
+        el.classList.add('invalid');
+        errors.push(`定期テスト${idx+1}行目は、0〜100の整数で入力してください。`);
+      }
+    });
+  });
+  const reportKeys=['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech'];
+  document.querySelectorAll('#reportBox .report').forEach((row,idx)=>{
+    reportKeys.forEach(k=>{
+      const el=row.querySelector(`[data-k="${k}"]`);
+      const v=(el?.value||'').trim();
+      if(!v) return;
+      const n=numberTextValue(v);
+      if(!isWholeNumberText(v) || n<1 || n>5){
+        el.classList.add('invalid');
+        errors.push(`通知表${idx+1}行目は、1〜5の整数で入力してください。`);
+      }
+    });
+  });
+  return [...new Set(errors)];
+}
 function collectFamilyRows(){
   return [...document.querySelectorAll('#familyBox .family')].map(row=>{
     const name=row.querySelector('[data-k="name"]')?.value.trim()||'';
@@ -240,6 +281,8 @@ async function submitForm(){
     wish:{pub1name:val('pub1name'),pub1dept:val('pub1dept'),pub2name:val('pub2name'),pub2dept:val('pub2dept'),pri1name:val('pri1name'),pri1dept:val('pri1dept'),pri2name:val('pri2name'),pri2dept:val('pri2dept')}
   };
   if(!payload.studentId||!payload.studentName){msg('生徒番号と生徒氏名を入力してください。',false);return}
+  const validationErrors=validateNumberRows();
+  if(validationErrors.length){msg(validationErrors.join('\n'),false);return}
   $('submitBtn').disabled=true; msg('送信中です...',true);
   try{
     const r=await api(payload);
