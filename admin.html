@@ -2788,7 +2788,7 @@ function renderMeetingTable(list) {
       <td>${htmlEsc(m.staff || '')}</td>
       <td style="white-space:pre-wrap;min-width:320px">${htmlEsc(m.content || '')}</td>
       <td style="white-space:nowrap">
-        <button class="btn btn-outline btn-sm" onclick="editMeetingMemo('${htmlEsc(m.id)}')">更新</button>
+        <button class="btn btn-outline btn-sm" onclick="editMeetingMemo('${htmlEsc(m.id)}')">編集</button>
         <button class="btn btn-danger btn-sm" onclick="deleteMeetingMemo('${htmlEsc(m.id)}')">削除</button>
       </td>
     </tr>
@@ -2823,7 +2823,7 @@ function editMeetingMemo(id) {
     contentEl.focus();
   }
   const btn = document.getElementById('meetSaveBtn');
-  if (btn) btn.textContent = '更新する';
+  if (btn) btn.textContent = '変更を保存';
 }
 
 async function deleteMeetingMemo(id) {

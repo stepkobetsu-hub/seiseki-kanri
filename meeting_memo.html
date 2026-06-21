@@ -463,7 +463,7 @@ function renderMemos(){
           <div class="meta">${esc(formatDate(m.date))}　${esc(m.counterpart || '')}　担当: ${esc(m.staff || '')}</div>
         </div>
         <div class="memoBtns">
-          <button onclick="editMemo('${esc(m.id)}')">更新</button>
+          <button onclick="editMemo('${esc(m.id)}')">編集</button>
           <button class="danger" onclick="deleteMemo('${esc(m.id)}')">削除</button>
         </div>
       </div>
@@ -485,8 +485,8 @@ function editMemo(id){
   const m = memos.find(x => String(x.id) === String(id));
   if (!m) return;
   editingId = m.id;
-  $('formTitle').textContent = '面談メモを更新';
-  $('saveBtn').textContent = '更新する';
+  $('formTitle').textContent = '面談メモを編集';
+  $('saveBtn').textContent = '変更を保存';
   selectCampus(m.campus || '');
   $('student').value = m.studentId || '';
   $('date').value = formatDate(m.date).replace(/\//g,'-');
