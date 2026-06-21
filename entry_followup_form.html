@@ -135,6 +135,7 @@ const $=id=>document.getElementById(id);
 async function api(data){const r=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(data)});return await r.json()}
 function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function val(id){return ($(id)?.value||'').trim()}
+function normNum(s){return String(s||'').trim().replace(/[０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0))}
 function msg(t,ok){$('msg').className='msg '+(ok?'ok':'err');$('msg').textContent=t}
 
 function addFamily(){
@@ -178,7 +179,7 @@ function refreshGradeSelects(){
   });
 }
 async function loadStudentGradeOptions(){
-  const studentId=val('studentId');
+  const studentId=normNum(val('studentId'));
   if(!studentId || loadedGradeStudentId===studentId) return;
   loadedGradeStudentId=studentId;
   // 学年は常に中1〜中3を表示（GAS側の判定は使わない）
@@ -280,7 +281,7 @@ function collectFamilyRows(){
 async function submitForm(){
   const payload={
     action:'submitEntryFollowupForm',
-    studentId:val('studentId'),
+    studentId:normNum(val('studentId')),
     studentName:val('studentName'),
     entryInfo:{club:val('club'),nickname:val('nickname'),currentLessons:val('currentLessons'),pastLessons:val('pastLessons'),commuteMethod:val('commuteMethod'),familyRequest:val('familyRequest')},
     family:collectFamilyRows(),
