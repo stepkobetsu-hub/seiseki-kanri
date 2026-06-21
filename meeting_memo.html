@@ -644,10 +644,10 @@ function renderDeleteNotice(){
   if (!deletedHistory.length){ box.style.display='none'; return; }
   box.style.display='block';
   box.innerHTML = deletedHistory.map((item,i) => `
-    <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #e8eef5;font-size:.83rem;color:#475569">
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #e8eef5;font-size:.83rem;color:#475569">
       <span style="flex:1">${esc(item.name)}さん（${esc(formatDate(item.date))}）のメモを削除しました</span>
-      <button style="padding:3px 10px;font-size:.76rem;border-radius:5px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;cursor:pointer" onclick="hardDelete(${i})">完全削除</button>
-      <button style="padding:3px 10px;font-size:.76rem;border-radius:5px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;cursor:pointer" onclick="undoDelete(${i})">戻す</button>
+      <button style="padding:5px 12px;font-size:.8rem;border-radius:5px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;cursor:pointer" onclick="hardDelete(${i})">完全削除</button>
+      <button style="padding:5px 14px;font-size:.8rem;border-radius:5px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;cursor:pointer" onclick="undoDelete(${i})">戻す</button>
     </div>
   `).join('');
 }
@@ -689,6 +689,17 @@ async function undoDelete(i){
 }
 
 init();
+
+// 画面を閉じるとき、完全削除されていないものはGASに戻す
+window.addEventListener('beforeunload', () => {
+  deletedHistory.forEach(item => {
+    // sendBeaconで非同期に復元（画面が閉じてもリクエストを飛ばせる）
+    const body = JSON.stringify({ action:'saveMeetingMemo', ...item });
+    navigator.sendBeacon
+      ? navigator.sendBeacon(GAS, new Blob([body], {type:'text/plain'}))
+      : fetch(GAS, {method:'POST', headers:{'Content-Type':'text/plain'}, body, keepalive:true});
+  });
+});
 </script>
 </body>
 </html>
