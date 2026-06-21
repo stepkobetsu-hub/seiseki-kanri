@@ -2362,7 +2362,8 @@ async function loadCompare(overrideSid) {
     const scLabel = sc.year ? (!year ? sc.year+'年度 第'+sc.term+'回'+_cmpGradeFor(sc.year) : '第'+sc.term+'回'+_cmpGradeFor(sc.year)) : '-';
     const rpLabel = rp.year ? (!year ? rp.year+'年度 '+rp.semester+_cmpGradeFor(rp.year) : rp.semester+_cmpGradeFor(rp.year)) : '-';
     const td = (v, bold) => `<td style="padding:3px 4px;text-align:center${bold?';font-weight:700;color:var(--primary)':''}">${v!==''&&v!=null ? v : '-'}</td>`;
-    const tdR = v => `<td style="padding:3px 4px;text-align:center">${rpRating(v)}</td>`;
+    const rpColor = v => { const n=Number(v); return n===5?'#059669':n===4?'var(--primary)':n===3?'#d97706':(n===2||n===1)?'#dc2626':'var(--sub)'; };
+    const tdR = v => `<td style="padding:3px 4px;text-align:center;color:${rpColor(v)};font-weight:${(v!=null&&v!==''&&Number(v)>=1)?'700':'400'}">${(v!=null&&v!=='')?v:'-'}</td>`;
     // 通知表5科計・9科計を計算
     const rp5 = [rp.rp_jpn,rp.rp_soc,rp.rp_math,rp.rp_sci,rp.rp_eng].every(v=>v!==''&&v!=null) ? [rp.rp_jpn,rp.rp_soc,rp.rp_math,rp.rp_sci,rp.rp_eng].reduce((a,b)=>a+Number(b),0) : '';
     const rp9 = [rp.rp_jpn,rp.rp_soc,rp.rp_math,rp.rp_sci,rp.rp_eng,rp.rp_mus,rp.rp_art,rp.rp_pe,rp.rp_tech].every(v=>v!==''&&v!=null) ? [rp.rp_jpn,rp.rp_soc,rp.rp_math,rp.rp_sci,rp.rp_eng,rp.rp_mus,rp.rp_art,rp.rp_pe,rp.rp_tech].reduce((a,b)=>a+Number(b),0) : '';
