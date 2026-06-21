@@ -10,13 +10,13 @@ const MASTER_SHEET_NAME = '☆マスタ';
 const TARGET_MASTER_FLAGS = ['1', '0']; // ☆マスタB列: 1=在籍, 0=保留中
 const SCHOOL_MASTER_COLS = ['学校名','年間テスト回数','学期制','登録日時','定期テスト日程JSON','予定表URL','日程メモ'];
 const MEETING_MEMO_COLS = ['ID','日付','生徒ID','氏名','校舎','学年','中学校','相手','内容','担当','登録日時','更新日時'];
-const STAFF_COLS = ['担当者名','メール','登録日時'];
+const STAFF_COLS = ['担当者名','メール','登録日時','面談メール通知'];
 const DEFAULT_STAFF_MAILS = {
   '加瀬': 'mintcocoajasmine@gmail.com',
   '大野': 'chloeandnina1@gmail.com',
   '林': '2350.fusa.koto.shou@gmail.com'
 };
-const OTEMACHI_MEETING_MAIL_STAFF = ['加瀬', '大野'];
+const DEFAULT_MEETING_MAIL_STAFF = ['加瀬', '大野'];
 
 // ===================================================
 // シート取得 / 初期化
@@ -72,6 +72,16 @@ function ensureStaffSheet_() {
   STAFF_COLS.forEach((name, idx) => {
     if (sh.getRange(1, idx + 1).getValue() !== name) sh.getRange(1, idx + 1).setValue(name);
   });
+  const lastRow = sh.getLastRow();
+  if (lastRow > 1) {
+    const values = sh.getRange(2, 1, lastRow - 1, STAFF_COLS.length).getValues();
+    values.forEach((r, idx) => {
+      const name = String(r[0] || '').trim();
+      if (name && r[3] === '') {
+        sh.getRange(idx + 2, 4).setValue(DEFAULT_MEETING_MAIL_STAFF.indexOf(name) >= 0 ? '1' : '0');
+      }
+    });
+  }
   return sh;
 }
 
@@ -754,7 +764,7 @@ function ensureDefaultStaffMembers_() {
     if (rowNo) {
       if (!sh.getRange(rowNo, 2).getValue()) sh.getRange(rowNo, 2).setValue(DEFAULT_STAFF_MAILS[name]);
     } else {
-      sh.appendRow([name, DEFAULT_STAFF_MAILS[name], now]);
+      sh.appendRow([name, DEFAULT_STAFF_MAILS[name], now, DEFAULT_MEETING_MAIL_STAFF.indexOf(name) >= 0 ? '1' : '0']);
     }
   });
 }
@@ -767,7 +777,11 @@ function getStaffMembers() {
   const staffMembers = [];
   for (let i = 1; i < rows.length; i++) {
     if (rows[i][0]) {
-      const item = { name: String(rows[i][0]), email: String(rows[i][1] || '') };
+      const item = {
+        name: String(rows[i][0]),
+        email: String(rows[i][1] || ''),
+        notify: String(rows[i][3] || '') === '1'
+      };
       staff.push(item.name);
       staffMembers.push(item);
     }
@@ -778,16 +792,18 @@ function getStaffMembers() {
 function addStaffMember(data) {
   const name = String(data.name || '').trim();
   const email = String(data.email || '').trim();
+  const notify = data.notify === true || String(data.notify || '') === '1';
   if (!name) return { success: false, error: '担当者名を入力してください' };
   const sh = ensureStaffSheet_();
   const rows = sh.getDataRange().getValues();
   for (let i = 1; i < rows.length; i++) {
     if (String(rows[i][0]).trim() === name) {
       sh.getRange(i + 1, 2).setValue(email);
+      sh.getRange(i + 1, 4).setValue(notify ? '1' : '0');
       return getStaffMembers();
     }
   }
-  sh.appendRow([name, email, new Date().toLocaleString('ja-JP')]);
+  sh.appendRow([name, email, new Date().toLocaleString('ja-JP'), notify ? '1' : '0']);
   return getStaffMembers();
 }
 
@@ -802,32 +818,28 @@ function deleteStaffMember(data) {
   return getStaffMembers();
 }
 
-function getStaffEmailMap_() {
+function getMeetingMailStaff_() {
   ensureDefaultStaffMembers_();
   const sh = ensureStaffSheet_();
   const rows = sh.getDataRange().getValues();
-  const map = {};
+  const result = [];
   for (let i = 1; i < rows.length; i++) {
     const name = String(rows[i][0] || '').trim();
     const email = String(rows[i][1] || '').trim();
-    if (name && email) map[name] = email;
+    const notify = String(rows[i][3] || '') === '1';
+    if (name && email && notify) result.push({ name, email });
   }
-  return map;
+  return result;
 }
 
-function getMeetingMemoRecipients_(campus, staffName) {
+function getMeetingMemoRecipients_(campus) {
   if (String(campus || '').indexOf('大手') < 0) return [];
-  const staffMap = getStaffEmailMap_();
-  const recipients = [];
-  OTEMACHI_MEETING_MAIL_STAFF.forEach(name => {
-    if (staffMap[name]) recipients.push(staffMap[name]);
-  });
-  if (staffName && staffMap[staffName]) recipients.push(staffMap[staffName]);
+  const recipients = getMeetingMailStaff_().map(s => s.email);
   return Array.from(new Set(recipients.filter(Boolean)));
 }
 
 function sendMeetingMemoEmail_(memo) {
-  const recipients = getMeetingMemoRecipients_(memo.campus, memo.staff);
+  const recipients = getMeetingMemoRecipients_(memo.campus);
   if (!recipients.length) return { sent: false, skipped: true, reason: '送信先がありません' };
   const subject = '【面談メモ】' + memo.name + '（No.' + memo.studentId + '）';
   const body = [
