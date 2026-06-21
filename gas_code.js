@@ -863,6 +863,7 @@ function saveMeetingMemo(data) {
   if (!data.studentId) return { success: false, error: '生徒を選択してください' };
   if (!data.date) return { success: false, error: '日付を入力してください' };
   if (!data.content) return { success: false, error: '内容を入力してください' };
+  if (!data.staff) return { success: false, error: '担当者を選択または入力してください' };
   const st = findStudentById_(data.studentId);
   if (!st) return { success: false, error: '生徒が見つかりません: ' + data.studentId };
   const sh = getOrCreateSheet('面談メモデータ', MEETING_MEMO_COLS);

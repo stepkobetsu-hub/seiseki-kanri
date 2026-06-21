@@ -265,7 +265,11 @@ textarea{
       </div>
       <div class="field">
         <label for="staff">担当</label>
-        <select id="staff"></select>
+        <select id="staff" onchange="toggleStaffOther()"></select>
+      </div>
+      <div class="field" id="staffOtherWrap" style="display:none">
+        <label for="staffOther">担当（その他）</label>
+        <input id="staffOther" placeholder="担当者名を入力">
       </div>
       <div class="field full">
         <label for="content">内容</label>
@@ -427,8 +431,9 @@ function renderStudents(){
 }
 
 function renderStaff(){
-  $('staff').innerHTML = '<option value="">担当を選択</option>' + staffMembers.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  $('staff').innerHTML = '<option value="">担当を選択</option>' + staffMembers.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('') + '<option value="他">他</option>';
   $('filterStaff').innerHTML = '<option value="">全担当</option>' + staffMembers.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  toggleStaffOther();
 }
 
 function toggleOther(){
@@ -443,18 +448,32 @@ function buildCounterpart(){
   return base === '他' && other ? `他: ${other}` : base;
 }
 
+function toggleStaffOther(){
+  const isOther = $('staff').value === '他';
+  $('staffOtherWrap').style.display = isOther ? '' : 'none';
+  if (!isOther) $('staffOther').value = '';
+}
+
+function buildStaff(){
+  const base = $('staff').value;
+  const other = $('staffOther').value.trim();
+  return base === '他' ? other : base;
+}
+
 async function saveMemo(sendEmail){
+  const staff = buildStaff();
   const payload = {
     action:'saveMeetingMemo',
     id: editingId,
     date: $('date').value,
     studentId: $('student').value,
     counterpart: buildCounterpart(),
-    staff: $('staff').value,
+    staff,
     content: $('content').value.trim(),
     sendEmail: !!sendEmail
   };
   if (!payload.studentId) { showToast('生徒を選択してください'); return; }
+  if (!payload.staff) { showToast('担当者を選択または入力してください'); return; }
   if (!payload.content) { showToast('内容を入力してください'); return; }
   $('saveBtn').disabled = true;
   if ($('mailSaveBtn')) $('mailSaveBtn').disabled = true;
@@ -485,8 +504,10 @@ function clearForm(keepStudent){
   $('counterpart').value = '母';
   $('other').value = '';
   $('staff').value = '';
+  $('staffOther').value = '';
   $('content').value = '';
   toggleOther();
+  toggleStaffOther();
 }
 
 async function loadMemos(){
@@ -559,7 +580,18 @@ function editMemo(id){
     $('other').value = cp.replace(/^他[:：]\s*/, '');
   }
   toggleOther();
-  $('staff').value = m.staff || '';
+  const staff = String(m.staff || '');
+  if (staff && staffMembers.includes(staff)) {
+    $('staff').value = staff;
+    $('staffOther').value = '';
+  } else if (staff) {
+    $('staff').value = '他';
+    $('staffOther').value = staff;
+  } else {
+    $('staff').value = '';
+    $('staffOther').value = '';
+  }
+  toggleStaffOther();
   $('content').value = m.content || '';
   window.scrollTo({ top:0, behavior:'smooth' });
 }

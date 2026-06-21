@@ -467,7 +467,8 @@ tr:hover td{background:#f8fafc}
               </select>
             </div>
             <div class="fld" id="meetOtherWrap" style="display:none"><label>相手（その他）</label><input id="meetOther" placeholder="例: 祖母、叔父、学校の先生"></div>
-            <div class="fld"><label>担当</label><select id="meetStaff"><option value="">担当を選択</option></select></div>
+            <div class="fld"><label>担当</label><select id="meetStaff" onchange="toggleMeetingStaffOther()"><option value="">担当を選択</option></select></div>
+            <div class="fld" id="meetStaffOtherWrap" style="display:none"><label>担当（その他）</label><input id="meetStaffOther" placeholder="担当者名を入力"></div>
           </div>
           <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
             <div class="fld"><label>内容</label><textarea id="meetContent" placeholder="面談・電話・相談内容など" style="min-height:170px"></textarea></div>
@@ -3239,6 +3240,22 @@ function toggleMeetingOther() {
   }
 }
 
+function toggleMeetingStaffOther() {
+  const isOther = document.getElementById('meetStaff')?.value === '他';
+  const wrap = document.getElementById('meetStaffOtherWrap');
+  if (wrap) wrap.style.display = isOther ? '' : 'none';
+  if (!isOther) {
+    const other = document.getElementById('meetStaffOther');
+    if (other) other.value = '';
+  }
+}
+
+function buildMeetingStaff() {
+  const base = document.getElementById('meetStaff')?.value || '';
+  const other = document.getElementById('meetStaffOther')?.value.trim() || '';
+  return base === '他' ? other : base;
+}
+
 function normalizeStaffRecords(r) {
   const records = (r.staffMembers || []).map(s => typeof s === 'string' ? { name: s, email: '', notify: false } : {
     name: s.name || '',
@@ -3262,9 +3279,11 @@ function renderStaffOptions() {
     if (!sel) return;
     const prev = sel.value;
     const first = id === 'meetFilterStaff' ? '<option value="">全担当</option>' : '<option value="">担当を選択</option>';
-    sel.innerHTML = first + staffMembers.map(n => `<option value="${htmlEsc(n)}">${htmlEsc(n)}</option>`).join('');
+    const other = id === 'meetFilterStaff' ? '' : '<option value="他">他</option>';
+    sel.innerHTML = first + staffMembers.map(n => `<option value="${htmlEsc(n)}">${htmlEsc(n)}</option>`).join('') + other;
     if (prev) sel.value = prev;
   });
+  toggleMeetingStaffOther();
 }
 
 function renderStaffSettings() {
@@ -3337,7 +3356,7 @@ async function deleteStaffMember(name) {
 
 function clearMeetingForm() {
   currentMeetingMemoId = '';
-  ['meetStudent','meetContent','meetOther'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['meetStudent','meetContent','meetOther','meetStaffOther'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   const dateEl = document.getElementById('meetDate');
   if (dateEl) dateEl.value = todayStr();
   const cp = document.getElementById('meetCounterpart');
@@ -3345,12 +3364,14 @@ function clearMeetingForm() {
   const btn = document.getElementById('meetSaveBtn');
   if (btn) btn.textContent = '保存する';
   toggleMeetingOther();
+  toggleMeetingStaffOther();
 }
 
 async function saveMeetingMemo(sendEmail) {
   const counterpartBase = document.getElementById('meetCounterpart')?.value || '';
   const other = document.getElementById('meetOther')?.value.trim() || '';
   const counterpart = counterpartBase === '他' && other ? `他: ${other}` : counterpartBase;
+  const staff = buildMeetingStaff();
   const payload = {
     action: 'saveMeetingMemo',
     id: currentMeetingMemoId,
@@ -3358,9 +3379,10 @@ async function saveMeetingMemo(sendEmail) {
     studentId: document.getElementById('meetStudent')?.value || '',
     counterpart,
     content: document.getElementById('meetContent')?.value.trim() || '',
-    staff: document.getElementById('meetStaff')?.value || '',
+    staff,
     sendEmail: !!sendEmail
   };
+  if (!staff) { toast('担当者を選択または入力してください'); return; }
   const saveBtn = document.getElementById('meetSaveBtn');
   const mailBtn = document.getElementById('meetMailSaveBtn');
   if (saveBtn) saveBtn.disabled = true;
@@ -3451,7 +3473,21 @@ function editMeetingMemo(id) {
   }
   toggleMeetingOther();
   const staffEl = document.getElementById('meetStaff');
-  if (staffEl) staffEl.value = m.staff || '';
+  const staffOtherEl = document.getElementById('meetStaffOther');
+  const staff = String(m.staff || '');
+  if (staffEl && staff) {
+    if (staffMembers.includes(staff)) {
+      staffEl.value = staff;
+      if (staffOtherEl) staffOtherEl.value = '';
+    } else {
+      staffEl.value = '他';
+      if (staffOtherEl) staffOtherEl.value = staff;
+    }
+  } else if (staffEl) {
+    staffEl.value = '';
+    if (staffOtherEl) staffOtherEl.value = '';
+  }
+  toggleMeetingStaffOther();
   const contentEl = document.getElementById('meetContent');
   if (contentEl) {
     contentEl.value = m.content || '';
