@@ -7,7 +7,7 @@ const MASTER_SPREADSHEET_ID = '1CIJkTlYUcUkbb8jBdFc6L8D5ubTGsxwNxFv01ten-Zk'; //
 const DATA_SPREADSHEET_ID   = '1Zq3AbL9Fx_skBUibh2F73kyWlw9Ionh3-dTOtots0D8'; // 成績管理用
 
 const MASTER_SHEET_NAME = '☆マスタ';
-const TARGET_GRADES     = ['中1', '中2', '中3'];
+const TARGET_MASTER_FLAGS = ['1', '0']; // ☆マスタB列: 1=在籍, 0=保留中
 const SCHOOL_MASTER_COLS = ['学校名','年間テスト回数','学期制','登録日時','定期テスト日程JSON','予定表URL','日程メモ'];
 const MEETING_MEMO_COLS = ['ID','日付','生徒ID','氏名','校舎','学年','中学校','相手','内容','担当','登録日時','更新日時'];
 const STAFF_COLS = ['担当者名','登録日時'];
@@ -380,7 +380,7 @@ function syncStudentsFromMaster(data) {
     return -1;
   };
   const colId     = col(['ID','id','コード','番号','生徒番号','生徒ID']);
-  const colFlag   = col(['在籍','フラグ','status','ステータス','数']);
+  const colFlag   = 1; // ☆マスタB列。1または0（保留中）の生徒を取り込む
   const colName   = col(['氏名','名前','生徒名','name']);
   const colCampus = col(['校舎','キャンパス','campus']);
   const colGrade  = col(['学年','grade']);
@@ -392,7 +392,7 @@ function syncStudentsFromMaster(data) {
   for (let i = 1; i < masterRows.length; i++) {
     const row = masterRows[i];
     const id    = colId >= 0     ? String(row[colId]).trim()     : String(row[0]).trim();
-    const flag  = colFlag >= 0   ? row[colFlag]                  : row[1];
+    const flag  = row[colFlag];
     const name  = colName >= 0   ? String(row[colName]).trim()   : String(row[4]).trim();
     const campus= colCampus >= 0 ? String(row[colCampus]).trim() : String(row[7]).trim();
     const grade = colGrade >= 0  ? String(row[colGrade]).trim()  : String(row[9]).trim();
@@ -401,12 +401,7 @@ function syncStudentsFromMaster(data) {
 
     if (!id || id === 'undefined' || id === '') continue;
     const flagVal = String(flag).trim();
-    if (flagVal === '') continue;
-
-    // 学年フィルタ（全角半角両対応）
-    const normGrade = grade.replace(/１/g,'1').replace(/２/g,'2').replace(/３/g,'3');
-    const normTargets = TARGET_GRADES.map(g => g.replace(/１/g,'1').replace(/２/g,'2').replace(/３/g,'3'));
-    if (!normTargets.includes(normGrade)) continue;
+    if (!TARGET_MASTER_FLAGS.includes(flagVal)) continue;
 
     masterStudents[id] = { id, name, campus, grade, school, pass, flag: flagVal };
   }

@@ -445,6 +445,21 @@ tr:hover td{background:#f8fafc}
                 <button id="meetCampusAll" class="btn btn-ghost btn-sm" type="button" onclick="selectMeetingCampus('')">全校舎</button>
               </div>
             </div>
+            <div class="fld">
+              <label>学年</label>
+              <select id="meetGradeGroup" onchange="selectMeetingGradeGroup(this.value)">
+                <option value="">全学年</option>
+                <option value="elementary">小学生</option>
+                <option value="junior">中学生</option>
+                <option value="high">高校生</option>
+                <option value="e13">小1〜小3</option>
+                <option value="e46">小4〜小6</option>
+                <option value="j1">中1</option>
+                <option value="j2">中2</option>
+                <option value="j3">中3</option>
+                <option value="h13">高1〜高3</option>
+              </select>
+            </div>
             <div class="fld"><label>生徒名</label><select id="meetStudent"><option value="">生徒を選択</option></select></div>
             <div class="fld"><label>相手</label>
               <select id="meetCounterpart" onchange="toggleMeetingOther()">
@@ -795,6 +810,7 @@ let renderedAdminScores = [];
 let renderedAdminReports = [];
 let renderedWishes = [];
 let selectedMeetingCampus = '';
+let selectedMeetingGradeGroup = '';
 let selectedMeetingListCampus = '';
 let currentMeetingMemoId = '';
 let schoolScheduleHistory = {};
@@ -828,12 +844,31 @@ const NOW_YEAR = getNendo();
 function normalizeGrade(grade) {
   const s = String(grade || '')
     .trim()
-    .replace(/[１２３]/g, ch => ({'１':'1','２':'2','３':'3'}[ch]))
+    .replace(/[１２３４５６]/g, ch => ({'１':'1','２':'2','３':'3','４':'4','５':'5','６':'6'}[ch]))
     .replace(/\s+/g, '')
+    .replace(/^小学/, '小')
     .replace(/^中学/, '中')
+    .replace(/^高校/, '高')
     .replace(/年$/, '');
-  const m = s.match(/中?([123])/);
-  return m ? '中' + m[1] : s;
+  const m = s.match(/^([小中高]?)([1-6])$/);
+  if (!m) return s;
+  return (m[1] || '中') + m[2];
+}
+
+function gradeMatchesGroup(grade, group) {
+  if (!group) return true;
+  const g = normalizeGrade(grade);
+  const n = Number((g.match(/[1-6]/) || [''])[0]);
+  if (group === 'elementary') return g.startsWith('小');
+  if (group === 'junior') return g.startsWith('中');
+  if (group === 'high') return g.startsWith('高');
+  if (group === 'e13') return g.startsWith('小') && n >= 1 && n <= 3;
+  if (group === 'e46') return g.startsWith('小') && n >= 4 && n <= 6;
+  if (group === 'j1') return g === '中1';
+  if (group === 'j2') return g === '中2';
+  if (group === 'j3') return g === '中3';
+  if (group === 'h13') return g.startsWith('高') && n >= 1 && n <= 3;
+  return true;
 }
 
 // ===== API =====
@@ -3071,10 +3106,16 @@ function populateMeetingStudents() {
   const prev = sel.value;
   let list = students;
   if (selectedMeetingCampus) list = list.filter(s => s.campus === selectedMeetingCampus);
+  if (selectedMeetingGradeGroup) list = list.filter(s => gradeMatchesGroup(s.grade, selectedMeetingGradeGroup));
   sel.innerHTML = '<option value="">生徒を選択</option>' + list.map(s =>
     `<option value="${htmlEsc(s.id)}">${htmlEsc(s.name)}（${htmlEsc(s.grade || '')} / No.${htmlEsc(s.id)}）</option>`
   ).join('');
   if (prev) sel.value = prev;
+}
+
+function selectMeetingGradeGroup(group) {
+  selectedMeetingGradeGroup = group || '';
+  populateMeetingStudents();
 }
 
 function selectMeetingCampus(campus) {
@@ -3249,6 +3290,9 @@ function editMeetingMemo(id) {
   currentMeetingMemoId = m.id;
   const dateEl = document.getElementById('meetDate');
   if (dateEl) dateEl.value = formatEntryValue(m.date).replace(/\//g, '-').slice(0, 10);
+  selectedMeetingGradeGroup = '';
+  const gradeGroupEl = document.getElementById('meetGradeGroup');
+  if (gradeGroupEl) gradeGroupEl.value = '';
   if (m.campus) selectMeetingCampus(m.campus);
   const studentEl = document.getElementById('meetStudent');
   if (studentEl) studentEl.value = m.studentId;

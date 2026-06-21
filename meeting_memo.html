@@ -228,6 +228,21 @@ textarea{
 
     <div class="formGrid">
       <div class="field">
+        <label for="gradeGroup">学年</label>
+        <select id="gradeGroup" onchange="selectGradeGroup(this.value)">
+          <option value="">全学年</option>
+          <option value="elementary">小学生</option>
+          <option value="junior">中学生</option>
+          <option value="high">高校生</option>
+          <option value="e13">小1〜小3</option>
+          <option value="e46">小4〜小6</option>
+          <option value="j1">中1</option>
+          <option value="j2">中2</option>
+          <option value="j3">中3</option>
+          <option value="h13">高1〜高3</option>
+        </select>
+      </div>
+      <div class="field">
         <label for="student">生徒名</label>
         <select id="student"></select>
       </div>
@@ -295,12 +310,41 @@ let students = [];
 let staffMembers = [];
 let memos = [];
 let currentCampus = '';
+let currentGradeGroup = '';
 let filterCampus = '';
 let editingId = '';
 
 function $(id){ return document.getElementById(id); }
 function esc(v){
   return String(v ?? '').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+}
+function normalizeGrade(grade) {
+  const s = String(grade || '')
+    .trim()
+    .replace(/[１２３４５６]/g, ch => ({'１':'1','２':'2','３':'3','４':'4','５':'5','６':'6'}[ch]))
+    .replace(/\s+/g, '')
+    .replace(/^小学/, '小')
+    .replace(/^中学/, '中')
+    .replace(/^高校/, '高')
+    .replace(/年$/, '');
+  const m = s.match(/^([小中高]?)([1-6])$/);
+  if (!m) return s;
+  return (m[1] || '中') + m[2];
+}
+function gradeMatchesGroup(grade, group) {
+  if (!group) return true;
+  const g = normalizeGrade(grade);
+  const n = Number((g.match(/[1-6]/) || [''])[0]);
+  if (group === 'elementary') return g.startsWith('小');
+  if (group === 'junior') return g.startsWith('中');
+  if (group === 'high') return g.startsWith('高');
+  if (group === 'e13') return g.startsWith('小') && n >= 1 && n <= 3;
+  if (group === 'e46') return g.startsWith('小') && n >= 4 && n <= 6;
+  if (group === 'j1') return g === '中1';
+  if (group === 'j2') return g === '中2';
+  if (group === 'j3') return g === '中3';
+  if (group === 'h13') return g.startsWith('高') && n >= 1 && n <= 3;
+  return true;
 }
 function today(){
   const d = new Date();
@@ -356,6 +400,11 @@ function selectCampus(campus){
   renderStudents();
 }
 
+function selectGradeGroup(group){
+  currentGradeGroup = group || '';
+  renderStudents();
+}
+
 function selectFilterCampus(campus){
   filterCampus = campus || '';
   [['filterCampusAll',''],['filterCampusJinryo','神領'],['filterCampusOte','大手']].forEach(([id,value]) => {
@@ -368,7 +417,8 @@ function selectFilterCampus(campus){
 
 function renderStudents(){
   const prev = $('student').value;
-  const list = currentCampus ? students.filter(s => s.campus === currentCampus) : students;
+  let list = currentCampus ? students.filter(s => s.campus === currentCampus) : students;
+  if (currentGradeGroup) list = list.filter(s => gradeMatchesGroup(s.grade, currentGradeGroup));
   $('student').innerHTML = '<option value="">生徒を選択</option>' + list.map(s =>
     `<option value="${esc(s.id)}">${esc(s.name)}（${esc(s.grade || '')} / No.${esc(s.id)}）</option>`
   ).join('');
@@ -487,6 +537,8 @@ function editMemo(id){
   editingId = m.id;
   $('formTitle').textContent = '面談メモを編集';
   $('saveBtn').textContent = '変更を保存';
+  currentGradeGroup = '';
+  if ($('gradeGroup')) $('gradeGroup').value = '';
   selectCampus(m.campus || '');
   $('student').value = m.studentId || '';
   $('date').value = formatDate(m.date).replace(/\//g,'-');
