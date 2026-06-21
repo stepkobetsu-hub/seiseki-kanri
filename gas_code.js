@@ -161,6 +161,7 @@ function route(e) {
       case 'getEntrySheetData':   result = getEntrySheetData(data); break;
       case 'saveEntrySheetData':  result = saveEntrySheetData(data); break;
       case 'importEntrySheet':    result = importEntrySheet(data); break;
+      case 'getEntryFollowupStudent': result = getEntryFollowupStudent(data); break;
       case 'submitEntryFollowupForm': result = submitEntryFollowupForm(data); break;
       case 'applyEntryGuardian2ToMaster': result = applyEntryGuardian2ToMaster(data); break;
       case 'applyEntryAiReview': result = applyEntryAiReview(data); break;
@@ -1177,6 +1178,18 @@ function submitEntryFollowupForm(data) {
   result.message = 'エントリーシート【デジタル版】を保存しました';
   if (result.errors.length) result.warning = result.errors.join('\n');
   return result;
+}
+
+function getEntryFollowupStudent(data) {
+  const student = findStudentById_(data.studentId);
+  if (!student) return { success: false, error: '生徒番号が見つかりません: ' + (data.studentId || '') };
+  if (data.studentName && normalizeName_(data.studentName) && normalizeName_(data.studentName) !== normalizeName_(student.name)) {
+    return { success: false, error: '生徒番号と氏名が一致しません。' };
+  }
+  const n = extractGradeNumber_(student.grade);
+  const prefix = String(student.grade || '').indexOf('高') >= 0 ? '高' : String(student.grade || '').indexOf('小') >= 0 ? '小' : '中';
+  const gradeOptions = prefix === '中' && n ? Array.from({ length: Math.min(n, 3) }, (_, i) => '中' + (i + 1)) : ['中1','中2','中3'];
+  return { success: true, studentId: student.id, name: student.name, grade: student.grade, gradeOptions };
 }
 
 function sendEntryFollowupSubmittedMail_(student, data, result) {
