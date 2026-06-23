@@ -300,9 +300,9 @@ tr:hover td{background:#f8fafc}
               <thead style="position:sticky;top:0;z-index:2;background:#fff"><tr>
                 <th style="min-width:100px">氏名</th><th>回次</th><th>学年</th><th>校舎</th>
                 <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
-                <th>5科計</th><th>5位</th>
+                <th>5科計</th><th>5科順</th>
                 <th>音</th><th>美</th><th>体</th><th>技</th>
-                <th>9科計</th><th>9位</th>
+                <th>9科計</th><th>9科順</th>
               </tr></thead>
               <tbody id="speedBody"></tbody>
             </table>
@@ -369,7 +369,7 @@ tr:hover td{background:#f8fafc}
             <tr style="white-space:nowrap">
               <th style="padding:4px 3px">年度・回次</th>
               <th style="padding:4px 3px">国</th><th style="padding:4px 3px">社</th><th style="padding:4px 3px">数</th><th style="padding:4px 3px">理</th><th style="padding:4px 3px">英</th>
-              <th style="padding:4px 3px">5科計</th><th style="padding:4px 3px">5位</th><th style="padding:4px 3px">9科計</th><th style="padding:4px 3px">9位</th>
+              <th style="padding:4px 3px">5科計</th><th style="padding:4px 3px">5科順</th><th style="padding:4px 3px">9科計</th><th style="padding:4px 3px">9科順</th>
               <th style="padding:4px 3px">年度・学期</th><th style="padding:4px 3px">国</th><th style="padding:4px 3px">社</th><th style="padding:4px 3px">数</th><th style="padding:4px 3px">理</th><th style="padding:4px 3px">英</th>
               <th style="padding:4px 3px">音</th><th style="padding:4px 3px">美</th><th style="padding:4px 3px">体</th><th style="padding:4px 3px">技</th>
               <th style="padding:4px 3px">5計</th><th style="padding:4px 3px">9計</th>
@@ -588,8 +588,8 @@ tr:hover td{background:#f8fafc}
             <thead style="position:sticky;top:0;z-index:2;background:#fff">
               <tr>
               <th>氏名</th><th>学年</th><th>学校</th><th>年度</th><th>回</th>
-              <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>5計</th><th>5位</th>
-              <th>音</th><th>美</th><th>体</th><th>技</th><th>9計</th><th>9位</th><th>操作</th>
+              <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>5計</th><th>5科順</th>
+              <th>音</th><th>美</th><th>体</th><th>技</th><th>9計</th><th>9科順</th><th>操作</th>
             </tr></thead>
             <tbody id="scABody"></tbody>
           </table>
@@ -2470,10 +2470,17 @@ async function loadCompare(overrideSid) {
     // 通知表5科計・9科計を計算
     const rp5 = [rp.rp_jpn,rp.rp_soc,rp.rp_math,rp.rp_sci,rp.rp_eng].every(v=>v!==''&&v!=null) ? [rp.rp_jpn,rp.rp_soc,rp.rp_math,rp.rp_sci,rp.rp_eng].reduce((a,b)=>a+Number(b),0) : '';
     const rp9 = [rp.rp_jpn,rp.rp_soc,rp.rp_math,rp.rp_sci,rp.rp_eng,rp.rp_mus,rp.rp_art,rp.rp_pe,rp.rp_tech].every(v=>v!==''&&v!=null) ? [rp.rp_jpn,rp.rp_soc,rp.rp_math,rp.rp_sci,rp.rp_eng,rp.rp_mus,rp.rp_art,rp.rp_pe,rp.rp_tech].reduce((a,b)=>a+Number(b),0) : '';
+    // テスト5科計・9科計：保存値があればそれ、なければフロントで計算
+    const sc5keys = ['jpn','soc','math','sci','eng'];
+    const sc9keys = [...sc5keys,'mus','art','pe','tech'];
+    const calcSc5 = sc5keys.every(k=>sc[k]!==''&&sc[k]!=null) ? sc5keys.reduce((s,k)=>s+Number(sc[k]),0) : '';
+    const calcSc9 = sc9keys.every(k=>sc[k]!==''&&sc[k]!=null) ? sc9keys.reduce((s,k)=>s+Number(sc[k]),0) : '';
+    const sc5 = (sc.total5!==''&&sc.total5!=null) ? sc.total5 : calcSc5;
+    const sc9 = (sc.total9!==''&&sc.total9!=null) ? sc.total9 : calcSc9;
     return `<tr style="font-size:.72rem">
       <td style="padding:3px 4px;white-space:nowrap">${scLabel}</td>
       ${td(sc.jpn)}${td(sc.soc)}${td(sc.math)}${td(sc.sci)}${td(sc.eng)}
-      ${td(sc.total5,true)}${td(sc.rank5)}${td(sc.total9)}${td(sc.rank9)}
+      ${td(sc5,true)}${td(sc.rank5)}${td(sc9)}${td(sc.rank9)}
       <td style="padding:3px 4px;white-space:nowrap">${rpLabel}</td>
       ${tdR(rp.rp_jpn)}${tdR(rp.rp_soc)}${tdR(rp.rp_math)}${tdR(rp.rp_sci)}${tdR(rp.rp_eng)}
       ${tdR(rp.rp_mus)}${tdR(rp.rp_art)}${tdR(rp.rp_pe)}${tdR(rp.rp_tech)}
