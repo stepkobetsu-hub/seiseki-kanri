@@ -287,9 +287,9 @@ tr:hover td{background:#f8fafc}
       </div>
       <div class="card">
         <!-- 切替ボタン -->
-        <div style="display:flex;gap:8px;margin-bottom:12px">
-          <button id="speedTabScore" onclick="switchSpeedTab('score')" class="btn btn-primary btn-sm" style="flex:1">📝 定期テスト結果速報</button>
-          <button id="speedTabReport" onclick="switchSpeedTab('report')" class="btn btn-outline btn-sm" style="flex:1">📒 通知表評価速報</button>
+        <div style="display:flex;gap:8px;margin-bottom:12px;justify-content:flex-start">
+          <button id="speedTabScore" onclick="switchSpeedTab('score')" class="btn btn-primary btn-sm" style="padding:6px 16px">📝 定期テスト結果速報</button>
+          <button id="speedTabReport" onclick="switchSpeedTab('report')" class="btn btn-outline btn-sm" style="padding:6px 16px">📒 通知表評価速報</button>
         </div>
 
         <!-- 定期テスト結果速報 -->
@@ -316,8 +316,8 @@ tr:hover td{background:#f8fafc}
             <table style="min-width:700px;border-collapse:collapse">
               <thead style="position:sticky;top:0;z-index:2;background:#fff"><tr>
                 <th style="min-width:100px">氏名</th><th>学年</th><th>校舎</th><th>学期</th>
-                <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
-                <th>音</th><th>美</th><th>体</th><th>技</th>
+                <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>5計</th>
+                <th>音</th><th>美</th><th>体</th><th>技</th><th>9計</th>
               </tr></thead>
               <tbody id="speedReportBody"></tbody>
             </table>
@@ -1340,16 +1340,22 @@ async function loadSpeed() {
   const sortedScores = [...allScores].sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   tbody.innerHTML = sortedScores.map(s => {
     const termLabel = s.year && s.term ? String(s.year).slice(2) + '年度' + '第' + s.term + '回' : '-';
+    const sc5k = ['jpn','soc','math','sci','eng'];
+    const sc9k = [...sc5k,'mus','art','pe','tech'];
+    const calc5 = sc5k.every(k=>s[k]!==''&&s[k]!=null) ? sc5k.reduce((a,k)=>a+Number(s[k]),0) : '';
+    const calc9 = sc9k.every(k=>s[k]!==''&&s[k]!=null) ? sc9k.reduce((a,k)=>a+Number(s[k]),0) : '';
+    const t5 = (s.total5!==''&&s.total5!=null) ? s.total5 : calc5;
+    const t9 = (s.total9!==''&&s.total9!=null) ? s.total9 : calc9;
     return `<tr>
       <td style="text-align:left;font-weight:600;cursor:pointer;color:var(--primary)" onclick="goToCompare('${s.studentId}')" title="成績を見る">${s.name}</td>
       <td style="font-size:.78rem;color:#64748b;white-space:nowrap">${termLabel}</td>
       <td>${s.grade}</td><td>${s.campus}</td>
       <td>${s.jpn||'-'}</td><td>${s.soc||'-'}</td><td>${s.math||'-'}</td>
       <td>${s.sci||'-'}</td><td>${s.eng||'-'}</td>
-      <td style="font-weight:700;color:var(--primary)">${s.total5||'-'}</td>
+      <td style="font-weight:700;color:var(--primary)">${t5!==''?t5:'-'}</td>
       <td>${s.rank5||'-'}</td>
       <td>${s.mus||'-'}</td><td>${s.art||'-'}</td><td>${s.pe||'-'}</td><td>${s.tech||'-'}</td>
-      <td>${s.total9||'-'}</td><td>${s.rank9||'-'}</td>
+      <td style="font-weight:700;color:var(--primary)">${t9!==''?t9:'-'}</td><td>${s.rank9||'-'}</td>
     </tr>`;
   }).join('');
   // studentsが未ロードなら非同期で取得（成績×通知表で名前が出るように）
@@ -1383,15 +1389,22 @@ async function renderSpeedReport() {
       tbody.innerHTML = '<tr><td colspan="13" class="noData">データなし</td></tr>';
       return;
     }
-    const n = v => (v===''||v==null) ? '<span style="color:var(--sub)">-</span>' : rpRating(v);
-    tbody.innerHTML = reports.map(d => `
-      <tr>
+    const rpColor = v => { const n=Number(v); return n===5?'#059669':n===4?'var(--primary)':n===3?'#d97706':(n===2||n===1)?'#dc2626':'#94a3b8'; };
+    const rTd = v => `<td style="text-align:center;color:${rpColor(v)};font-weight:${(v!=null&&v!=='')?'700':'400'}">${(v!=null&&v!=='')?v:'-'}</td>`;
+    const rp5k = ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng'];
+    const rp9k = [...rp5k,'rp_mus','rp_art','rp_pe','rp_tech'];
+    tbody.innerHTML = reports.map(d => {
+      const r5 = rp5k.every(k=>d[k]!==''&&d[k]!=null) ? rp5k.reduce((s,k)=>s+Number(d[k]),0) : '';
+      const r9 = rp9k.every(k=>d[k]!==''&&d[k]!=null) ? rp9k.reduce((s,k)=>s+Number(d[k]),0) : '';
+      return `<tr>
         <td style="text-align:left;font-weight:600;color:var(--primary);cursor:pointer" onclick="goToCompare('${htmlEsc(d.studentId)}')">${htmlEsc(d.name)}</td>
         <td>${htmlEsc(d.grade)}</td><td>${htmlEsc(d.campus)}</td><td>${htmlEsc(d.semester)}</td>
-        <td>${n(d.rp_jpn)}</td><td>${n(d.rp_soc)}</td><td>${n(d.rp_math)}</td>
-        <td>${n(d.rp_sci)}</td><td>${n(d.rp_eng)}</td>
-        <td>${n(d.rp_mus)}</td><td>${n(d.rp_art)}</td><td>${n(d.rp_pe)}</td><td>${n(d.rp_tech)}</td>
-      </tr>`).join('');
+        ${rTd(d.rp_jpn)}${rTd(d.rp_soc)}${rTd(d.rp_math)}${rTd(d.rp_sci)}${rTd(d.rp_eng)}
+        <td style="text-align:center;font-weight:700;color:var(--primary)">${r5!==''?r5:'-'}</td>
+        ${rTd(d.rp_mus)}${rTd(d.rp_art)}${rTd(d.rp_pe)}${rTd(d.rp_tech)}
+        <td style="text-align:center;font-weight:700;color:var(--primary)">${r9!==''?r9:'-'}</td>
+      </tr>`;
+    }).join('');
   } catch(e) {
     tbody.innerHTML = '<tr><td colspan="13" class="noData">読み込みに失敗しました</td></tr>';
   }
