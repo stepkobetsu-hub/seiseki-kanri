@@ -54,7 +54,16 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 
 /* LAYOUT */
 .layout{display:flex;min-height:calc(100vh - 56px);background:#f0f4f8}
-.sidebar{width:200px;background:#ffffff;border-right:1px solid #e2e8f0;padding:16px 0;flex-shrink:0;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto}
+.sidebar{width:200px;background:#ffffff;border-right:1px solid #e2e8f0;padding:16px 0;flex-shrink:0;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto;transition:width .2s,padding .2s}
+.sidebar.collapsed{width:0;padding:0;overflow:hidden}
+.sideToggleBtn{display:none;position:fixed;bottom:16px;left:16px;z-index:300;background:var(--primary);color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:1.2rem;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.25);align-items:center;justify-content:center}
+@media(max-width:760px){
+  .sideToggleBtn{display:flex}
+  .sidebar{position:fixed;top:56px;left:0;height:calc(100vh - 56px);z-index:250;width:0;padding:0;overflow:hidden}
+  .sidebar.open{width:200px;padding:16px 0;overflow-y:auto}
+  .sideOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:240}
+  .sideOverlay.show{display:block}
+}
 .sideItem{display:flex;align-items:center;gap:10px;padding:11px 20px;font-size:.85rem;color:#475569;cursor:pointer;transition:.15s;border-left:3px solid transparent}
 .sideItem:hover{background:#f1f5f9;color:#1e293b}
 .sideItem.on{background:#e8f0fb;color:var(--primary);border-left-color:var(--primary);font-weight:600}
@@ -204,8 +213,10 @@ tr:hover td{background:#f8fafc}
 
 <!-- ===== MAIN LAYOUT ===== -->
 <div id="mainLayout" class="layout" style="display:none">
+  <div id="sideOverlay" class="sideOverlay" onclick="closeSidebar()"></div>
+  <button class="sideToggleBtn" id="sideToggleBtn" onclick="toggleSidebar()">☰</button>
   <!-- サイドバー -->
-  <nav class="sidebar">
+  <nav class="sidebar" id="sidebar">
     <div class="sideSection">分析</div>
     <div class="sideItem on" onclick="aNav('speed',this)"><span class="ico">⚡</span> 速報</div>
     <div class="sideItem" onclick="aNav('compare',this)"><span class="ico">📊</span> 成績×通知表</div>
@@ -234,14 +245,14 @@ tr:hover td{background:#f8fafc}
       <div class="card">
         <div class="cardHead">⚡ 成績速報 <span class="badge" id="speedCount"></span></div>
         <div class="filterRow">
-          <select id="spYear" onchange="loadSpeed()"></select>
+          <select id="spYear" onchange="loadSpeed();if(_speedTab==='report')renderSpeedReport()"></select>
           <select id="spTerm" onchange="loadSpeed()"></select>
-          <select id="spCampus" onchange="loadSpeed()">
+          <select id="spCampus" onchange="loadSpeed();if(_speedTab==='report')renderSpeedReport()">
             <option value="">全校舎</option>
             <option>神領</option>
             <option>大手</option>
           </select>
-          <select id="spGrade" onchange="loadSpeed()">
+          <select id="spGrade" onchange="loadSpeed();if(_speedTab==='report')renderSpeedReport()">
             <option value="">全学年</option>
             <option>中1</option><option>中2</option><option>中3</option>
           </select>
@@ -275,18 +286,42 @@ tr:hover td{background:#f8fafc}
         <div class="chartWrapLg"><canvas id="speedChart"></canvas></div>
       </div>
       <div class="card">
-        <div class="cardHead">📋 生徒別一覧</div>
-        <div style="overflow-x:auto;overflow-y:auto;max-height:60vh;-webkit-overflow-scrolling:touch">
-          <table style="min-width:700px;border-collapse:collapse">
-            <thead style="position:sticky;top:0;z-index:2;background:#fff"><tr>
-              <th style="min-width:100px">氏名</th><th>回次</th><th>学年</th><th>校舎</th>
-              <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
-              <th>5科計</th><th>5位</th>
-              <th>音</th><th>美</th><th>体</th><th>技</th>
-              <th>9科計</th><th>9位</th>
-            </tr></thead>
-            <tbody id="speedBody"></tbody>
-          </table>
+        <!-- 切替ボタン -->
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <button id="speedTabScore" onclick="switchSpeedTab('score')" class="btn btn-primary btn-sm" style="flex:1">📝 定期テスト結果速報</button>
+          <button id="speedTabReport" onclick="switchSpeedTab('report')" class="btn btn-outline btn-sm" style="flex:1">📒 通知表評価速報</button>
+        </div>
+
+        <!-- 定期テスト結果速報 -->
+        <div id="speedPanelScore">
+          <div class="cardHead" style="margin-bottom:8px">📋 定期テスト結果速報</div>
+          <div style="overflow-x:auto;overflow-y:auto;max-height:60vh;-webkit-overflow-scrolling:touch">
+            <table style="min-width:700px;border-collapse:collapse">
+              <thead style="position:sticky;top:0;z-index:2;background:#fff"><tr>
+                <th style="min-width:100px">氏名</th><th>回次</th><th>学年</th><th>校舎</th>
+                <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
+                <th>5科計</th><th>5位</th>
+                <th>音</th><th>美</th><th>体</th><th>技</th>
+                <th>9科計</th><th>9位</th>
+              </tr></thead>
+              <tbody id="speedBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 通知表評価速報 -->
+        <div id="speedPanelReport" style="display:none">
+          <div class="cardHead" style="margin-bottom:8px">📒 通知表評価速報</div>
+          <div style="overflow-x:auto;overflow-y:auto;max-height:60vh;-webkit-overflow-scrolling:touch">
+            <table style="min-width:700px;border-collapse:collapse">
+              <thead style="position:sticky;top:0;z-index:2;background:#fff"><tr>
+                <th style="min-width:100px">氏名</th><th>学年</th><th>校舎</th><th>学期</th>
+                <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
+                <th>音</th><th>美</th><th>体</th><th>技</th>
+              </tr></thead>
+              <tbody id="speedReportBody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -916,6 +951,24 @@ async function api(data) {
 }
 
 // ===== LOGIN =====
+function toggleSidebar(){
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sideOverlay');
+  const isOpen = sb.classList.contains('open');
+  if(isOpen){ closeSidebar(); } else {
+    sb.classList.add('open');
+    ov.classList.add('show');
+    document.getElementById('sideToggleBtn').textContent = '✕';
+  }
+}
+function closeSidebar(){
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sideOverlay');
+  sb.classList.remove('open');
+  ov.classList.remove('show');
+  document.getElementById('sideToggleBtn').textContent = '☰';
+}
+
 function doAdminLogin() {
   const pw = document.getElementById('adminPwIn').value;
   const saved = localStorage.getItem('adminPass') || 'admin1234';
@@ -1050,6 +1103,7 @@ function aNav(name, el) {
   document.querySelectorAll('.sideItem').forEach(s => s.classList.remove('on'));
   el.classList.add('on');
   if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+  if (window.innerWidth <= 760) closeSidebar();
   if (name === 'speed') loadSpeed();
   if (name === 'students') loadStudents();
   if (name === 'meetings') initMeetings();
@@ -1280,10 +1334,11 @@ async function loadSpeed() {
   // グラフ（分布）
   redrawSpeedChart();
 
-  // テーブル
+  // テーブル（登録日時の新しい順）
   const tbody = document.getElementById('speedBody');
   if (!allScores.length) { tbody.innerHTML = '<tr><td colspan="16" class="noData">データなし</td></tr>'; return; }
-  tbody.innerHTML = allScores.map(s => {
+  const sortedScores = [...allScores].sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  tbody.innerHTML = sortedScores.map(s => {
     const termLabel = s.year && s.term ? String(s.year).slice(2) + '年度' + '第' + s.term + '回' : '-';
     return `<tr>
       <td style="text-align:left;font-weight:600;cursor:pointer;color:var(--primary)" onclick="goToCompare('${s.studentId}')" title="成績を見る">${s.name}</td>
@@ -1300,6 +1355,45 @@ async function loadSpeed() {
   // studentsが未ロードなら非同期で取得（成績×通知表で名前が出るように）
   if (!students || students.length === 0) {
     api({ action: 'getStudents' }).then(r => { students = r.students || []; });
+  }
+}
+
+let _speedTab = 'score';
+function switchSpeedTab(tab) {
+  _speedTab = tab;
+  document.getElementById('speedPanelScore').style.display  = tab === 'score'  ? '' : 'none';
+  document.getElementById('speedPanelReport').style.display = tab === 'report' ? '' : 'none';
+  document.getElementById('speedTabScore').className  = 'btn btn-sm ' + (tab === 'score'  ? 'btn-primary' : 'btn-outline');
+  document.getElementById('speedTabReport').className = 'btn btn-sm ' + (tab === 'report' ? 'btn-primary' : 'btn-outline');
+  if (tab === 'report') renderSpeedReport();
+}
+
+async function renderSpeedReport() {
+  const tbody = document.getElementById('speedReportBody');
+  tbody.innerHTML = '<tr><td colspan="13" class="noData">読み込み中...</td></tr>';
+  const campus = document.getElementById('spCampus').value;
+  const grade  = document.getElementById('spGrade').value;
+  const year   = document.getElementById('spYear').value;
+  try {
+    const r = await api({ action:'getAllReports', campus, year });
+    let reports = r.data || [];
+    if (grade) reports = reports.filter(d => gradeMatchesGroup(d.grade, grade));
+    reports.sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+    if (!reports.length) {
+      tbody.innerHTML = '<tr><td colspan="13" class="noData">データなし</td></tr>';
+      return;
+    }
+    const n = v => (v===''||v==null) ? '<span style="color:var(--sub)">-</span>' : rpRating(v);
+    tbody.innerHTML = reports.map(d => `
+      <tr>
+        <td style="text-align:left;font-weight:600;color:var(--primary);cursor:pointer" onclick="goToCompare('${htmlEsc(d.studentId)}')">${htmlEsc(d.name)}</td>
+        <td>${htmlEsc(d.grade)}</td><td>${htmlEsc(d.campus)}</td><td>${htmlEsc(d.semester)}</td>
+        <td>${n(d.rp_jpn)}</td><td>${n(d.rp_soc)}</td><td>${n(d.rp_math)}</td>
+        <td>${n(d.rp_sci)}</td><td>${n(d.rp_eng)}</td>
+        <td>${n(d.rp_mus)}</td><td>${n(d.rp_art)}</td><td>${n(d.rp_pe)}</td><td>${n(d.rp_tech)}</td>
+      </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="13" class="noData">読み込みに失敗しました</td></tr>';
   }
 }
 
