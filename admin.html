@@ -626,8 +626,8 @@ tr:hover td{background:#f8fafc}
             <thead style="position:sticky;top:0;z-index:2;background:#fff">
               <tr>
               <th>氏名</th><th>学年</th><th>学校</th><th>学期</th>
-              <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
-              <th>音</th><th>美</th><th>体</th><th>技</th><th>操作</th>
+              <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>5計</th>
+              <th>音</th><th>美</th><th>体</th><th>技</th><th>9計</th><th>操作</th>
             </tr></thead>
             <tbody id="rpABody"></tbody>
           </table>
@@ -2250,7 +2250,7 @@ function renderAdminReport(reports) {
   const tbody = document.getElementById('rpABody');
   renderedAdminReports = reports;
   if (!reports.length) {
-    tbody.innerHTML = '<tr><td colspan="14" class="noData">データなし</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="16" class="noData">データなし</td></tr>';
     document.getElementById('rpAStudent').innerHTML = '<option value="">生徒を選択</option>';
     if (reportChartInst) {
       reportChartInst.destroy();
@@ -2258,19 +2258,25 @@ function renderAdminReport(reports) {
     }
     return;
   }
-  tbody.innerHTML = reports.map((d, idx) => `
-    <tr>
+  tbody.innerHTML = reports.map((d, idx) => {
+    const rp5keys = ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng'];
+    const rp9keys = [...rp5keys,'rp_mus','rp_art','rp_pe','rp_tech'];
+    const rp5 = rp5keys.every(k=>d[k]!==''&&d[k]!=null) ? rp5keys.reduce((s,k)=>s+Number(d[k]),0) : '';
+    const rp9 = rp9keys.every(k=>d[k]!==''&&d[k]!=null) ? rp9keys.reduce((s,k)=>s+Number(d[k]),0) : '';
+    return `<tr>
       <td style="text-align:left;font-weight:600;color:#1a56a0;cursor:pointer;text-decoration:underline" onclick="goToCompare('${htmlEsc(d.studentId)}')" title="成績×通知表へ">${htmlEsc(d.name)}</td>
       <td>${d.grade}</td><td>${d.school}</td><td>${d.semester}</td>
       <td>${rpRating(d.rp_jpn)}</td><td>${rpRating(d.rp_soc)}</td><td>${rpRating(d.rp_math)}</td>
       <td>${rpRating(d.rp_sci)}</td><td>${rpRating(d.rp_eng)}</td>
+      <td style="font-weight:700;color:var(--primary)">${rp5!==''?rp5:'-'}</td>
       <td>${rpRating(d.rp_mus)}</td><td>${rpRating(d.rp_art)}</td>
       <td>${rpRating(d.rp_pe)}</td><td>${rpRating(d.rp_tech)}</td>
+      <td style="font-weight:700;color:var(--primary)">${rp9!==''?rp9:'-'}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-outline btn-sm" onclick="openEditModal(null, renderedAdminReports[${idx}])">編集</button>
         <button class="btn btn-danger btn-sm" onclick="deleteAdminReport(renderedAdminReports[${idx}])">削除</button>
       </td>
-    </tr>`).join('');
+    </tr>`;}).join('');
   const names = [...new Set(reports.map(d => d.studentId + '|' + d.name + '|' + d.grade))];
   const sel = document.getElementById('rpAStudent');
   const prev = sel.value;
@@ -3100,9 +3106,12 @@ function openEditModal(sc, rp) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
       ${fld('jpn','国語',sc.jpn)} ${fld('soc','社会',sc.soc)}
       ${fld('math','数学',sc.math)} ${fld('sci','理科',sc.sci)}
-      ${fld('eng','英語',sc.eng)} ${fld('rank5','5科順位',sc.rank5)}
+      ${fld('eng','英語',sc.eng)}
+      <div class="fld"><label style="font-size:.78rem">5科目合計</label><input id="em_total5" type="number" value="${sc.total5??''}" readonly style="padding:7px 10px;border:1px solid #e2e8f0;border-radius:8px;width:100%;box-sizing:border-box;font-size:.85rem;background:#f0f9ff;font-weight:700"></div>
+      ${fld('rank5','5科順位',sc.rank5)}
       ${fld('mus','音楽',sc.mus)} ${fld('art','美術',sc.art)}
       ${fld('pe','体育',sc.pe)} ${fld('tech','技術家庭',sc.tech)}
+      <div class="fld"><label style="font-size:.78rem">9科目合計</label><input id="em_total9" type="number" value="${sc.total9??''}" readonly style="padding:7px 10px;border:1px solid #e2e8f0;border-radius:8px;width:100%;box-sizing:border-box;font-size:.85rem;background:#f0f9ff;font-weight:700"></div>
       ${fld('rank9','9科順位',sc.rank9)}
       ${fld('avg_jpn','平均 国語',sc.avg_jpn)} ${fld('avg_soc','平均 社会',sc.avg_soc)}
       ${fld('avg_math','平均 数学',sc.avg_math)} ${fld('avg_sci','平均 理科',sc.avg_sci)}
@@ -3113,12 +3122,31 @@ function openEditModal(sc, rp) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
       ${fld('rp_jpn','国語',rp.rp_jpn)} ${fld('rp_soc','社会',rp.rp_soc)}
       ${fld('rp_math','数学',rp.rp_math)} ${fld('rp_sci','理科',rp.rp_sci)}
-      ${fld('rp_eng','英語',rp.rp_eng)} ${fld('rp_mus','音楽',rp.rp_mus)}
+      ${fld('rp_eng','英語',rp.rp_eng)}
+      <div class="fld"><label style="font-size:.78rem">5科目合計</label><input id="em_rp_total5" type="number" readonly style="padding:7px 10px;border:1px solid #e2e8f0;border-radius:8px;width:100%;box-sizing:border-box;font-size:.85rem;background:#f0f9ff;font-weight:700"></div>
+      ${fld('rp_mus','音楽',rp.rp_mus)}
       ${fld('rp_art','美術',rp.rp_art)} ${fld('rp_pe','体育',rp.rp_pe)}
       ${fld('rp_tech','技術家庭',rp.rp_tech)}
+      <div class="fld"><label style="font-size:.78rem">9科目合計</label><input id="em_rp_total9" type="number" readonly style="padding:7px 10px;border:1px solid #e2e8f0;border-radius:8px;width:100%;box-sizing:border-box;font-size:.85rem;background:#f0f9ff;font-weight:700"></div>
     </div>` : ''}
   `;
   modal.style.display = 'flex';
+  // 自動合計計算
+  const calcModalTotal = () => {
+    const g = id => Number(document.getElementById('em_'+id)?.value) || 0;
+    const t5  = document.getElementById('em_total5');
+    const t9  = document.getElementById('em_total9');
+    const rt5 = document.getElementById('em_rp_total5');
+    const rt9 = document.getElementById('em_rp_total9');
+    if (t5)  { const v = ['jpn','soc','math','sci','eng'].map(g);                                      if(v.some(v=>v)) t5.value  = v.reduce((a,b)=>a+b,0); }
+    if (t9)  { const v = ['jpn','soc','math','sci','eng','mus','art','pe','tech'].map(g);              if(v.some(v=>v)) t9.value  = v.reduce((a,b)=>a+b,0); }
+    if (rt5) { const v = ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng'].map(g);                     if(v.some(v=>v)) rt5.value = v.reduce((a,b)=>a+b,0); }
+    if (rt9) { const v = ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech'].map(g); if(v.some(v=>v)) rt9.value = v.reduce((a,b)=>a+b,0); }
+  };
+  ['jpn','soc','math','sci','eng','mus','art','pe','tech',
+   'rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech'
+  ].forEach(id => { const el = document.getElementById('em_'+id); if(el) el.addEventListener('input', calcModalTotal); });
+  calcModalTotal();
 }
 
 function openWishEditModal(w) {
