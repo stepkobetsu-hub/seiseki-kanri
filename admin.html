@@ -180,7 +180,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.8</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.9</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -276,9 +276,9 @@ tr:hover td{background:#f8fafc}
       </div>
       <div class="card">
         <div class="cardHead">📋 生徒別一覧</div>
-        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-          <table style="min-width:700px">
-            <thead><tr>
+        <div style="overflow-x:auto;overflow-y:auto;max-height:60vh;-webkit-overflow-scrolling:touch">
+          <table style="min-width:700px;border-collapse:collapse">
+            <thead style="position:sticky;top:0;z-index:2;background:#fff"><tr>
               <th style="min-width:100px">氏名</th><th>回次</th><th>学年</th><th>校舎</th>
               <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
               <th>5科計</th><th>5位</th>
@@ -2088,7 +2088,7 @@ function filterAdminScores() {
   const scores = adminScores.filter(d =>
     (!grade || gradeMatchesGroup(d.grade, grade)) &&
     (!q || String(d.name || '').toLowerCase().includes(q) || String(d.studentId || '').toLowerCase().includes(q))
-  ).sort((a,b) => Number(b.year) - Number(a.year) || Number(b.term) - Number(a.term));
+  ).sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   renderAdminScores(scores);
 }
 function renderAdminScores(scores) {
@@ -2145,11 +2145,7 @@ async function loadAdminReport() {
 function filterAdminReport() {
   const q = (document.getElementById('rpASearch')?.value || '').trim().toLowerCase();
   const grade = document.getElementById('rpAGrade').value;
-  const semOrder = {'1学期':1,'前期':1,'2学期':2,'後期':2,'3学期':3};
-  const reports = allReports.filter(d =>
-    (!grade || gradeMatchesGroup(d.grade, grade)) &&
-    (!q || String(d.name || '').toLowerCase().includes(q) || String(d.studentId || '').toLowerCase().includes(q))
-  ).sort((a,b) => Number(b.year) - Number(a.year) || (semOrder[b.semester]||0) - (semOrder[a.semester]||0));
+  ).sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   renderAdminReport(reports);
 }
 function renderAdminReport(reports) {
