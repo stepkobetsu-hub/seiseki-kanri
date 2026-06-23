@@ -1,6 +1,6 @@
 {
-  "name": "職員用アプリ",
-  "short_name": "職員アプリ",
+  "name": "スタッフ用アプリ",
+  "short_name": "スタッフアプリ",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
