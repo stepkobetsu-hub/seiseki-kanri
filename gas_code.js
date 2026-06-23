@@ -145,6 +145,7 @@ function route(e) {
       case 'getMeetingMemos':    result = getMeetingMemos(data); break;
       case 'saveMeetingMemo':    result = saveMeetingMemo(data); break;
       case 'deleteMeetingMemo':  result = deleteMeetingMemo(data); break;
+      case 'getDeletedMemos':    result = getDeletedMemos(); break;
       case 'getStaffMembers':    result = getStaffMembers(); break;
       case 'addStaffMember':     result = addStaffMember(data); break;
       case 'deleteStaffMember':  result = deleteStaffMember(data); break;
@@ -753,7 +754,8 @@ function rowToReport(row) {
     studentId: row[0], name: row[1], campus: row[2], grade: row[3], school: row[4],
     year: row[5], semester: row[6],
     rp_jpn: row[7], rp_soc: row[8], rp_math: row[9], rp_sci: row[10], rp_eng: row[11],
-    rp_mus: row[12], rp_art: row[13], rp_pe: row[14], rp_tech: row[15]
+    rp_mus: row[12], rp_art: row[13], rp_pe: row[14], rp_tech: row[15],
+    createdAt: row[16], updatedAt: row[17]
   };
 }
 
@@ -936,11 +938,30 @@ function getMeetingMemos(data) {
   return { success: true, memos: result };
 }
 
+function getDeletedMemos() {
+  const bsh = SpreadsheetApp.openById(DATA_SPREADSHEET_ID).getSheetByName('削除済みメモ');
+  if (!bsh) return { success: true, memos: [] };
+  const rows = bsh.getDataRange().getValues();
+  const result = [];
+  for (let i = rows.length - 1; i >= 1; i--) {
+    if (!rows[i][0]) continue;
+    const m = rowToMeetingMemo_(rows[i]);
+    m.deletedAt = rows[i][12] ? new Date(rows[i][12]).toLocaleString('ja-JP') : '';
+    result.push(m);
+  }
+  return { success: true, memos: result };
+}
+
 function deleteMeetingMemo(data) {
   const sh = getOrCreateSheet('面談メモデータ', MEETING_MEMO_COLS);
   const rows = sh.getDataRange().getValues();
   for (let i = rows.length - 1; i >= 1; i--) {
     if (String(rows[i][0]) === String(data.id)) {
+      // 削除済みシートにバックアップ
+      const backupCols = [...MEETING_MEMO_COLS, '削除日時'];
+      const bsh = getOrCreateSheet('削除済みメモ', backupCols);
+      const backupRow = [...rows[i], new Date()];
+      bsh.appendRow(backupRow);
       sh.deleteRow(i + 1);
       return { success: true };
     }
