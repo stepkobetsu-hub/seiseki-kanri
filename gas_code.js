@@ -1514,13 +1514,19 @@ function updateMasterGuardianInfo_(data) {
 
   // 電話番号フィールドは文字列として書き込む（先頭の0が消えないよう）
   const phoneKeys = ['guardian2Mobile'];
+  const formatPhone = (v) => {
+    const s = String(v).replace(/[-\s]/g, '');
+    if (/^0[789]0\d{8}$/.test(s)) return s.slice(0,3) + '-' + s.slice(3,7) + '-' + s.slice(7);
+    if (/^0\d{9}$/.test(s)) return s.slice(0,3) + '-' + s.slice(3,6) + '-' + s.slice(6);
+    return s;
+  };
   Object.keys(ENTRY_MASTER_MAP).forEach(key => {
     if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
       const cell = sh.getRange(rowNo, ENTRY_MASTER_MAP[key]);
       if (phoneKeys.includes(key)) {
-        // 数値化を防ぐため文字列として設定
+        const formatted = formatPhone(data[key]);
         cell.setNumberFormat('@');
-        cell.setValue(String(data[key]));
+        cell.setValue(formatted);
       } else {
         cell.setValue(data[key]);
       }
