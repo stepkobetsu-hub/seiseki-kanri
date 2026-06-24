@@ -722,7 +722,12 @@ tr:hover td{background:#f8fafc}
               <input id="entryClub" placeholder="部活動">
               <input id="entryNickname" placeholder="ニックネーム">
               <input id="entryCommute" placeholder="通塾方法">
-              <input id="entrySignatureDate" placeholder="保護者署名日（例: 2024年7月21日）">
+              <div style="grid-column:1/-1">
+                <div id="entrySignatureDateWrap" style="display:none;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:8px 12px;margin-bottom:4px;font-size:.85rem;color:#0369a1">
+                  📝 <span id="entrySignatureDateLabel"></span>
+                </div>
+                <input id="entrySignatureDate" placeholder="保護者署名日（例: 2024-7-22）">
+              </div>
               <input id="entrySignatureName" placeholder="保護者署名氏名">
               <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px">
                 <input id="entryImageUrl1" placeholder="原本画像URL 1" style="flex:1">
@@ -835,7 +840,6 @@ tr:hover td{background:#f8fafc}
   <div class="modal" style="max-width:760px">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
       <h3 id="entryInfoTitle" style="margin:0">入塾時情報</h3>
-      <button class="btn btn-ghost btn-sm" onclick="closeEntryInfoModal()">閉じる</button>
     </div>
     <div id="entryInfoModalBody" style="font-size:.84rem;color:#334155;line-height:1.7"></div>
     <div class="modalFoot" style="margin-top:16px">
@@ -1181,10 +1185,10 @@ function setEntryVal(id, value) {
 // ===== 家族情報UI =====
 let _familyRowCount = 0;
 function addFamilyRow(data) {
-  const colors = ['#f0f9ff','#f0fdf4','#fefce8','#fdf4ff','#fff1f2'];
-  const borderColors = ['#bae6fd','#bbf7d0','#fef08a','#e9d5ff','#fecdd3'];
+  const colors = ['#f0f9ff','#f0fdf4'];
+  const borderColors = ['#bae6fd','#bbf7d0'];
   const idx = _familyRowCount++;
-  const ci = idx % colors.length;
+  const ci = idx % 2;
   const container = document.getElementById('entryFamilyRows');
   const div = document.createElement('div');
   div.id = 'familyRow_' + idx;
@@ -1375,13 +1379,19 @@ async function loadEntryData() {
     const label = document.getElementById('entryJoinDateLabel');
     if (wrap && label) { label.textContent = joinLabel; wrap.style.display = ''; }
   }
-  // 保護者署名日：ISO形式を日本語に変換
+  // 保護者署名日：ISO形式を「保護者署名日：YYYY-M-D」形式で表示
   const rawDate = r.data.signatureDate || '';
   const parsedDate = rawDate ? new Date(rawDate) : null;
-  const jpDate = parsedDate && !isNaN(parsedDate)
-    ? parsedDate.getFullYear() + '年' + (parsedDate.getMonth()+1) + '月' + parsedDate.getDate() + '日'
-    : rawDate;
-  setEntryVal('entrySignatureDate', jpDate);
+  if (parsedDate && !isNaN(parsedDate)) {
+    const y = parsedDate.getFullYear(), m = parsedDate.getMonth()+1, d = parsedDate.getDate();
+    const jpDate = `${y}-${m}-${d}`;
+    setEntryVal('entrySignatureDate', jpDate);
+    const wrap = document.getElementById('entrySignatureDateWrap');
+    const label = document.getElementById('entrySignatureDateLabel');
+    if (wrap && label) { label.textContent = '保護者署名日：' + jpDate; wrap.style.display = ''; }
+  } else if (rawDate) {
+    setEntryVal('entrySignatureDate', rawDate);
+  }
   setEntryVal('entrySignatureName', r.data.signatureName);
   // 画像URLをリンクボタンに反映
   setEntryVal('entryImageUrl1', r.data.imageUrl1);
@@ -2818,7 +2828,7 @@ async function openEntryInfoModal() {
   if (guardianBtn) guardianBtn.style.display = 'none';
   const st = students.find(s => String(s.id) === String(sid)) || {};
   title.textContent = `入塾時情報：${st.name || '生徒'}（No.${sid}）`;
-  body.innerHTML = '<div style="color:#64748b">読み込み中...</div>';
+  body.innerHTML = '<div style="text-align:center;padding:32px 0;font-size:1.1rem;color:#64748b;font-weight:600">⏳ 読み込み中...</div>';
   document.getElementById('entryInfoModal').classList.add('show');
 
   const r = await api({ action: 'getEntrySheetData', studentId: sid });
