@@ -722,12 +722,7 @@ tr:hover td{background:#f8fafc}
               <input id="entryClub" placeholder="部活動">
               <input id="entryNickname" placeholder="ニックネーム">
               <input id="entryCommute" placeholder="通塾方法">
-              <div style="grid-column:1/-1">
-                <div id="entrySignatureDateWrap" style="display:none;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:8px 12px;margin-bottom:4px;font-size:.85rem;color:#0369a1">
-                  📝 <span id="entrySignatureDateLabel"></span>
-                </div>
-                <input id="entrySignatureDate" placeholder="保護者署名日（例: 2024-7-22）">
-              </div>
+              <input id="entrySignatureDate" placeholder="保護者署名日：2024-7-22">
               <input id="entrySignatureName" placeholder="保護者署名氏名">
               <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px">
                 <input id="entryImageUrl1" placeholder="原本画像URL 1" style="flex:1">
@@ -761,6 +756,10 @@ tr:hover td{background:#f8fafc}
               <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">続柄（AC列）</label><input id="entryG2Relation" placeholder="例: 母"></div>
               <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">携帯番号（AD列）</label><input id="entryG2Mobile" placeholder="例: 090-1234-5678"></div>
               <div style="grid-column:1/-1"><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">メール（AE列）</label><input id="entryG2Email" placeholder="例: hanako@example.com" style="width:100%;box-sizing:border-box"></div>
+            </div>
+            <div style="margin-top:12px">
+              <button class="btn btn-primary btn-sm" onclick="saveEntryImport()">✅ 確認して取り込む</button>
+              <div id="entryImportMsgRight" style="margin-top:6px;font-size:.8rem;color:#64748b"></div>
             </div>
           </div>
         </div>
@@ -1185,14 +1184,11 @@ function setEntryVal(id, value) {
 // ===== 家族情報UI =====
 let _familyRowCount = 0;
 function addFamilyRow(data) {
-  const colors = ['#f0f9ff','#f0fdf4'];
-  const borderColors = ['#bae6fd','#bbf7d0'];
   const idx = _familyRowCount++;
-  const ci = idx % 2;
   const container = document.getElementById('entryFamilyRows');
   const div = document.createElement('div');
   div.id = 'familyRow_' + idx;
-  div.style.cssText = `border:1px solid ${borderColors[ci]};border-radius:10px;padding:10px 12px;background:${colors[ci]};display:grid;gap:6px`;
+  div.style.cssText = 'border:1px solid #bae6fd;border-radius:10px;padding:10px 12px;background:#f0f9ff;display:grid;gap:6px';
   div.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
       <span style="font-size:.8rem;font-weight:700;color:#475569">家族 ${container.children.length + 1}人目</span>
@@ -1379,16 +1375,12 @@ async function loadEntryData() {
     const label = document.getElementById('entryJoinDateLabel');
     if (wrap && label) { label.textContent = joinLabel; wrap.style.display = ''; }
   }
-  // 保護者署名日：ISO形式を「保護者署名日：YYYY-M-D」形式で表示
+  // 保護者署名日：「保護者署名日：YYYY-M-D」形式でinput欄に表示
   const rawDate = r.data.signatureDate || '';
   const parsedDate = rawDate ? new Date(rawDate) : null;
   if (parsedDate && !isNaN(parsedDate)) {
     const y = parsedDate.getFullYear(), m = parsedDate.getMonth()+1, d = parsedDate.getDate();
-    const jpDate = `${y}-${m}-${d}`;
-    setEntryVal('entrySignatureDate', jpDate);
-    const wrap = document.getElementById('entrySignatureDateWrap');
-    const label = document.getElementById('entrySignatureDateLabel');
-    if (wrap && label) { label.textContent = '保護者署名日：' + jpDate; wrap.style.display = ''; }
+    setEntryVal('entrySignatureDate', `保護者署名日：${y}-${m}-${d}`);
   } else if (rawDate) {
     setEntryVal('entrySignatureDate', rawDate);
   }
@@ -1403,15 +1395,17 @@ async function loadEntryData() {
 
 async function saveEntryImport() {
   const msg = document.getElementById('entryImportMsg');
+  const msgR = document.getElementById('entryImportMsgRight');
+  const setMsg = t => { if(msg) msg.textContent = t; if(msgR) msgR.textContent = t; };
   try {
     const payload = buildEntryPayload();
     if (!payload.studentId || !payload.name) throw new Error('生徒IDと氏名を入力してください。');
     if (!confirm('生徒ID: ' + payload.studentId + '\n氏名: ' + payload.name + '\n\nこの生徒として取り込みます。\n間違いがあれば「キャンセル」を押して、画面の欄を修正してください。')) return;
-    msg.textContent = '取り込み中...';
+    setMsg('取り込み中...');
     const r = await api(payload);
-    msg.textContent = r.success ? (r.message + '（' + (r.saved || []).join(', ') + '）' + (r.warning ? ' ' + r.warning : '')) : (r.error || '取り込みに失敗しました');
+    setMsg(r.success ? (r.message + '（' + (r.saved || []).join(', ') + '）' + (r.warning ? ' ' + r.warning : '')) : (r.error || '取り込みに失敗しました'));
   } catch(e) {
-    msg.textContent = e.message;
+    setMsg(e.message);
   }
 }
 
