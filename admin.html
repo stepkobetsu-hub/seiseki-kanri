@@ -727,10 +727,16 @@ tr:hover td{background:#f8fafc}
               <input id="entryClub" placeholder="部活動">
               <input id="entryNickname" placeholder="ニックネーム">
               <input id="entryCommute" placeholder="通塾方法">
-              <input id="entrySignatureDate" placeholder="保護者署名日">
+              <input id="entrySignatureDate" placeholder="入塾日（例: 2024年7月21日）">
               <input id="entrySignatureName" placeholder="保護者署名氏名">
-              <input id="entryImageUrl1" placeholder="原本画像URL 1">
-              <input id="entryImageUrl2" placeholder="原本画像URL 2" style="grid-column:1/-1">
+              <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px">
+                <input id="entryImageUrl1" placeholder="原本画像URL 1" style="flex:1">
+                <a id="entryImageUrl1Link" href="#" target="_blank" rel="noopener" style="display:none;white-space:nowrap;font-size:.8rem;padding:5px 10px;border:1px solid #bae6fd;border-radius:6px;color:var(--primary);background:#f0f9ff;text-decoration:none">📄 画像1を開く</a>
+              </div>
+              <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px">
+                <input id="entryImageUrl2" placeholder="原本画像URL 2" style="flex:1">
+                <a id="entryImageUrl2Link" href="#" target="_blank" rel="noopener" style="display:none;white-space:nowrap;font-size:.8rem;padding:5px 10px;border:1px solid #bae6fd;border-radius:6px;color:var(--primary);background:#f0f9ff;text-decoration:none">📄 画像2を開く</a>
+              </div>
               <textarea id="entryCurrentLessons" placeholder="現在通っている習い事や塾" style="grid-column:1/-1;min-height:52px"></textarea>
               <textarea id="entryPastLessons" placeholder="過去に通っていた習い事や塾" style="grid-column:1/-1;min-height:52px"></textarea>
               <textarea id="entryFamilyRequest" placeholder="ご家庭からの要望・希望" style="grid-column:1/-1;min-height:70px"></textarea>
@@ -1215,6 +1221,21 @@ function syncFamilyJson(){
   if (json) json.value = JSON.stringify(family);
 }
 
+function updateImageLinks(){
+  ['1','2'].forEach(n => {
+    const url = (document.getElementById('entryImageUrl'+n)?.value||'').trim();
+    const link = document.getElementById('entryImageUrl'+n+'Link');
+    if (!link) return;
+    if (url) { link.href = url; link.style.display = ''; }
+    else { link.style.display = 'none'; }
+  });
+}
+// URL入力欄変更時にリンク更新
+['entryImageUrl1','entryImageUrl2'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', updateImageLinks);
+});
+
 function setFamilyRows(arr){
   const container = document.getElementById('entryFamilyRows');
   if (!container) return;
@@ -1322,10 +1343,18 @@ async function loadEntryData() {
   setEntryVal('entryCurrentLessons', r.data.currentLessons);
   setEntryVal('entryPastLessons', r.data.pastLessons);
   setEntryVal('entryFamilyRequest', r.data.familyRequest);
-  setEntryVal('entrySignatureDate', r.data.signatureDate);
+  // 入塾日：ISO形式を日本語に変換
+  const rawDate = r.data.signatureDate || '';
+  const parsedDate = rawDate ? new Date(rawDate) : null;
+  const jpDate = parsedDate && !isNaN(parsedDate)
+    ? parsedDate.getFullYear() + '年' + (parsedDate.getMonth()+1) + '月' + parsedDate.getDate() + '日'
+    : rawDate;
+  setEntryVal('entrySignatureDate', jpDate);
   setEntryVal('entrySignatureName', r.data.signatureName);
+  // 画像URLをリンクボタンに反映
   setEntryVal('entryImageUrl1', r.data.imageUrl1);
   setEntryVal('entryImageUrl2', r.data.imageUrl2);
+  updateImageLinks();
   setFamilyRows(r.data.family || []);
   msg.textContent = '保存済みの入塾時情報を読み込みました。';
 }
