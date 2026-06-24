@@ -1512,9 +1512,18 @@ function updateMasterGuardianInfo_(data) {
   }
   if (!rowNo) return false;
 
+  // 電話番号フィールドは文字列として書き込む（先頭の0が消えないよう）
+  const phoneKeys = ['guardian2Mobile'];
   Object.keys(ENTRY_MASTER_MAP).forEach(key => {
     if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
-      sh.getRange(rowNo, ENTRY_MASTER_MAP[key]).setValue(data[key]);
+      const cell = sh.getRange(rowNo, ENTRY_MASTER_MAP[key]);
+      if (phoneKeys.includes(key)) {
+        // 数値化を防ぐため文字列として設定
+        cell.setNumberFormat('@');
+        cell.setValue(String(data[key]));
+      } else {
+        cell.setValue(data[key]);
+      }
     }
   });
   return true;
