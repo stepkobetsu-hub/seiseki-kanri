@@ -527,15 +527,13 @@ tr:hover td{background:#f8fafc}
             <option value="">相手すべて</option><option>母</option><option>父</option><option>本人</option><option>他</option>
           </select>
           <button class="btn btn-outline btn-sm" onclick="loadMeetingMemos()">🔄 更新</button>
+          <button onclick="openAdminTrash()" class="btn btn-outline btn-sm">🗑️ 削除済みメモを見る</button>
         </div>
         <div class="tblWrap">
           <table>
             <thead><tr><th>日付</th><th>生徒</th><th>相手</th><th>担当</th><th>内容</th><th></th></tr></thead>
             <tbody id="meetBody"><tr><td colspan="6" class="noData">データなし</td></tr></tbody>
           </table>
-        </div>
-        <div style="margin-top:10px;text-align:right">
-          <button onclick="openAdminTrash()" class="btn btn-outline btn-sm">🗑️ 削除済みメモを見る</button>
         </div>
       </div>
     </div>
@@ -736,7 +734,12 @@ tr:hover td{background:#f8fafc}
               <textarea id="entryCurrentLessons" placeholder="現在通っている習い事や塾" style="grid-column:1/-1;min-height:52px"></textarea>
               <textarea id="entryPastLessons" placeholder="過去に通っていた習い事や塾" style="grid-column:1/-1;min-height:52px"></textarea>
               <textarea id="entryFamilyRequest" placeholder="ご家庭からの要望・希望" style="grid-column:1/-1;min-height:70px"></textarea>
-              <textarea id="entryFamilyJson" placeholder='家族情報JSON 例: [{"name":"山田太郎","relation":"父","job":"会社員","workplace":"○○会社","grade":""}]' style="grid-column:1/-1;min-height:80px"></textarea>
+            </div>
+            <!-- 家族情報 -->
+            <div class="cardHead" style="font-size:.82rem;margin:12px 0 6px">家族構成（入塾日現在）</div>
+            <div id="entryFamilyRows" style="display:grid;gap:8px"></div>
+            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="addFamilyRow()">＋ 家族を追加</button>
+            <textarea id="entryFamilyJson" style="display:none"></textarea>
             </div>
           </div>
         </div>
@@ -1159,6 +1162,67 @@ function setEntryVal(id, value) {
   if (el && value != null) el.value = value;
 }
 
+// ===== 家族情報UI =====
+let _familyRowCount = 0;
+function addFamilyRow(data) {
+  const idx = _familyRowCount++;
+  const container = document.getElementById('entryFamilyRows');
+  const div = document.createElement('div');
+  div.id = 'familyRow_' + idx;
+  div.style.cssText = 'border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;background:#f8fafc;display:grid;gap:6px';
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+      <span style="font-size:.8rem;font-weight:700;color:#475569">家族 ${container.children.length + 1}人目</span>
+      <button type="button" onclick="removeFamilyRow('familyRow_${idx}')" style="background:none;border:none;color:#f87171;font-size:.85rem;cursor:pointer;padding:0">✕ 削除</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">氏名</label><input class="frow-name" value="${htmlEsc(data&&data.name||'')}" placeholder="例: 山田花子" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;box-sizing:border-box;font-size:.84rem"></div>
+      <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">続柄</label><input class="frow-relation" value="${htmlEsc(data&&data.relation||'')}" placeholder="例: 母・父・兄" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;box-sizing:border-box;font-size:.84rem"></div>
+      <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">職業</label><input class="frow-job" value="${htmlEsc(data&&data.job||'')}" placeholder="例: 会社員" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;box-sizing:border-box;font-size:.84rem"></div>
+      <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">勤務先・学校名</label><input class="frow-workplace" value="${htmlEsc(data&&data.workplace||'')}" placeholder="例: ○○株式会社" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;box-sizing:border-box;font-size:.84rem"></div>
+      <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">学年（生徒の場合）</label><input class="frow-grade" value="${htmlEsc(data&&data.grade||'')}" placeholder="例: 中1・小5" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;box-sizing:border-box;font-size:.84rem"></div>
+    </div>
+  `;
+  container.appendChild(div);
+  syncFamilyJson();
+  div.querySelectorAll('input').forEach(el => el.addEventListener('input', syncFamilyJson));
+}
+
+function removeFamilyRow(id){
+  const el = document.getElementById(id);
+  if (el) { el.remove(); syncFamilyJson(); renumberFamilyRows(); }
+}
+
+function renumberFamilyRows(){
+  document.querySelectorAll('#entryFamilyRows > div').forEach((div, i) => {
+    const label = div.querySelector('span');
+    if (label) label.textContent = '家族 ' + (i+1) + '人目';
+  });
+}
+
+function syncFamilyJson(){
+  const rows = document.querySelectorAll('#entryFamilyRows > div');
+  const family = [];
+  rows.forEach(div => {
+    const name     = (div.querySelector('.frow-name')?.value||'').trim();
+    const relation = (div.querySelector('.frow-relation')?.value||'').trim();
+    const job      = (div.querySelector('.frow-job')?.value||'').trim();
+    const workplace= (div.querySelector('.frow-workplace')?.value||'').trim();
+    const grade    = (div.querySelector('.frow-grade')?.value||'').trim();
+    family.push({name,relation,job,workplace,grade});
+  });
+  const json = document.getElementById('entryFamilyJson');
+  if (json) json.value = JSON.stringify(family);
+}
+
+function setFamilyRows(arr){
+  const container = document.getElementById('entryFamilyRows');
+  if (!container) return;
+  container.innerHTML = '';
+  _familyRowCount = 0;
+  (arr||[]).forEach(item => addFamilyRow(item));
+}
+
 function parseEntryJson() {
   const raw = entryVal('entryJson');
   if (!raw) return {};
@@ -1170,8 +1234,8 @@ function fillEntryFromJson() {
   try {
     const d = parseEntryJson();
     if (Array.isArray(d)) {
-      setEntryVal('entryFamilyJson', JSON.stringify(d, null, 2));
-      document.getElementById('entryImportMsg').textContent = '家族情報JSONをフォームへ反映しました。内容を確認して取り込んでください。';
+      setFamilyRows(d);
+      document.getElementById('entryImportMsg').textContent = '家族情報をフォームへ反映しました。内容を確認して取り込んでください。';
       return;
     }
     const map = {
@@ -1187,7 +1251,8 @@ function fillEntryFromJson() {
       currentLessons:'entryCurrentLessons', pastLessons:'entryPastLessons', familyRequest:'entryFamilyRequest'
     };
     Object.keys(map).forEach(k => setEntryVal(map[k], d[k]));
-    if (d.family) setEntryVal('entryFamilyJson', JSON.stringify(d.family, null, 2));
+    if (d.family) setFamilyRows(d.family);
+    else if (Array.isArray(d)) { setFamilyRows(d); return; }
     document.getElementById('entryImportMsg').textContent = 'JSONをフォームへ反映しました。内容を確認して取り込んでください。';
   } catch(e) {
     document.getElementById('entryImportMsg').textContent = e.message;
@@ -1261,7 +1326,7 @@ async function loadEntryData() {
   setEntryVal('entrySignatureName', r.data.signatureName);
   setEntryVal('entryImageUrl1', r.data.imageUrl1);
   setEntryVal('entryImageUrl2', r.data.imageUrl2);
-  setEntryVal('entryFamilyJson', JSON.stringify(r.data.family || [], null, 2));
+  setFamilyRows(r.data.family || []);
   msg.textContent = '保存済みの入塾時情報を読み込みました。';
 }
 
