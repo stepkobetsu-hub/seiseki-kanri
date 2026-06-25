@@ -189,7 +189,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v5.9</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v6.0</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -245,14 +245,14 @@ tr:hover td{background:#f8fafc}
       <div class="card">
         <div class="cardHead">⚡ 成績速報 <span class="badge" id="speedCount"></span></div>
         <div class="filterRow">
-          <select id="spYear" onchange="loadSpeed();if(_speedTab==='report')renderSpeedReport()"></select>
+          <select id="spYear" onchange="loadSpeed();if(_speedTab==='report')renderSpeedReport();if(_speedTab==='result')renderSpeedResult()"></select>
           <select id="spTerm" onchange="loadSpeed()"></select>
-          <select id="spCampus" onchange="loadSpeed();if(_speedTab==='report')renderSpeedReport()">
+          <select id="spCampus" onchange="loadSpeed();if(_speedTab==='report')renderSpeedReport();if(_speedTab==='result')renderSpeedResult()">
             <option value="">全校舎</option>
             <option>神領</option>
             <option>大手</option>
           </select>
-          <select id="spGrade" onchange="loadSpeed();if(_speedTab==='report')renderSpeedReport()">
+          <select id="spGrade" onchange="loadSpeed();if(_speedTab==='report')renderSpeedReport();if(_speedTab==='result')renderSpeedResult()">
             <option value="">全学年</option>
             <option>中1</option><option>中2</option><option>中3</option>
           </select>
@@ -287,9 +287,10 @@ tr:hover td{background:#f8fafc}
       </div>
       <div class="card">
         <!-- 切替ボタン -->
-        <div style="display:flex;gap:8px;margin-bottom:12px;justify-content:flex-start">
-          <button id="speedTabScore" onclick="switchSpeedTab('score')" class="btn btn-primary btn-sm" style="padding:6px 16px">📝 定期テスト結果速報</button>
-          <button id="speedTabReport" onclick="switchSpeedTab('report')" class="btn btn-outline btn-sm" style="padding:6px 16px">📒 通知表評価速報</button>
+        <div style="display:flex;gap:8px;margin-bottom:12px;justify-content:flex-start;flex-wrap:wrap">
+          <button id="speedTabScore" onclick="switchSpeedTab('score')" class="btn btn-primary btn-sm" style="padding:6px 16px;position:relative">📝 定期テスト結果速報<span id="newDotScore" style="display:none;position:absolute;top:-5px;right:-5px;width:10px;height:10px;background:#ef4444;border-radius:50%;border:2px solid #fff"></span></button>
+          <button id="speedTabReport" onclick="switchSpeedTab('report')" class="btn btn-outline btn-sm" style="padding:6px 16px;position:relative">📒 通知表評価速報<span id="newDotReport" style="display:none;position:absolute;top:-5px;right:-5px;width:10px;height:10px;background:#ef4444;border-radius:50%;border:2px solid #fff"></span></button>
+          <button id="speedTabResult" onclick="switchSpeedTab('result')" class="btn btn-outline btn-sm" style="padding:6px 16px;position:relative">📋 通知表結果速報<span id="newDotResult" style="display:none;position:absolute;top:-5px;right:-5px;width:10px;height:10px;background:#ef4444;border-radius:50%;border:2px solid #fff"></span></button>
         </div>
 
         <!-- 定期テスト結果速報 -->
@@ -320,6 +321,22 @@ tr:hover td{background:#f8fafc}
                 <th>音</th><th>美</th><th>体</th><th>技</th><th>9計</th>
               </tr></thead>
               <tbody id="speedReportBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 通知表結果速報 -->
+        <div id="speedPanelResult" style="display:none">
+          <div class="cardHead" style="margin-bottom:8px">📋 通知表結果速報</div>
+          <div style="overflow-x:auto;overflow-y:auto;max-height:60vh;-webkit-overflow-scrolling:touch">
+            <table style="min-width:800px;border-collapse:collapse">
+              <thead style="position:sticky;top:0;z-index:2;background:#fff"><tr>
+                <th style="min-width:100px">氏名</th><th>学年</th><th>校舎</th><th>学期</th>
+                <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>5計</th>
+                <th>音</th><th>美</th><th>体</th><th>技</th><th>9計</th>
+                <th>志望校</th>
+              </tr></thead>
+              <tbody id="speedResultBody"></tbody>
             </table>
           </div>
         </div>
@@ -1510,6 +1527,11 @@ async function loadSpeed() {
   if (!students || students.length === 0) {
     api({ action: 'getStudents' }).then(r => { students = r.students || []; });
   }
+  // 新着バッジ確認（getAllReportsも取得して比較）
+  try {
+    const rr = await api({ action:'getAllReports' });
+    checkSpeedNewBadges(_cache.allScores || [], rr.data || []);
+  } catch(e) { /* 無視 */ }
 }
 
 let _speedTab = 'score';
@@ -1517,9 +1539,79 @@ function switchSpeedTab(tab) {
   _speedTab = tab;
   document.getElementById('speedPanelScore').style.display  = tab === 'score'  ? '' : 'none';
   document.getElementById('speedPanelReport').style.display = tab === 'report' ? '' : 'none';
+  document.getElementById('speedPanelResult').style.display = tab === 'result' ? '' : 'none';
   document.getElementById('speedTabScore').className  = 'btn btn-sm ' + (tab === 'score'  ? 'btn-primary' : 'btn-outline');
   document.getElementById('speedTabReport').className = 'btn btn-sm ' + (tab === 'report' ? 'btn-primary' : 'btn-outline');
+  document.getElementById('speedTabResult').className = 'btn btn-sm ' + (tab === 'result' ? 'btn-primary' : 'btn-outline');
+  // 新着ドットを消す（見たのでクリア）
+  const dotId = { score:'newDotScore', report:'newDotReport', result:'newDotResult' }[tab];
+  if (dotId) { document.getElementById(dotId).style.display = 'none'; }
+  // 最終確認時刻を記録
+  localStorage.setItem('speedSeen_' + tab, Date.now());
   if (tab === 'report') renderSpeedReport();
+  if (tab === 'result') renderSpeedResult();
+}
+
+// 新着チェック: 各タブのデータ最新createdAtと最終確認時刻を比較
+function checkSpeedNewBadges(allScoresData, allReportsData) {
+  const tabs = [
+    { key: 'score',  dot: 'newDotScore',  data: allScoresData },
+    { key: 'report', dot: 'newDotReport', data: allReportsData },
+    { key: 'result', dot: 'newDotResult', data: allReportsData }, // 通知表結果速報も同じreportsデータ
+  ];
+  tabs.forEach(t => {
+    if (!t.data || !t.data.length) return;
+    const lastSeen = Number(localStorage.getItem('speedSeen_' + t.key) || 0);
+    // createdAtが文字列の場合はDateに変換
+    const latestMs = t.data.reduce((mx, d) => {
+      const ts = d.createdAt ? new Date(d.createdAt).getTime() : 0;
+      return ts > mx ? ts : mx;
+    }, 0);
+    const dot = document.getElementById(t.dot);
+    if (dot) dot.style.display = (latestMs > lastSeen && latestMs > 0) ? '' : 'none';
+  });
+}
+
+async function renderSpeedResult() {
+  const tbody = document.getElementById('speedResultBody');
+  tbody.innerHTML = '<tr><td colspan="16" class="noData">読み込み中...</td></tr>';
+  const campus = document.getElementById('spCampus').value;
+  const grade  = document.getElementById('spGrade').value;
+  const year   = document.getElementById('spYear').value;
+  try {
+    const r = await api({ action:'getAllReports', campus, year });
+    let reports = r.data || [];
+    if (grade) reports = reports.filter(d => gradeMatchesGroup(d.grade, grade));
+    reports.sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+    if (!reports.length) {
+      tbody.innerHTML = '<tr><td colspan="16" class="noData">データなし</td></tr>';
+      return;
+    }
+    const rpColor = v => { const n=Number(v); return n===5?'#059669':n===4?'var(--primary)':n===3?'#d97706':(n===2||n===1)?'#dc2626':'#94a3b8'; };
+    const rTd = v => `<td style="text-align:center;color:${rpColor(v)};font-weight:${(v!=null&&v!=='')?'700':'400'}">${(v!=null&&v!=='')?v:'-'}</td>`;
+    const rp5k = ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng'];
+    const rp9k = [...rp5k,'rp_mus','rp_art','rp_pe','rp_tech'];
+    // 志望校は students データから取得
+    const stuMap = {};
+    (students||[]).forEach(s => { stuMap[s.id] = s; });
+    tbody.innerHTML = reports.map(d => {
+      const r5 = rp5k.every(k=>d[k]!==''&&d[k]!=null) ? rp5k.reduce((s,k)=>s+Number(d[k]),0) : '';
+      const r9 = rp9k.every(k=>d[k]!==''&&d[k]!=null) ? rp9k.reduce((s,k)=>s+Number(d[k]),0) : '';
+      const stu = stuMap[d.studentId] || {};
+      const desiredSchool = stu.desiredSchool || '-';
+      return `<tr>
+        <td style="text-align:left;font-weight:600;color:var(--primary);cursor:pointer" onclick="goToCompare('${htmlEsc(d.studentId)}')">${htmlEsc(d.name)}</td>
+        <td>${htmlEsc(d.grade)}</td><td>${htmlEsc(d.campus)}</td><td>${htmlEsc(d.semester)}</td>
+        ${rTd(d.rp_jpn)}${rTd(d.rp_soc)}${rTd(d.rp_math)}${rTd(d.rp_sci)}${rTd(d.rp_eng)}
+        <td style="text-align:center;font-weight:700;color:var(--primary)">${r5!==''?r5:'-'}</td>
+        ${rTd(d.rp_mus)}${rTd(d.rp_art)}${rTd(d.rp_pe)}${rTd(d.rp_tech)}
+        <td style="text-align:center;font-weight:700;color:var(--primary)">${r9!==''?r9:'-'}</td>
+        <td style="text-align:left;font-size:.75rem;color:var(--sub)">${htmlEsc(desiredSchool)}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="16" class="noData">読み込みに失敗しました</td></tr>';
+  }
 }
 
 async function renderSpeedReport() {
