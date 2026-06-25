@@ -189,7 +189,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v6.4</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v6.5</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -469,26 +469,19 @@ tr:hover td{background:#f8fafc}
           <div class="searchWrap">
             <input type="text" id="stuSearch" placeholder="名前・IDで検索" oninput="filterStudents()">
           </div>
-          <select id="stuCampus" onchange="filterStudents();buildSchoolCheckboxes()">
+          <select id="stuCampus" onchange="filterStudents();buildSchoolSelect()">
             <option value="">全校舎</option>
             <option>神領</option>
             <option>大手</option>
           </select>
-          <select id="stuGrade" onchange="filterStudents();buildSchoolCheckboxes()">
+          <select id="stuGrade" onchange="filterStudents();buildSchoolSelect()">
             <option value="">全学年</option>
             <option>中1</option><option>中2</option><option>中3</option>
           </select>
+          <select id="stuSchool" onchange="filterStudents()">
+            <option value="">全学校</option>
+          </select>
           <button class="btn btn-outline btn-sm" onclick="printStudentList()">🖨️ 印刷</button>
-        </div>
-
-        <!-- 学校チェックボックス行 -->
-        <div style="margin-bottom:10px;padding:10px 12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-            <span style="font-size:.74rem;color:#64748b;font-weight:600;white-space:nowrap">学校で絞込：</span>
-            <button onclick="stuSchoolCheckAll(true)"  style="padding:3px 10px;border-radius:20px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:.73rem;cursor:pointer">すべて選択</button>
-            <button onclick="stuSchoolCheckAll(false)" style="padding:3px 10px;border-radius:20px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:.73rem;cursor:pointer">すべて外す</button>
-          </div>
-          <div id="stuSchoolChecks" style="display:flex;flex-wrap:wrap;gap:6px"></div>
         </div>
 
         <!-- 並び順行 -->
@@ -1910,7 +1903,7 @@ function drawSpeedChart(data, subj) {
 async function loadStudents() {
   const r = await api({ action: 'getStudents' });
   students = r.students || [];
-  buildSchoolCheckboxes();
+  buildSchoolSelect();
   filterStudents();
 }
 function printStudentList() {
@@ -1979,55 +1972,21 @@ function printStudentList() {
   setTimeout(() => win.print(), 400);
 }
 
-// ===== 生徒一覧 並び順・学校チェック =====
+// ===== 生徒一覧 並び順・学校絞込 =====
 let _stuSortGrade  = true;
 let _stuSortSchool = '';
-let _stuSchoolExclude = new Set(); // チェックを外した学校名
 
-function buildSchoolCheckboxes() {
+function buildSchoolSelect() {
   const campus = document.getElementById('stuCampus').value;
   const grade  = document.getElementById('stuGrade').value;
+  const sel    = document.getElementById('stuSchool');
+  if (!sel) return;
+  const prev = sel.value;
   let base = students;
   if (campus) base = base.filter(s => s.campus === campus);
   if (grade)  base = base.filter(s => gradeMatchesGroup(s.grade, grade));
-  const schools = [...new Set(base.map(s => s.school || '不明'))].sort((a,b) => a.localeCompare(b,'ja'));
-  const box = document.getElementById('stuSchoolChecks');
-  if (!box) return;
-  box.innerHTML = schools.map(sc => {
-    const checked = !_stuSchoolExclude.has(sc);
-    return `<label style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;border:1px solid ${checked?'#1a56a0':'#d1d5db'};background:${checked?'#e8f0fb':'#fff'};cursor:pointer;font-size:.76rem;color:${checked?'#1a56a0':'#94a3b8'};font-weight:${checked?'600':'400'};transition:.15s" onclick="toggleStuSchool('${sc.replace(/'/g,"\\'")}',this)">
-      <input type="checkbox" ${checked?'checked':''} style="display:none">
-      ${sc}
-    </label>`;
-  }).join('');
-}
-
-function toggleStuSchool(school, labelEl) {
-  if (_stuSchoolExclude.has(school)) {
-    _stuSchoolExclude.delete(school);
-    labelEl.style.borderColor='#1a56a0'; labelEl.style.background='#e8f0fb';
-    labelEl.style.color='#1a56a0'; labelEl.style.fontWeight='600';
-  } else {
-    _stuSchoolExclude.add(school);
-    labelEl.style.borderColor='#d1d5db'; labelEl.style.background='#fff';
-    labelEl.style.color='#94a3b8'; labelEl.style.fontWeight='400';
-  }
-  filterStudents();
-}
-
-function stuSchoolCheckAll(on) {
-  if (on) {
-    _stuSchoolExclude.clear();
-  } else {
-    const campus = document.getElementById('stuCampus').value;
-    const grade  = document.getElementById('stuGrade').value;
-    let base = students;
-    if (campus) base = base.filter(s => s.campus === campus);
-    if (grade)  base = base.filter(s => gradeMatchesGroup(s.grade, grade));
-    base.forEach(s => _stuSchoolExclude.add(s.school || '不明'));
-  }
-  buildSchoolCheckboxes();
-  filterStudents();
+  const schools = [...new Set(base.map(s => s.school || ''))].filter(Boolean).sort((a,b) => a.localeCompare(b,'ja'));
+  sel.innerHTML = '<option value="">全学校</option>' + schools.map(sc => `<option value="${sc}"${sc===prev?'selected':''}>${sc}</option>`).join('');
 }
 
 function setStuSort(key) {
@@ -2056,17 +2015,16 @@ function setStuSchoolSort(val) {
   filterStudents();
 }
 
-// 現在の表示条件でリストを作るユーティリティ
 function _getFilteredSortedStudents() {
   const q      = (document.getElementById('stuSearch').value || '').toLowerCase();
   const grade  = document.getElementById('stuGrade').value;
   const campus = document.getElementById('stuCampus').value;
+  const school = document.getElementById('stuSchool')?.value || '';
   let list = [...students];
   if (q)      list = list.filter(s => s.name.toLowerCase().includes(q) || String(s.id).includes(q));
   if (grade)  list = list.filter(s => gradeMatchesGroup(s.grade, grade));
   if (campus) list = list.filter(s => s.campus === campus);
-  // 学校チェックボックスで外したものを除外
-  if (_stuSchoolExclude.size > 0) list = list.filter(s => !_stuSchoolExclude.has(s.school || '不明'));
+  if (school) list = list.filter(s => (s.school||'') === school);
 
   const gradeNum  = g => { const norm = normalizeGrade(g); const m = norm.match(/(\d)/); return m ? Number(m[1]) : 99; };
   const schoolVal = s => s.school || 'んんん';
