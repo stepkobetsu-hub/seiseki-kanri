@@ -189,7 +189,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v6.6</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v6.7</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -503,7 +503,7 @@ tr:hover td{background:#f8fafc}
           <span style="font-size:.74rem;color:#64748b;font-weight:600;white-space:nowrap">並び順：</span>
           <button id="sortGradeBtn" onclick="setStuSort('grade')"
             style="padding:5px 14px;border-radius:20px;border:2px solid #1a56a0;background:#1a56a0;color:#fff;font-size:.78rem;font-weight:700;cursor:pointer;transition:.15s">
-            学年順（中1→中2→中3）✔
+            学年順（小1→高3）✔
           </button>
           <span style="color:#cbd5e1;font-size:.8rem">＋</span>
           <div style="display:flex;gap:0">
@@ -2065,10 +2065,10 @@ function setStuSort(key) {
     const btn = document.getElementById('sortGradeBtn');
     if (_stuSortGrade) {
       btn.style.background='#1a56a0'; btn.style.borderColor='#1a56a0';
-      btn.style.color='#fff'; btn.textContent='学年順（中1→中2→中3）✔';
+      btn.style.color='#fff'; btn.textContent='学年順（小1→高3）✔';
     } else {
       btn.style.background='#fff'; btn.style.borderColor='#e2e8f0';
-      btn.style.color='#94a3b8'; btn.textContent='学年順（中1→中2→中3）';
+      btn.style.color='#94a3b8'; btn.textContent='学年順（小1→高3）';
     }
   }
   filterStudents();
@@ -2095,7 +2095,12 @@ function _getFilteredSortedStudents() {
   if (campus) list = list.filter(s => s.campus === campus);
   if (_stuSchoolExclude.size > 0) list = list.filter(s => !_stuSchoolExclude.has(s.school || ''));
 
-  const gradeNum  = g => { const norm = normalizeGrade(g); const m = norm.match(/(\d)/); return m ? Number(m[1]) : 99; };
+  const gradeNum  = g => {
+    const norm = normalizeGrade(g);
+    const level = norm.startsWith('小') ? 0 : norm.startsWith('中') ? 10 : norm.startsWith('高') ? 20 : 30;
+    const m = norm.match(/(\d)/);
+    return level + (m ? Number(m[1]) : 9);
+  };
   const schoolVal = s => s.school || 'んんん';
   list.sort((a, b) => {
     if (_stuSortGrade) { const gd = gradeNum(a.grade) - gradeNum(b.grade); if (gd !== 0) return gd; }
