@@ -189,7 +189,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v6.8</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v6.9</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -1630,32 +1630,29 @@ async function renderSpeedResult() {
     if (campus) wishes = wishes.filter(w => w.campus === campus);
     if (grade)  wishes = wishes.filter(w => gradeMatchesGroup(w.grade, grade));
     // 志望校が1つ以上登録されている生徒のみ
-    wishes = wishes.filter(w => {
-      const res = w.results || {};
-      return res.w1name || res.w2name || res.w3name;
-    });
-    // 最終更新日時が新しい順
+    wishes = wishes.filter(w => w.pub1name || w.pub2name || w.pub3name || w.pri1name || w.pri2name || w.pri3name);
+    // 最終更新が新しい順
     wishes.sort((a,b) => String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')));
     if (!wishes.length) {
       tbody.innerHTML = '<tr><td colspan="12" class="noData">志望校登録データなし</td></tr>';
       return;
     }
     const typeColor = v => v==='一般'?'#1a56a0':v==='推薦'?'#7c3aed':'#94a3b8';
-    const wTd = (res, n) => {
-      const name = res[`w${n}name`] || '';
-      const dept = res[`w${n}dept`] || '';
-      const type = res[`w${n}type`] || '';
+    const wTd = (w, prefix) => {
+      const name = w[prefix+'name'] || '';
+      const dept = w[prefix+'dept'] || '';
+      const res  = w.results || {};
+      const type = res[prefix+'type'] || '';
       return `<td style="font-size:.8rem;color:${name?'#1e293b':'#cbd5e1'}">${name||'－'}</td>
               <td style="font-size:.75rem;color:#64748b">${dept||'－'}</td>
               <td style="font-size:.75rem;color:${typeColor(type)};font-weight:${type?'700':'400'}">${type||'－'}</td>`;
     };
     tbody.innerHTML = wishes.map(w => {
-      const res = w.results || {};
       return `<tr>
-        <td style="font-weight:600;color:var(--primary);cursor:pointer;text-align:left" onclick="goToWishForCurrentStudent && aNav('wish');setTimeout(()=>wishSearch('${htmlEsc(w.studentId)}'),400)">${htmlEsc(w.name)}</td>
+        <td style="font-weight:600;color:var(--primary);cursor:pointer;text-align:left" onclick="aNav('wish');setTimeout(()=>{if(document.getElementById('wishSearch')){document.getElementById('wishSearch').value='${htmlEsc(w.name)}';loadAllWishes();}},400)">${htmlEsc(w.name)}</td>
         <td>${htmlEsc(w.grade)}</td>
         <td>${htmlEsc(w.campus)}</td>
-        ${wTd(res,1)}${wTd(res,2)}${wTd(res,3)}
+        ${wTd(w,'pub1')}${wTd(w,'pub2')}${wTd(w,'pub3')}
       </tr>`;
     }).join('');
   } catch(e) {
@@ -2229,6 +2226,8 @@ async function loadAllWishes() {
 
 function renderWishTable(wishes) {
   const tbody = document.getElementById('wishBody');
+  // 最新更新順に並び替え
+  wishes = [...wishes].sort((a,b) => String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')));
   renderedWishes = wishes;
   if (!wishes.length) {
     tbody.innerHTML = '<tr><td colspan="28" class="noData">データなし</td></tr>';
