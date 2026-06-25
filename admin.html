@@ -189,7 +189,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v6.9</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v7.0</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -329,13 +329,28 @@ tr:hover td{background:#f8fafc}
         <div id="speedPanelResult" style="display:none">
           <div class="cardHead" style="margin-bottom:8px">🏫 志望校登録速報</div>
           <div style="overflow-x:auto;overflow-y:auto;max-height:60vh;-webkit-overflow-scrolling:touch">
-            <table style="min-width:700px;border-collapse:collapse">
-              <thead style="position:sticky;top:0;z-index:2;background:#fff"><tr>
-                <th style="min-width:100px">氏名</th><th>学年</th><th>校舎</th>
-                <th style="min-width:160px">第1志望</th><th>学科</th><th>区分</th>
-                <th style="min-width:160px">第2志望</th><th>学科</th><th>区分</th>
-                <th style="min-width:160px">第3志望</th><th>学科</th><th>区分</th>
-              </tr></thead>
+            <table style="min-width:1200px;border-collapse:collapse">
+              <thead style="position:sticky;top:0;z-index:2;background:#fff">
+                <tr>
+                  <th rowspan="2" style="min-width:80px">氏名</th>
+                  <th rowspan="2">学年</th>
+                  <th colspan="4" style="background:#eef2ff;border-left:3px solid #4f46e5">公立 第1志望</th>
+                  <th colspan="4" style="background:#eef2ff;border-left:3px solid #4f46e5">公立 第2志望</th>
+                  <th colspan="4" style="background:#eef2ff;border-left:3px solid #4f46e5">公立 第3志望</th>
+                  <th colspan="4" style="background:#fef5d0;border-left:3px solid #d97706">私立 第1志望</th>
+                  <th colspan="4" style="background:#fef5d0;border-left:3px solid #d97706">私立 第2志望</th>
+                  <th colspan="4" style="background:#fef5d0;border-left:3px solid #d97706">私立 第3志望</th>
+                  <th rowspan="2">更新日</th>
+                </tr>
+                <tr>
+                  <th style="background:#dde8ff;border-left:3px solid #4f46e5">高校名</th><th style="background:#dde8ff">入試</th><th style="background:#dde8ff">合否</th><th style="background:#dde8ff">進学</th>
+                  <th style="background:#dde8ff;border-left:3px solid #4f46e5">高校名</th><th style="background:#dde8ff">入試</th><th style="background:#dde8ff">合否</th><th style="background:#dde8ff">進学</th>
+                  <th style="background:#dde8ff;border-left:3px solid #4f46e5">高校名</th><th style="background:#dde8ff">入試</th><th style="background:#dde8ff">合否</th><th style="background:#dde8ff">進学</th>
+                  <th style="background:#fef5d0;border-left:3px solid #d97706">高校名</th><th style="background:#fef5d0">入試</th><th style="background:#fef5d0">合否</th><th style="background:#fef5d0">進学</th>
+                  <th style="background:#fef5d0;border-left:3px solid #d97706">高校名</th><th style="background:#fef5d0">入試</th><th style="background:#fef5d0">合否</th><th style="background:#fef5d0">進学</th>
+                  <th style="background:#fef5d0;border-left:3px solid #d97706">高校名</th><th style="background:#fef5d0">入試</th><th style="background:#fef5d0">合否</th><th style="background:#fef5d0">進学</th>
+                </tr>
+              </thead>
               <tbody id="speedResultBody"></tbody>
             </table>
           </div>
@@ -1621,7 +1636,7 @@ function checkSpeedNewBadges(allScoresData, allReportsData, allWishesData) {
 
 async function renderSpeedResult() {
   const tbody = document.getElementById('speedResultBody');
-  tbody.innerHTML = '<tr><td colspan="12" class="noData">読み込み中...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="26" class="noData">読み込み中...</td></tr>';
   const campus = document.getElementById('spCampus').value;
   const grade  = document.getElementById('spGrade').value;
   try {
@@ -1629,34 +1644,45 @@ async function renderSpeedResult() {
     let wishes = r.wishes || [];
     if (campus) wishes = wishes.filter(w => w.campus === campus);
     if (grade)  wishes = wishes.filter(w => gradeMatchesGroup(w.grade, grade));
-    // 志望校が1つ以上登録されている生徒のみ
     wishes = wishes.filter(w => w.pub1name || w.pub2name || w.pub3name || w.pri1name || w.pri2name || w.pri3name);
-    // 最終更新が新しい順
-    wishes.sort((a,b) => String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')));
+    wishes = [...wishes].sort((a,b) => String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')));
     if (!wishes.length) {
-      tbody.innerHTML = '<tr><td colspan="12" class="noData">志望校登録データなし</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="26" class="noData">志望校登録データなし</td></tr>';
       return;
     }
-    const typeColor = v => v==='一般'?'#1a56a0':v==='推薦'?'#7c3aed':'#94a3b8';
-    const wTd = (w, prefix) => {
-      const name = w[prefix+'name'] || '';
-      const dept = w[prefix+'dept'] || '';
-      const res  = w.results || {};
-      const type = res[prefix+'type'] || '';
-      return `<td style="font-size:.8rem;color:${name?'#1e293b':'#cbd5e1'}">${name||'－'}</td>
-              <td style="font-size:.75rem;color:#64748b">${dept||'－'}</td>
-              <td style="font-size:.75rem;color:${typeColor(type)};font-weight:${type?'700':'400'}">${type||'－'}</td>`;
+    const res = w => w.results || {};
+    const tdName = (v, bg, border) => `<td style="padding:3px 5px;text-align:left${bg?';background:'+bg:''}${border?';'+border:''};font-size:.75rem">${v||'-'}</td>`;
+    const tdType = (r2, key, bg) => {
+      const v = r2[key+'type']||'';
+      const c = v==='一般'?'#1a56a0':v==='推薦'?'#7c3aed':'#94a3b8';
+      return `<td style="padding:3px 4px;text-align:center${bg?';background:'+bg:''};font-size:.7rem;color:${c};font-weight:${v?'700':'400'}">${v||'ー'}</td>`;
+    };
+    const tdResult = (r2, key, bg) => {
+      const v = r2[key]||'-';
+      const c = v==='合格'?'#10b981':v==='不合格'?'#ef4444':'#94a3b8';
+      const bgg = v==='合格'?'#dcfce7':v==='不合格'?'#fee2e2':'transparent';
+      return `<td style="padding:3px 4px;text-align:center${bg?';background:'+bg:''};font-size:.7rem;color:${c};font-weight:${v!=='-'?'700':'400'};background:${bgg}">${v}</td>`;
+    };
+    const tdEnroll = (r2, key, bg) => {
+      const v = r2[key+'enroll'];
+      return `<td style="padding:3px 4px;text-align:center${bg?';background:'+bg:''}">${v?'<span style="color:#1a56a0;font-weight:700;font-size:.8rem">✓</span>':'<span style="color:#e2e8f0">ー</span>'}</td>`;
     };
     tbody.innerHTML = wishes.map(w => {
+      const r2 = res(w);
       return `<tr>
-        <td style="font-weight:600;color:var(--primary);cursor:pointer;text-align:left" onclick="aNav('wish');setTimeout(()=>{if(document.getElementById('wishSearch')){document.getElementById('wishSearch').value='${htmlEsc(w.name)}';loadAllWishes();}},400)">${htmlEsc(w.name)}</td>
-        <td>${htmlEsc(w.grade)}</td>
-        <td>${htmlEsc(w.campus)}</td>
-        ${wTd(w,'pub1')}${wTd(w,'pub2')}${wTd(w,'pub3')}
+        <td style="padding:4px 8px;font-weight:600;color:#1a56a0;cursor:pointer;text-decoration:underline" onclick="goToCompare('${htmlEsc(w.studentId)}')" title="成績×通知表へ">${htmlEsc(w.name)}</td>
+        <td style="padding:4px 4px;text-align:center">${w.grade||'-'}</td>
+        ${tdName(w.pub1name?w.pub1name+(w.pub1dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub1dept+'</span>':''):null,'#dde8ff','border-left:3px solid #4f46e5')}${tdType(r2,'pub1','#dde8ff')}${tdResult(r2,'pub1','#dde8ff')}${tdEnroll(r2,'pub1','#dde8ff')}
+        ${tdName(w.pub2name?w.pub2name+(w.pub2dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub2dept+'</span>':''):null,'#dde8ff','border-left:3px solid #4f46e5')}${tdType(r2,'pub2','#dde8ff')}${tdResult(r2,'pub2','#dde8ff')}${tdEnroll(r2,'pub2','#dde8ff')}
+        ${tdName(w.pub3name?w.pub3name+(w.pub3dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub3dept+'</span>':''):null,'#dde8ff','border-left:3px solid #4f46e5')}${tdType(r2,'pub3','#dde8ff')}${tdResult(r2,'pub3','#dde8ff')}${tdEnroll(r2,'pub3','#dde8ff')}
+        ${tdName(w.pri1name?w.pri1name+(w.pri1dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri1dept+'</span>':''):null,'#fef5d0','border-left:3px solid #d97706')}${tdType(r2,'pri1','#fef5d0')}${tdResult(r2,'pri1','#fef5d0')}${tdEnroll(r2,'pri1','#fef5d0')}
+        ${tdName(w.pri2name?w.pri2name+(w.pri2dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri2dept+'</span>':''):null,'#fef5d0','border-left:3px solid #d97706')}${tdType(r2,'pri2','#fef5d0')}${tdResult(r2,'pri2','#fef5d0')}${tdEnroll(r2,'pri2','#fef5d0')}
+        ${tdName(w.pri3name?w.pri3name+(w.pri3dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri3dept+'</span>':''):null,'#fef5d0','border-left:3px solid #d97706')}${tdType(r2,'pri3','#fef5d0')}${tdResult(r2,'pri3','#fef5d0')}${tdEnroll(r2,'pri3','#fef5d0')}
+        <td style="padding:3px 6px;font-size:.68rem;color:#94a3b8;white-space:nowrap">${w.updatedAt?w.updatedAt.slice(0,10):'-'}</td>
       </tr>`;
     }).join('');
   } catch(e) {
-    tbody.innerHTML = '<tr><td colspan="12" class="noData">読み込みに失敗しました</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="26" class="noData">読み込みに失敗しました</td></tr>';
   }
 }
 
