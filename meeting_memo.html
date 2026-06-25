@@ -226,7 +226,7 @@ select.invalid,input.invalid{
   .actions button{flex:1;min-width:0}
   .memoTop{display:block}
   .memoBtns{margin-top:10px}
-  .memoBtns button{flex:1}
+  .memoBtns button{flex:0 0 auto}
 }
 </style>
 </head>
@@ -640,7 +640,7 @@ function renderMemos(){
         </div>
         <div class="memoBtns">
           <button class="btnBack" onclick="editMemo('${esc(m.id)}')">編集</button>
-          <button class="danger" style="padding:5px 8px;font-size:.78rem;min-height:28px;border-radius:6px" onclick="deleteMemo('${esc(m.id)}')">削除</button>
+          <button class="danger" style="padding:3px 10px;font-size:.72rem;min-height:24px;border-radius:5px" onclick="if(confirm('このメモを削除しますか？'))deleteMemo('${esc(m.id)}')">削除</button>
         </div>
       </div>
       <div class="content">${esc(m.content || '')}</div>
