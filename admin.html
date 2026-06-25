@@ -189,7 +189,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v6.2</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v6.3</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -478,6 +478,7 @@ tr:hover td{background:#f8fafc}
             <option value="">全学年</option>
             <option>中1</option><option>中2</option><option>中3</option>
           </select>
+          <button class="btn btn-outline btn-sm" onclick="printStudentList()">🖨️ 印刷</button>
         </div>
 
         <!-- 並び順行 -->
@@ -496,7 +497,7 @@ tr:hover td{background:#f8fafc}
           <!-- 学校順 3択 -->
           <div style="display:flex;gap:4px">
             <button id="sortSchoolOffBtn" onclick="setStuSchoolSort('')"
-              style="padding:5px 12px;border-radius:20px 0 0 20px;border:2px solid #e2e8f0;background:#fff;color:#94a3b8;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s">
+              style="padding:5px 12px;border-radius:20px 0 0 20px;border:2px solid #1a56a0;background:#1a56a0;color:#fff;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s">
               学校順なし
             </button>
             <button id="sortSchoolAscBtn" onclick="setStuSchoolSort('asc')"
@@ -508,9 +509,6 @@ tr:hover td{background:#f8fafc}
               学校 ん→あ
             </button>
           </div>
-
-          <!-- 印刷ボタン（右端） -->
-          <button class="btn btn-outline btn-sm" onclick="printStudentList()" style="margin-left:auto">🖨️ 印刷</button>
         </div>
 
         <div class="listBox" id="stuList"></div>
@@ -2007,7 +2005,7 @@ function filterStudents() {
   if (grade)  list = list.filter(s => gradeMatchesGroup(s.grade, grade));
   if (campus) list = list.filter(s => s.campus === campus);
 
-  const gradeNum = g => { const m = String(g||'').match(/(\d)/); return m ? Number(m[1]) : 99; };
+  const gradeNum = g => { const norm = normalizeGrade(g); const m = norm.match(/(\d)/); return m ? Number(m[1]) : 99; };
   const schoolVal = s => s.school || 'んんん'; // 未設定は末尾
 
   list.sort((a, b) => {
