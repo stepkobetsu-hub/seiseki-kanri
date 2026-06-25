@@ -189,7 +189,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v6.7</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v6.8</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -290,7 +290,7 @@ tr:hover td{background:#f8fafc}
         <div style="display:flex;gap:8px;margin-bottom:12px;justify-content:flex-start;flex-wrap:wrap">
           <button id="speedTabScore" onclick="switchSpeedTab('score')" class="btn btn-primary btn-sm" style="padding:6px 16px;position:relative">📝 定期テスト結果速報<span id="newDotScore" style="display:none;position:absolute;top:-8px;right:-8px;min-width:18px;height:18px;background:#ef4444;border-radius:999px;border:2px solid #fff;font-size:.6rem;color:#fff;font-weight:800;line-height:14px;text-align:center;padding:0 3px">NEW</span></button>
           <button id="speedTabReport" onclick="switchSpeedTab('report')" class="btn btn-outline btn-sm" style="padding:6px 16px;position:relative">📒 通知表評価速報<span id="newDotReport" style="display:none;position:absolute;top:-8px;right:-8px;min-width:18px;height:18px;background:#ef4444;border-radius:999px;border:2px solid #fff;font-size:.6rem;color:#fff;font-weight:800;line-height:14px;text-align:center;padding:0 3px">NEW</span></button>
-          <button id="speedTabResult" onclick="switchSpeedTab('result')" class="btn btn-outline btn-sm" style="padding:6px 16px;position:relative">📋 通知表結果速報<span id="newDotResult" style="display:none;position:absolute;top:-8px;right:-8px;min-width:18px;height:18px;background:#ef4444;border-radius:999px;border:2px solid #fff;font-size:.6rem;color:#fff;font-weight:800;line-height:14px;text-align:center;padding:0 3px">NEW</span></button>
+          <button id="speedTabResult" onclick="switchSpeedTab('result')" class="btn btn-outline btn-sm" style="padding:6px 16px;position:relative">🏫 志望校登録速報<span id="newDotResult" style="display:none;position:absolute;top:-8px;right:-8px;min-width:18px;height:18px;background:#ef4444;border-radius:999px;border:2px solid #fff;font-size:.6rem;color:#fff;font-weight:800;line-height:14px;text-align:center;padding:0 3px">NEW</span></button>
         </div>
 
         <!-- 定期テスト結果速報 -->
@@ -325,16 +325,16 @@ tr:hover td{background:#f8fafc}
           </div>
         </div>
 
-        <!-- 通知表結果速報 -->
+        <!-- 志望校登録速報 -->
         <div id="speedPanelResult" style="display:none">
-          <div class="cardHead" style="margin-bottom:8px">📋 通知表結果速報</div>
+          <div class="cardHead" style="margin-bottom:8px">🏫 志望校登録速報</div>
           <div style="overflow-x:auto;overflow-y:auto;max-height:60vh;-webkit-overflow-scrolling:touch">
-            <table style="min-width:800px;border-collapse:collapse">
+            <table style="min-width:700px;border-collapse:collapse">
               <thead style="position:sticky;top:0;z-index:2;background:#fff"><tr>
-                <th style="min-width:100px">氏名</th><th>学年</th><th>校舎</th><th>学期</th>
-                <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>5計</th>
-                <th>音</th><th>美</th><th>体</th><th>技</th><th>9計</th>
-                <th>志望校</th>
+                <th style="min-width:100px">氏名</th><th>学年</th><th>校舎</th>
+                <th style="min-width:160px">第1志望</th><th>学科</th><th>区分</th>
+                <th style="min-width:160px">第2志望</th><th>学科</th><th>区分</th>
+                <th style="min-width:160px">第3志望</th><th>学科</th><th>区分</th>
               </tr></thead>
               <tbody id="speedResultBody"></tbody>
             </table>
@@ -1571,10 +1571,13 @@ async function loadSpeed() {
   if (!students || students.length === 0) {
     api({ action: 'getStudents' }).then(r => { students = r.students || []; });
   }
-  // 新着バッジ確認（getAllReportsも取得して比較）
+  // 新着バッジ確認
   try {
-    const rr = await api({ action:'getAllReports' });
-    checkSpeedNewBadges(_cache.allScores || [], rr.data || []);
+    const [rr, rw] = await Promise.all([
+      api({ action:'getAllReports' }),
+      api({ action:'getAllWishes' })
+    ]);
+    checkSpeedNewBadges(_cache.allScores || [], rr.data || [], rw.wishes || []);
   } catch(e) { /* 無視 */ }
 }
 
@@ -1597,11 +1600,11 @@ function switchSpeedTab(tab) {
 }
 
 // 新着チェック: 各タブのデータ最新createdAtと最終確認時刻を比較
-function checkSpeedNewBadges(allScoresData, allReportsData) {
+function checkSpeedNewBadges(allScoresData, allReportsData, allWishesData) {
   const tabs = [
     { key: 'score',  dot: 'newDotScore',  data: allScoresData },
     { key: 'report', dot: 'newDotReport', data: allReportsData },
-    { key: 'result', dot: 'newDotResult', data: allReportsData }, // 通知表結果速報も同じreportsデータ
+    { key: 'result', dot: 'newDotResult', data: allWishesData },
   ];
   tabs.forEach(t => {
     if (!t.data || !t.data.length) return;
@@ -1618,43 +1621,45 @@ function checkSpeedNewBadges(allScoresData, allReportsData) {
 
 async function renderSpeedResult() {
   const tbody = document.getElementById('speedResultBody');
-  tbody.innerHTML = '<tr><td colspan="16" class="noData">読み込み中...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="12" class="noData">読み込み中...</td></tr>';
   const campus = document.getElementById('spCampus').value;
   const grade  = document.getElementById('spGrade').value;
-  const year   = document.getElementById('spYear').value;
   try {
-    const r = await api({ action:'getAllReports', campus, year });
-    let reports = r.data || [];
-    if (grade) reports = reports.filter(d => gradeMatchesGroup(d.grade, grade));
-    reports.sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
-    if (!reports.length) {
-      tbody.innerHTML = '<tr><td colspan="16" class="noData">データなし</td></tr>';
+    const r = await api({ action: 'getAllWishes' });
+    let wishes = r.wishes || [];
+    if (campus) wishes = wishes.filter(w => w.campus === campus);
+    if (grade)  wishes = wishes.filter(w => gradeMatchesGroup(w.grade, grade));
+    // 志望校が1つ以上登録されている生徒のみ
+    wishes = wishes.filter(w => {
+      const res = w.results || {};
+      return res.w1name || res.w2name || res.w3name;
+    });
+    // 最終更新日時が新しい順
+    wishes.sort((a,b) => String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')));
+    if (!wishes.length) {
+      tbody.innerHTML = '<tr><td colspan="12" class="noData">志望校登録データなし</td></tr>';
       return;
     }
-    const rpColor = v => { const n=Number(v); return n===5?'#059669':n===4?'var(--primary)':n===3?'#d97706':(n===2||n===1)?'#dc2626':'#94a3b8'; };
-    const rTd = v => `<td style="text-align:center;color:${rpColor(v)};font-weight:${(v!=null&&v!=='')?'700':'400'}">${(v!=null&&v!=='')?v:'-'}</td>`;
-    const rp5k = ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng'];
-    const rp9k = [...rp5k,'rp_mus','rp_art','rp_pe','rp_tech'];
-    // 志望校は students データから取得
-    const stuMap = {};
-    (students||[]).forEach(s => { stuMap[s.id] = s; });
-    tbody.innerHTML = reports.map(d => {
-      const r5 = rp5k.every(k=>d[k]!==''&&d[k]!=null) ? rp5k.reduce((s,k)=>s+Number(d[k]),0) : '';
-      const r9 = rp9k.every(k=>d[k]!==''&&d[k]!=null) ? rp9k.reduce((s,k)=>s+Number(d[k]),0) : '';
-      const stu = stuMap[d.studentId] || {};
-      const desiredSchool = stu.desiredSchool || '-';
+    const typeColor = v => v==='一般'?'#1a56a0':v==='推薦'?'#7c3aed':'#94a3b8';
+    const wTd = (res, n) => {
+      const name = res[`w${n}name`] || '';
+      const dept = res[`w${n}dept`] || '';
+      const type = res[`w${n}type`] || '';
+      return `<td style="font-size:.8rem;color:${name?'#1e293b':'#cbd5e1'}">${name||'－'}</td>
+              <td style="font-size:.75rem;color:#64748b">${dept||'－'}</td>
+              <td style="font-size:.75rem;color:${typeColor(type)};font-weight:${type?'700':'400'}">${type||'－'}</td>`;
+    };
+    tbody.innerHTML = wishes.map(w => {
+      const res = w.results || {};
       return `<tr>
-        <td style="text-align:left;font-weight:600;color:var(--primary);cursor:pointer" onclick="goToCompare('${htmlEsc(d.studentId)}')">${htmlEsc(d.name)}</td>
-        <td>${htmlEsc(d.grade)}</td><td>${htmlEsc(d.campus)}</td><td>${htmlEsc(d.semester)}</td>
-        ${rTd(d.rp_jpn)}${rTd(d.rp_soc)}${rTd(d.rp_math)}${rTd(d.rp_sci)}${rTd(d.rp_eng)}
-        <td style="text-align:center;font-weight:700;color:var(--primary)">${r5!==''?r5:'-'}</td>
-        ${rTd(d.rp_mus)}${rTd(d.rp_art)}${rTd(d.rp_pe)}${rTd(d.rp_tech)}
-        <td style="text-align:center;font-weight:700;color:var(--primary)">${r9!==''?r9:'-'}</td>
-        <td style="text-align:left;font-size:.75rem;color:var(--sub)">${htmlEsc(desiredSchool)}</td>
+        <td style="font-weight:600;color:var(--primary);cursor:pointer;text-align:left" onclick="goToWishForCurrentStudent && aNav('wish');setTimeout(()=>wishSearch('${htmlEsc(w.studentId)}'),400)">${htmlEsc(w.name)}</td>
+        <td>${htmlEsc(w.grade)}</td>
+        <td>${htmlEsc(w.campus)}</td>
+        ${wTd(res,1)}${wTd(res,2)}${wTd(res,3)}
       </tr>`;
     }).join('');
   } catch(e) {
-    tbody.innerHTML = '<tr><td colspan="16" class="noData">読み込みに失敗しました</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="noData">読み込みに失敗しました</td></tr>';
   }
 }
 
