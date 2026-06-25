@@ -3735,7 +3735,9 @@ async function openAdminTrash(){
   list.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px">読み込み中...</div>';
   try {
     const r = await api({ action:'getDeletedMemos' });
-    const memos = r.memos || [];
+    const hiddenIds = JSON.parse(localStorage.getItem('hiddenTrashIds')||'[]');
+    const memos = (r.memos || []).filter(m => !hiddenIds.includes(m.id));
+    window._adminTrashMemos = memos;
     if (!memos.length) {
       list.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px">削除済みメモはありません。</div>';
       return;
@@ -3749,13 +3751,24 @@ async function openAdminTrash(){
           <span style="font-size:.72rem;color:#f87171;margin-left:auto">🗑️ 削除日時: ${htmlEsc(m.deletedAt||'')}</span>
         </div>
         <div style="font-size:.84rem;color:#475569;white-space:pre-wrap;margin-bottom:8px">${htmlEsc(m.content||'')}</div>
-        <button class="btn btn-outline btn-sm" onclick="restoreAdminMemo(${i})">↩️ 復元する</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="restoreAdminMemo(${i})">↩️ 復元する</button>
+          <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5" onclick="hideAdminTrashMemo(${i})">🗑️ 完全削除</button>
+        </div>
       </div>
     `).join('');
-    window._adminTrashMemos = memos;
   } catch(e) {
     list.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px">読み込みに失敗しました。</div>';
   }
+}
+
+function hideAdminTrashMemo(i){
+  const m = (window._adminTrashMemos || [])[i];
+  if (!m) return;
+  const ids = JSON.parse(localStorage.getItem('hiddenTrashIds')||'[]');
+  if (!ids.includes(m.id)) ids.push(m.id);
+  localStorage.setItem('hiddenTrashIds', JSON.stringify(ids));
+  openAdminTrash();
 }
 
 function closeAdminTrash(){

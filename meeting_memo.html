@@ -745,13 +745,23 @@ function undoDelete(i){
   showToast('元に戻しました');
 }
 
+function getHiddenTrashIds(){
+  try { return JSON.parse(localStorage.getItem('hiddenTrashIds')||'[]'); } catch(e){ return []; }
+}
+function hideTrashId(id){
+  const ids = getHiddenTrashIds();
+  if (!ids.includes(id)) ids.push(id);
+  localStorage.setItem('hiddenTrashIds', JSON.stringify(ids));
+}
+
 async function openTrash(){
   $('trashModal').style.display = 'flex';
   const list = $('trashList');
   list.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px">読み込み中...</div>';
   try {
     const r = await api({ action:'getDeletedMemos' });
-    const memos = r.memos || [];
+    const hiddenIds = getHiddenTrashIds();
+    const memos = (r.memos || []).filter(m => !hiddenIds.includes(m.id));
     window._trashMemos = memos;
     if (!memos.length) {
       list.innerHTML = '<div style="color:#94a3b8;text-align:center;padding:20px">削除済みメモはありません。</div>';
@@ -766,12 +776,22 @@ async function openTrash(){
           <span style="font-size:.72rem;color:#f87171;margin-left:auto">🗑️ 削除日時: ${esc(m.deletedAt||'')}</span>
         </div>
         <div style="font-size:.84rem;color:#475569;white-space:pre-wrap;margin-bottom:8px">${esc(m.content||'')}</div>
-        <button onclick="restoreTrashMemo(${i})" style="padding:5px 14px;font-size:.8rem;border-radius:6px;background:#f0f9ff;color:var(--primary);border:1px solid #bae6fd;cursor:pointer">↩️ 復元する</button>
+        <div style="display:flex;gap:8px">
+          <button onclick="restoreTrashMemo(${i})" style="padding:5px 14px;font-size:.8rem;border-radius:6px;background:#f0f9ff;color:var(--primary);border:1px solid #bae6fd;cursor:pointer">↩️ 復元する</button>
+          <button onclick="hideTrashMemo(${i})" style="padding:5px 14px;font-size:.8rem;border-radius:6px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;cursor:pointer">🗑️ 完全削除</button>
+        </div>
       </div>
     `).join('');
   } catch(e) {
     list.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px">読み込みに失敗しました。</div>';
   }
+}
+
+function hideTrashMemo(i){
+  const m = (window._trashMemos || [])[i];
+  if (!m) return;
+  hideTrashId(m.id);
+  openTrash();
 }
 
 async function restoreTrashMemo(i){
@@ -781,8 +801,11 @@ async function restoreTrashMemo(i){
   try {
     const r = await api({ action:'saveMeetingMemo', ...m });
     if (!r.success) throw new Error(r.error || '復元に失敗しました');
+    // 復元したら非表示リストからも除外
+    const ids = getHiddenTrashIds().filter(id => id !== m.id);
+    localStorage.setItem('hiddenTrashIds', JSON.stringify(ids));
     showToast('復元しました');
-    openTrash(); // 一覧を再読込
+    openTrash();
     loadMemos();
   } catch(e) {
     showToast(e.message || '復元に失敗しました');
