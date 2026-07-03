@@ -404,6 +404,7 @@ textarea{
 <script>
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 const STAFF_AUTH_KEY = 'stepStaffAppAuth';
+const STAFF_CODE_KEY = 'stepStaffAppCode';
 let qrStream = null;
 let qrScanTimer = null;
 
@@ -411,9 +412,11 @@ document.addEventListener('DOMContentLoaded', initStaffAppLogin);
 
 function initStaffAppLogin(){
   const saved = getSavedStaffAuth();
-  if (saved && saved.code) {
-    document.getElementById('staffCode').value = saved.code || '';
-    document.getElementById('staffPassword').value = saved.password || '';
+  const savedCode = saved?.code || localStorage.getItem(STAFF_CODE_KEY) || '';
+  if (savedCode) {
+    document.getElementById('staffCode').value = savedCode;
+    document.getElementById('staffPassword').value = saved?.password || '';
+    setLoginMsg('自動ログインしています...');
     staffLogin(true);
   }
 }
@@ -443,9 +446,10 @@ async function staffLogin(isAuto){
     if (!isAuto) setLoginMsg('確認しています...');
     const result = await postGas({ action:'staffLogin', code, password });
     if (!result.success) throw new Error(result.error || 'ログインできませんでした');
+    localStorage.setItem(STAFF_CODE_KEY, code);
     localStorage.setItem(STAFF_AUTH_KEY, JSON.stringify({
       code,
-      password,
+      password: password || '',
       name: result.name || '',
       savedAt: new Date().toISOString()
     }));
