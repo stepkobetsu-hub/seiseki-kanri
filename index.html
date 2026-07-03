@@ -40,8 +40,7 @@ body{
 .topActions{
   display:flex;
   align-items:center;
-  gap:10px;
-  flex-wrap:wrap;
+  align-self:flex-start;
   justify-content:flex-end;
 }
 h1{
@@ -54,23 +53,14 @@ h1{
   color:#52667c;
   font-size:.92rem;
 }
-.badge{
-  flex:0 0 auto;
-  border:1px solid #cbd8e6;
-  background:#fff;
-  border-radius:999px;
-  padding:8px 12px;
-  font-size:.82rem;
-  font-weight:700;
-  color:#1d5fa8;
-}
 .portalBtn{
   border:1px solid #cbd8e6;
-  background:#fff;
-  color:#1d5fa8;
+  background:#f8fbff;
+  color:#42627f;
   border-radius:999px;
-  padding:9px 13px;
-  font-weight:900;
+  padding:6px 10px;
+  font-size:.78rem;
+  font-weight:800;
   cursor:pointer;
 }
 .loginPage{
@@ -278,8 +268,7 @@ textarea{
 @media(max-width:720px){
   .page{align-items:flex-start;padding-top:22px}
   .top{display:block}
-  .topActions{justify-content:flex-start;margin-top:12px}
-  .badge{display:inline-block;margin-top:12px}
+  .topActions{justify-content:flex-end;margin-top:0;margin-bottom:12px}
   .grid{grid-template-columns:1fr}
   .app{min-height:132px}
   .card{padding:16px}
@@ -313,8 +302,7 @@ textarea{
         <p class="sub"><span id="staffNameLabel"></span>よく使う入力・読取ページをここから開きます。</p>
       </div>
       <div class="topActions">
-        <button class="portalBtn" type="button" onclick="backToTeacherPortal()">講師ポータルにもどる</button>
-        <div class="badge">STEP 個別指導</div>
+        <button class="portalBtn" type="button" onclick="backToTeacherPortal()">講師ポータルへ</button>
       </div>
     </div>
 
