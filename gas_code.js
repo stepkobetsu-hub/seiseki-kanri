@@ -135,6 +135,7 @@ function route(e) {
       case 'getStudents':        result = getStudents(); break;
       case 'getAllScores':        result = getAllScores(data); break;
       case 'getStudentDetail':   result = getStudentDetail(data); break;
+      case 'saveQrData':         result = saveQrData(data); break;
       // 通知表
       case 'getReport':          result = getReport(data); break;
       case 'saveReport':         result = saveReport(data); break;
@@ -1611,6 +1612,65 @@ function resolveEntryStudent_(data) {
 
 function normalizeName_(s) {
   return String(s || '').replace(/\s+/g, '').replace(/　/g, '').trim();
+}
+
+function saveQrData(data) {
+  const adminCode = String(data.adminCode || data.code || '').trim();
+  const qrData = String(data.adminQrData || data.qrData || '').trim();
+  if (!adminCode) return { success: false, error: '講師コードがありません' };
+  if (!qrData) return { success: false, error: 'QRデータがありません' };
+
+  const found = findTeacherMasterSheet_();
+  if (!found || !found.sheet) {
+    return { success: false, error: '講師マスターが見つかりません' };
+  }
+
+  const sh = found.sheet;
+  const values = sh.getDataRange().getValues();
+  if (values.length < 2) return { success: false, error: '講師マスターにデータがありません' };
+
+  const headers = values[0].map(v => String(v || '').trim());
+  const codeCol = findHeaderIndex_(headers, ['講師コード', 'コード', 'ID', '講師ID']);
+  const nameCol = findHeaderIndex_(headers, ['氏名', '講師名', '名前']);
+  const targetCodeCol = codeCol >= 0 ? codeCol : 0;
+  const targetNameCol = nameCol >= 0 ? nameCol : 1;
+  let rowNo = 0;
+  let teacherName = '';
+
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][targetCodeCol] || '').trim() === adminCode) {
+      rowNo = i + 1;
+      teacherName = String(values[i][targetNameCol] || '').trim();
+      break;
+    }
+  }
+  if (!rowNo) return { success: false, error: '講師コードが見つかりません: ' + adminCode };
+
+  sh.getRange(rowNo, 17).setValue(qrData); // Q列
+  return { success: true, code: adminCode, name: teacherName, sheet: sh.getName(), row: rowNo };
+}
+
+function findTeacherMasterSheet_() {
+  const names = ['講師マスター', '講師マスタ', '先生マスター', '先生マスタ'];
+  const books = [getDataSS()];
+  try {
+    books.push(SpreadsheetApp.openById(MASTER_SPREADSHEET_ID));
+  } catch (e) {}
+  for (let i = 0; i < books.length; i++) {
+    for (let j = 0; j < names.length; j++) {
+      const sh = books[i].getSheetByName(names[j]);
+      if (sh) return { spreadsheet: books[i], sheet: sh };
+    }
+  }
+  return null;
+}
+
+function findHeaderIndex_(headers, candidates) {
+  for (let i = 0; i < candidates.length; i++) {
+    const idx = headers.indexOf(candidates[i]);
+    if (idx >= 0) return idx;
+  }
+  return -1;
 }
 
 function uploadEntryImage(data) {

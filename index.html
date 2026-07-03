@@ -75,6 +75,12 @@ h1{
   justify-content:space-between;
   transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease;
 }
+button.app{
+  width:100%;
+  font:inherit;
+  text-align:left;
+  cursor:pointer;
+}
 .app:hover{
   transform:translateY(-2px);
   border-color:#8fb4dc;
@@ -96,6 +102,11 @@ h1{
   background:#eaf3ff;
   color:#1d5fa8;
   font-size:1.25rem;
+}
+.ico img{
+  width:25px;
+  height:25px;
+  object-fit:contain;
 }
 .desc{
   margin:14px 0 0;
@@ -119,17 +130,113 @@ h1{
   color:#fff;
 }
 .primary .desc,.primary .go{color:#eef6ff}
+.hidden{display:none!important}
+.toolPage{
+  min-height:100vh;
+  padding:24px 16px;
+}
+.toolShell{
+  width:min(760px,100%);
+  margin:0 auto;
+}
+.card{
+  background:#fff;
+  border:1px solid #d7e1ec;
+  border-radius:14px;
+  box-shadow:0 10px 24px rgba(31,52,78,.08);
+  padding:20px;
+}
+.back{
+  border:0;
+  background:#eef4fb;
+  color:#1d5fa8;
+  border-radius:10px;
+  padding:9px 12px;
+  font-weight:800;
+  cursor:pointer;
+}
+.lead{
+  color:#52667c;
+  line-height:1.7;
+}
+.formGrid{
+  display:grid;
+  gap:14px;
+  margin-top:16px;
+}
+label{
+  display:block;
+  font-weight:800;
+  color:#33465c;
+  margin-bottom:6px;
+}
+input,textarea{
+  width:100%;
+  border:1px solid #c9d6e5;
+  border-radius:10px;
+  padding:12px;
+  font:inherit;
+}
+textarea{
+  min-height:120px;
+  resize:vertical;
+}
+.scannerBox{
+  border:1px solid #d7e1ec;
+  background:#f5f8fb;
+  border-radius:12px;
+  overflow:hidden;
+  min-height:180px;
+  display:grid;
+  place-items:center;
+}
+#qrVideo{
+  width:100%;
+  max-height:360px;
+  background:#102033;
+}
+.actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
+.btn{
+  border:0;
+  border-radius:10px;
+  padding:11px 14px;
+  background:#155aa5;
+  color:#fff;
+  font-weight:900;
+  cursor:pointer;
+}
+.btn.secondary{
+  background:#eef4fb;
+  color:#1d5fa8;
+}
+.noticeMsg{
+  margin-top:14px;
+  border-radius:10px;
+  padding:12px;
+  background:#eef8f1;
+  color:#146b32;
+  font-weight:800;
+}
+.noticeMsg.error{
+  background:#fff1f1;
+  color:#b4232b;
+}
 @media(max-width:720px){
   .page{align-items:flex-start;padding-top:22px}
   .top{display:block}
   .badge{display:inline-block;margin-top:12px}
   .grid{grid-template-columns:1fr}
   .app{min-height:132px}
+  .card{padding:16px}
 }
 </style>
 </head>
 <body>
-<main class="page">
+<main id="homePage" class="page">
   <section class="shell">
     <div class="top">
       <div>
@@ -147,6 +254,22 @@ h1{
         </div>
         <div class="go">開く</div>
       </a>
+
+      <a class="app" href="https://stepkobetsu-hub.github.io/step-message-center/">
+        <div>
+          <div class="appTitle"><span class="ico"><img src="icons/message-center-icon.png" alt=""></span><span>STEP配信システム</span></div>
+          <p class="desc">個別送信・添付・履歴・欠席確認</p>
+        </div>
+        <div class="go">開く</div>
+      </a>
+
+      <button class="app" type="button" onclick="showAdminQr()">
+        <div>
+          <div class="appTitle"><span class="ico"><img src="icons/admin-qr-icon.png" alt=""></span><span>管理者QR登録</span></div>
+          <p class="desc">入退くんQRデータを登録</p>
+        </div>
+        <div class="go">開く</div>
+      </button>
 
       <a class="app" href="admin.html">
         <div>
@@ -182,5 +305,140 @@ h1{
     </div>
   </section>
 </main>
+<section id="adminQrPage" class="toolPage hidden">
+  <div class="toolShell">
+    <div class="card">
+      <button class="back" type="button" onclick="backHome()">← トップへ</button>
+      <h2>管理者QR登録</h2>
+      <p class="lead">紙の入退くんQRを読み取り、講師マスターQ列に保存します。カメラが使えない場合も、QRデータを貼り付けて保存できます。</p>
+
+      <div class="formGrid">
+        <div>
+          <label for="adminCode">講師コード</label>
+          <input id="adminCode" type="text" inputmode="numeric" placeholder="例：7085">
+        </div>
+
+        <div class="scannerBox">
+          <video id="qrVideo" playsinline muted></video>
+          <canvas id="qrCanvas" class="hidden"></canvas>
+        </div>
+
+        <div class="actions">
+          <button class="btn secondary" type="button" onclick="startQrScan()">カメラでQRを読む</button>
+          <button class="btn secondary" type="button" onclick="stopQrScan()">カメラ停止</button>
+        </div>
+
+        <div>
+          <label for="adminQrData">読み取ったQRデータ</label>
+          <textarea id="adminQrData" placeholder="QRデータを貼り付けても保存できます"></textarea>
+        </div>
+
+        <div class="actions">
+          <button class="btn" type="button" onclick="saveAdminQrData()">このQRデータをQ列へ保存</button>
+        </div>
+        <div id="adminMsg" class="noticeMsg hidden"></div>
+      </div>
+    </div>
+  </div>
+</section>
+<script>
+const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
+let qrStream = null;
+let qrScanTimer = null;
+
+function showAdminQr(){
+  document.getElementById('homePage').classList.add('hidden');
+  document.getElementById('adminQrPage').classList.remove('hidden');
+}
+
+function backHome(){
+  stopQrScan();
+  document.getElementById('adminQrPage').classList.add('hidden');
+  document.getElementById('homePage').classList.remove('hidden');
+}
+
+function setAdminMsg(text, isError){
+  const el = document.getElementById('adminMsg');
+  el.textContent = text;
+  el.classList.toggle('error', !!isError);
+  el.classList.remove('hidden');
+}
+
+async function startQrScan(){
+  const video = document.getElementById('qrVideo');
+  const dataEl = document.getElementById('adminQrData');
+  try{
+    stopQrScan();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setAdminMsg('このブラウザではカメラ読取が使えません。QRデータを貼り付けて保存してください。', true);
+      return;
+    }
+    qrStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' }, audio:false });
+    video.srcObject = qrStream;
+    await video.play();
+    setAdminMsg('カメラを起動しました。読み取れない場合はQRデータを貼り付けてください。', false);
+
+    if (!('BarcodeDetector' in window)) return;
+    const detector = new BarcodeDetector({ formats:['qr_code'] });
+    qrScanTimer = setInterval(async () => {
+      try{
+        const codes = await detector.detect(video);
+        if (codes && codes.length) {
+          dataEl.value = codes[0].rawValue || '';
+          setAdminMsg('QRデータを読み取りました。内容を確認して保存してください。', false);
+          stopQrScan();
+        }
+      } catch(err) {
+        // Camera frames may be temporarily unreadable while focusing.
+      }
+    }, 700);
+  }catch(err){
+    setAdminMsg('カメラを起動できませんでした。QRデータを貼り付けて保存してください。', true);
+  }
+}
+
+function stopQrScan(){
+  if (qrScanTimer) {
+    clearInterval(qrScanTimer);
+    qrScanTimer = null;
+  }
+  if (qrStream) {
+    qrStream.getTracks().forEach(track => track.stop());
+    qrStream = null;
+  }
+  const video = document.getElementById('qrVideo');
+  if (video) video.srcObject = null;
+}
+
+async function postGas(data){
+  const res = await fetch(GAS, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain'},
+    body:JSON.stringify(data)
+  });
+  return await res.json();
+}
+
+async function saveAdminQrData(){
+  const adminCode = document.getElementById('adminCode').value.trim();
+  const adminQrData = document.getElementById('adminQrData').value.trim();
+  if (!adminCode) {
+    setAdminMsg('講師コードを入力してください。', true);
+    return;
+  }
+  if (!adminQrData) {
+    setAdminMsg('QRデータを入力してください。', true);
+    return;
+  }
+  try{
+    setAdminMsg('保存しています...', false);
+    const result = await postGas({ action:'saveQrData', adminCode, adminQrData });
+    if (!result.success) throw new Error(result.error || '保存できませんでした');
+    setAdminMsg('保存しました。' + (result.name ? '（' + result.name + '）' : ''), false);
+  }catch(err){
+    setAdminMsg(err.message || '保存できませんでした', true);
+  }
+}
+</script>
 </body>
 </html>
