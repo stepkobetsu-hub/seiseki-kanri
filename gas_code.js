@@ -5,8 +5,10 @@
 // ★ 以下2つのIDを設定してください
 const MASTER_SPREADSHEET_ID = '1CIJkTlYUcUkbb8jBdFc6L8D5ubTGsxwNxFv01ten-Zk'; // 生徒マスタ元ファイル
 const DATA_SPREADSHEET_ID   = '1Zq3AbL9Fx_skBUibh2F73kyWlw9Ionh3-dTOtots0D8'; // 成績管理用
+const TEACHER_SPREADSHEET_ID = '1L5aFDXAmfUDkBg8d7X3WqJgMhdMq5tM5sfUZ2G-M58E'; // 講師マスター
 
 const MASTER_SHEET_NAME = '☆マスタ';
+const TEACHER_SHEET_NAME = '講師マスター';
 const TARGET_MASTER_FLAGS = ['1', '0']; // ☆マスタB列: 1=在籍, 0=保留中
 const SCHOOL_MASTER_COLS = ['学校名','年間テスト回数','学期制','登録日時','定期テスト日程JSON','予定表URL','日程メモ'];
 const MEETING_MEMO_COLS = ['ID','日付','生徒ID','氏名','校舎','学年','中学校','相手','内容','担当','登録日時','更新日時'];
@@ -135,6 +137,7 @@ function route(e) {
       case 'getStudents':        result = getStudents(); break;
       case 'getAllScores':        result = getAllScores(data); break;
       case 'getStudentDetail':   result = getStudentDetail(data); break;
+      case 'staffLogin':         result = staffLogin(data); break;
       case 'saveQrData':         result = saveQrData(data); break;
       // 通知表
       case 'getReport':          result = getReport(data); break;
@@ -146,7 +149,6 @@ function route(e) {
       case 'getMeetingMemos':    result = getMeetingMemos(data); break;
       case 'saveMeetingMemo':    result = saveMeetingMemo(data); break;
       case 'deleteMeetingMemo':  result = deleteMeetingMemo(data); break;
-      case 'getDeletedMemos':    result = getDeletedMemos(); break;
       case 'getStaffMembers':    result = getStaffMembers(); break;
       case 'addStaffMember':     result = addStaffMember(data); break;
       case 'deleteStaffMember':  result = deleteStaffMember(data); break;
@@ -755,8 +757,7 @@ function rowToReport(row) {
     studentId: row[0], name: row[1], campus: row[2], grade: row[3], school: row[4],
     year: row[5], semester: row[6],
     rp_jpn: row[7], rp_soc: row[8], rp_math: row[9], rp_sci: row[10], rp_eng: row[11],
-    rp_mus: row[12], rp_art: row[13], rp_pe: row[14], rp_tech: row[15],
-    createdAt: row[16], updatedAt: row[17]
+    rp_mus: row[12], rp_art: row[13], rp_pe: row[14], rp_tech: row[15]
   };
 }
 
@@ -939,30 +940,11 @@ function getMeetingMemos(data) {
   return { success: true, memos: result };
 }
 
-function getDeletedMemos() {
-  const bsh = SpreadsheetApp.openById(DATA_SPREADSHEET_ID).getSheetByName('削除済みメモ');
-  if (!bsh) return { success: true, memos: [] };
-  const rows = bsh.getDataRange().getValues();
-  const result = [];
-  for (let i = rows.length - 1; i >= 1; i--) {
-    if (!rows[i][0]) continue;
-    const m = rowToMeetingMemo_(rows[i]);
-    m.deletedAt = rows[i][12] ? new Date(rows[i][12]).toLocaleString('ja-JP') : '';
-    result.push(m);
-  }
-  return { success: true, memos: result };
-}
-
 function deleteMeetingMemo(data) {
   const sh = getOrCreateSheet('面談メモデータ', MEETING_MEMO_COLS);
   const rows = sh.getDataRange().getValues();
   for (let i = rows.length - 1; i >= 1; i--) {
     if (String(rows[i][0]) === String(data.id)) {
-      // 削除済みシートにバックアップ
-      const backupCols = [...MEETING_MEMO_COLS, '削除日時'];
-      const bsh = getOrCreateSheet('削除済みメモ', backupCols);
-      const backupRow = [...rows[i], new Date()];
-      bsh.appendRow(backupRow);
       sh.deleteRow(i + 1);
       return { success: true };
     }
@@ -1513,24 +1495,9 @@ function updateMasterGuardianInfo_(data) {
   }
   if (!rowNo) return false;
 
-  // 電話番号フィールドは文字列として書き込む（先頭の0が消えないよう）
-  const phoneKeys = ['guardian2Mobile'];
-  const formatPhone = (v) => {
-    const s = String(v).replace(/[-\s]/g, '');
-    if (/^0[789]0\d{8}$/.test(s)) return s.slice(0,3) + '-' + s.slice(3,7) + '-' + s.slice(7);
-    if (/^0\d{9}$/.test(s)) return s.slice(0,3) + '-' + s.slice(3,6) + '-' + s.slice(6);
-    return s;
-  };
   Object.keys(ENTRY_MASTER_MAP).forEach(key => {
     if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
-      const cell = sh.getRange(rowNo, ENTRY_MASTER_MAP[key]);
-      if (phoneKeys.includes(key)) {
-        const formatted = formatPhone(data[key]);
-        cell.setNumberFormat('@');
-        cell.setValue(formatted);
-      } else {
-        cell.setValue(data[key]);
-      }
+      sh.getRange(rowNo, ENTRY_MASTER_MAP[key]).setValue(data[key]);
     }
   });
   return true;
@@ -1614,6 +1581,38 @@ function normalizeName_(s) {
   return String(s || '').replace(/\s+/g, '').replace(/　/g, '').trim();
 }
 
+function staffLogin(data) {
+  const code = String(data.code || data.adminCode || '').trim();
+  const password = String(data.password || '');
+  if (!code) return { success: false, error: '講師番号を入力してください。' };
+
+  const sh = getTeacherMasterSheet_();
+  const rows = sh.getDataRange().getValues();
+  for (let i = 1; i < rows.length; i++) {
+    const rowCode = String(rows[i][0] || '').trim(); // A列
+    if (rowCode !== code) continue;
+
+    const name = String(rows[i][1] || '').trim(); // B列
+    const savedPassword = String(rows[i][35] || ''); // AJ列
+    const allowed = String(rows[i][36] || '').trim(); // AK列
+    if (allowed !== '1') {
+      return { success: false, error: '管理者の入室の許可をもらってください。' };
+    }
+    if (savedPassword && password !== savedPassword) {
+      return { success: false, error: 'パスワードが違います。' };
+    }
+    return { success: true, code, name, passwordRequired: !!savedPassword };
+  }
+  return { success: false, error: '管理者の入室の許可をもらってください。' };
+}
+
+function getTeacherMasterSheet_() {
+  const ss = SpreadsheetApp.openById(TEACHER_SPREADSHEET_ID);
+  const sh = ss.getSheetByName(TEACHER_SHEET_NAME);
+  if (!sh) throw new Error('講師マスターが見つかりません');
+  return sh;
+}
+
 function saveQrData(data) {
   const adminCode = String(data.adminCode || data.code || '').trim();
   const qrData = String(data.adminQrData || data.qrData || '').trim();
@@ -1653,6 +1652,9 @@ function saveQrData(data) {
 function findTeacherMasterSheet_() {
   const names = ['講師マスター', '講師マスタ', '先生マスター', '先生マスタ'];
   const books = [getDataSS()];
+  try {
+    books.unshift(SpreadsheetApp.openById(TEACHER_SPREADSHEET_ID));
+  } catch (e) {}
   try {
     books.push(SpreadsheetApp.openById(MASTER_SPREADSHEET_ID));
   } catch (e) {}
