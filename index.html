@@ -302,6 +302,7 @@ textarea{
         <p class="sub"><span id="staffNameLabel"></span>よく使う入力・読取ページをここから開きます。</p>
       </div>
       <div class="topActions">
+        <button class="portalBtn" type="button" onclick="staffLogout()">ログアウト</button>
         <button class="portalBtn" type="button" onclick="backToTeacherPortal()">講師ポータルへ</button>
       </div>
     </div>
@@ -465,6 +466,17 @@ function showStaffHome(name){
   document.getElementById('homePage').classList.remove('hidden');
   const label = document.getElementById('staffNameLabel');
   label.textContent = name ? name + 'さん / ' : '';
+}
+
+function staffLogout(){
+  localStorage.removeItem(STAFF_AUTH_KEY);
+  localStorage.removeItem(STAFF_CODE_KEY);
+  document.getElementById('staffCode').value = '';
+  document.getElementById('staffPassword').value = '';
+  document.getElementById('homePage').classList.add('hidden');
+  document.getElementById('adminQrPage').classList.add('hidden');
+  document.getElementById('loginPage').classList.remove('hidden');
+  setLoginMsg('');
 }
 
 function backToTeacherPortal(){
