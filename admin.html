@@ -862,7 +862,7 @@ tr:hover td{background:#f8fafc}
         <div class="cardHead">🔄 生徒マスタ同期</div>
         <p style="font-size:.82rem;color:var(--sub);margin-bottom:14px">
           元スプレッドシート（☆マスタ）から差分を確認して適用します。<br>
-          毎日午前2時に自動同期されますが、手動でも実行できます。
+          Supabase方式では、GAS生徒マスタの変更をここからSupabaseへ反映できます。
         </p>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn btn-primary btn-sm" onclick="runSync()">🔍 差分を確認する</button>
@@ -969,7 +969,7 @@ const RUNTIME_CONFIG = window.SEISEKI_CONFIG || {};
 const SUPABASE_URL = RUNTIME_CONFIG.supabaseUrl || localStorage.getItem('seisekiSupabaseUrl') || '';
 const SUPABASE_ANON_KEY = RUNTIME_CONFIG.supabaseAnonKey || localStorage.getItem('seisekiSupabaseAnonKey') || '';
 let DATA_SOURCE = localStorage.getItem('seisekiDataSource') || (SUPABASE_URL && SUPABASE_ANON_KEY ? 'supabase' : 'legacy-gas');
-const SUPABASE_ENABLED_ACTIONS = new Set(['getStudents']);
+const SUPABASE_ENABLED_ACTIONS = new Set(['getStudents', 'syncStudents', 'applySyncResult', 'getSyncLog']);
 let schools = [];
 let students = [];
 let allScores = [];
@@ -1266,6 +1266,32 @@ async function supabaseGet(path, params) {
   return await r.json();
 }
 
+async function supabaseWrite(path, params, options) {
+  const url = supabaseUrl(path, params);
+  const r = await fetch(url, {
+    method: options.method || 'POST',
+    headers: supabaseHeaders(options.headers),
+    body: options.body === undefined ? undefined : JSON.stringify(options.body)
+  });
+  const text = await r.text();
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch(e) { body = text; }
+  if (!r.ok) {
+    const message = typeof body === 'object' && body ? (body.message || body.msg || JSON.stringify(body)) : String(body || '');
+    throw new Error('Supabase write failed: ' + r.status + (message ? ' ' + message : ''));
+  }
+  return body;
+}
+
+async function legacyApi(data) {
+  const r = await fetch(GAS, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(data)
+  });
+  return await r.json();
+}
+
 async function supabaseApi(data) {
   if (!hasSupabaseConfig()) return { success: false, fallback: true, error: 'Supabase設定がありません' };
   if (!SUPABASE_ENABLED_ACTIONS.has(data.action)) {
@@ -1296,9 +1322,175 @@ async function supabaseApi(data) {
       });
       return { success: true, students: rows.map(sbStudent), source: 'supabase', hasMore: rows.length === limit, limit, offset };
     }
+    case 'syncStudents':
+      return await previewSupabaseStudentSync();
+    case 'applySyncResult':
+      return await applySupabaseStudentSync(data);
+    case 'getSyncLog':
+      return { success: true, logs: getSupabaseSyncLogs() };
     default:
       return { success: false, fallback: true, error: 'Supabase未対応アクション: ' + data.action };
   }
+}
+
+function cleanSyncValue(value) {
+  return value === null || value === undefined ? '' : String(value).trim();
+}
+
+function activeFromStudentFlag(value) {
+  if (value === false) return false;
+  const flag = cleanSyncValue(value);
+  return !['退塾', 'inactive', 'false', '0'].includes(flag);
+}
+
+function syncStudentFromGas(s, index) {
+  const active = activeFromStudentFlag(s.flag ?? s.status ?? s.active);
+  return {
+    id: cleanSyncValue(s.id || s.studentId || s.student_code),
+    name: cleanSyncValue(s.name),
+    nameKana: cleanSyncValue(s.kana || s.nameKana || s.name_kana),
+    campus: cleanSyncValue(s.campus),
+    grade: cleanSyncValue(s.grade),
+    school: cleanSyncValue(s.school || s.school_name),
+    flag: active ? '1' : '退塾',
+    active,
+    sourceRow: index + 2
+  };
+}
+
+function syncStudentToSupabaseRow(s) {
+  return {
+    student_code: cleanSyncValue(s.id),
+    name: cleanSyncValue(s.name),
+    name_kana: cleanSyncValue(s.nameKana),
+    campus: cleanSyncValue(s.campus),
+    grade: cleanSyncValue(s.grade),
+    school_name: cleanSyncValue(s.school),
+    active: activeFromStudentFlag(s.flag),
+    source_row: Number(s.sourceRow || 0) || null,
+    source_updated_at: new Date().toISOString()
+  };
+}
+
+function supabaseStudentToSync(row) {
+  return {
+    id: cleanSyncValue(row.student_code),
+    name: cleanSyncValue(row.name),
+    nameKana: cleanSyncValue(row.name_kana),
+    campus: cleanSyncValue(row.campus),
+    grade: cleanSyncValue(row.grade),
+    school: cleanSyncValue(row.school_name),
+    flag: row.active === false ? '退塾' : '1',
+    active: row.active !== false
+  };
+}
+
+function studentSyncChanges(next, current) {
+  const fields = [
+    ['name', '氏名'],
+    ['nameKana', 'かな'],
+    ['campus', '校舎'],
+    ['grade', '学年'],
+    ['school', '学校'],
+    ['flag', '在籍']
+  ];
+  return fields
+    .filter(([key]) => cleanSyncValue(next[key]) !== cleanSyncValue(current[key]))
+    .map(([key, label]) => `${label}: ${cleanSyncValue(current[key]) || '-'}→${cleanSyncValue(next[key]) || '-'}`);
+}
+
+async function previewSupabaseStudentSync() {
+  const gasResult = await legacyApi({ action: 'getStudents' });
+  if (!gasResult.success) return { success: false, error: gasResult.error || 'GAS生徒マスタを取得できませんでした' };
+  const gasStudents = (gasResult.students || [])
+    .map(syncStudentFromGas)
+    .filter(s => s.id && s.name);
+  const supabaseRows = await supabaseGet('students', {
+    select: 'student_code,name,name_kana,campus,grade,school_name,active',
+    order: 'student_code.asc',
+    limit: 1000
+  });
+  const currentByCode = new Map(supabaseRows.map(row => [cleanSyncValue(row.student_code), supabaseStudentToSync(row)]));
+  const nextByCode = new Map(gasStudents.map(s => [s.id, s]));
+  const toAdd = [];
+  const toUpdate = [];
+  const toDeactivate = [];
+  gasStudents.forEach(next => {
+    const current = currentByCode.get(next.id);
+    if (!current) {
+      toAdd.push(next);
+      return;
+    }
+    const changes = studentSyncChanges(next, current);
+    if (changes.length) toUpdate.push({ ...next, changes });
+  });
+  currentByCode.forEach((current, id) => {
+    if (!nextByCode.has(id) && current.active) toDeactivate.push(current);
+  });
+  return {
+    success: true,
+    preview: { toAdd, toUpdate, passChanged: [], toDeactivate },
+    masterCount: gasStudents.length,
+    localCount: supabaseRows.length,
+    source: 'supabase'
+  };
+}
+
+async function applySupabaseStudentSync(data) {
+  const toUpsert = [...(data.toAdd || []), ...(data.toUpdate || [])].map(syncStudentToSupabaseRow);
+  let applied = 0;
+  if (toUpsert.length) {
+    await supabaseWrite('students', { on_conflict: 'student_code' }, {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+      body: toUpsert
+    });
+    applied += toUpsert.length;
+  }
+  const toDeactivate = data.toDeactivate || [];
+  if (toDeactivate.length) {
+    const codes = toDeactivate.map(s => cleanSyncValue(s.id)).filter(Boolean);
+    if (data.deleteDeactivated) {
+      for (const code of codes) {
+        await supabaseWrite('students', { student_code: 'eq.' + code }, { method: 'DELETE' });
+        applied++;
+      }
+    } else {
+      const rows = toDeactivate.map(s => ({
+        student_code: cleanSyncValue(s.id),
+        name: cleanSyncValue(s.name) || '退塾生',
+        name_kana: cleanSyncValue(s.nameKana),
+        campus: cleanSyncValue(s.campus),
+        grade: cleanSyncValue(s.grade),
+        school_name: cleanSyncValue(s.school),
+        active: false,
+        source_updated_at: new Date().toISOString()
+      }));
+      await supabaseWrite('students', { on_conflict: 'student_code' }, {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: rows
+      });
+      applied += rows.length;
+    }
+  }
+  addSupabaseSyncLog(applied, toUpsert.length, toDeactivate.length, !!data.deleteDeactivated);
+  return { success: true, applied };
+}
+
+function getSupabaseSyncLogs() {
+  try { return JSON.parse(localStorage.getItem('seisekiSupabaseSyncLogs') || '[]'); }
+  catch(e) { return []; }
+}
+
+function addSupabaseSyncLog(applied, upserted, deactivated, deleted) {
+  const logs = getSupabaseSyncLogs();
+  logs.unshift({
+    time: new Date().toLocaleString('ja-JP'),
+    type: 'sync',
+    detail: `Supabase生徒マスタ同期: ${applied}件（追加/更新 ${upserted}件、${deleted ? '削除' : '退塾'} ${deactivated}件）`
+  });
+  localStorage.setItem('seisekiSupabaseSyncLogs', JSON.stringify(logs.slice(0, 50)));
 }
 
 function supabaseGradeParam(grade) {
@@ -4115,8 +4307,11 @@ async function applySync(deleteOld) {
     toDeactivate: pendingSync.toDeactivate || [],
     deleteDeactivated: deleteOld
   });
-  if (r.success) toast(`✅ 同期完了（${r.applied}件）`);
-  else toast('❌ ' + r.error);
+  if (r.success) {
+    toast(`✅ 同期完了（${r.applied}件）`);
+    pendingSync = null;
+    if (DATA_SOURCE === 'supabase') loadStudents();
+  } else toast('❌ ' + r.error);
 }
 async function loadSyncLog() {
   const r = await api({ action: 'getSyncLog' });
