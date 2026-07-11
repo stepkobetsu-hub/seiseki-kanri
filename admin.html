@@ -205,6 +205,7 @@ tr:hover td{background:#f8fafc}
       <h2>管理者ログイン</h2>
       <p>成績管理システム 管理画面</p>
     </div>
+    <div class="fld" id="adminEmailFld" style="display:none"><label>管理者メールアドレス</label><input type="email" id="adminEmailIn" placeholder="Supabase Authのメールアドレス"></div>
     <div class="fld"><label>管理者パスワード</label><input type="password" id="adminPwIn" placeholder="パスワードを入力" onkeydown="if(event.key==='Enter')doAdminLogin()"></div>
     <div class="errMsg" id="loginErr"></div>
     <button class="btn btn-primary btn-full" onclick="doAdminLogin()">🔑 ログイン</button>
@@ -478,18 +479,19 @@ tr:hover td{background:#f8fafc}
     <div id="aTab_students" style="display:none">
       <div class="card">
         <div class="cardHead">👥 生徒一覧</div>
+        <div id="stuSourceStatus" style="display:none;margin:-4px 0 12px;color:#64748b;font-size:.74rem"></div>
 
         <!-- 絞り込み行 -->
         <div class="filterRow" style="flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px">
           <div class="searchWrap">
-            <input type="text" id="stuSearch" placeholder="名前・IDで検索" oninput="filterStudents()">
+            <input type="text" id="stuSearch" placeholder="名前・IDで検索" oninput="onStudentFilterChange()">
           </div>
-          <select id="stuCampus" onchange="filterStudents();buildSchoolDropdown()">
+          <select id="stuCampus" onchange="onStudentFilterChange();buildSchoolDropdown()">
             <option value="">全校舎</option>
             <option>神領</option>
             <option>大手</option>
           </select>
-          <select id="stuGrade" onchange="filterStudents();buildSchoolDropdown()">
+          <select id="stuGrade" onchange="onStudentFilterChange();buildSchoolDropdown()">
             <option value="">全学年</option>
             <option>中1</option><option>中2</option><option>中3</option>
           </select>
@@ -511,6 +513,7 @@ tr:hover td{background:#f8fafc}
           </div>
 
           <button class="btn btn-outline btn-sm" onclick="printStudentList()">🖨️ 印刷</button>
+          <button id="stuLegacyBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="openStudentsWithLegacy()">従来方式で開く</button>
         </div>
 
         <!-- 並び順行 -->
@@ -538,6 +541,9 @@ tr:hover td{background:#f8fafc}
         </div>
 
         <div class="listBox" id="stuList"></div>
+        <div id="stuPager" style="display:none;margin-top:12px;justify-content:center;gap:8px">
+          <button id="stuMoreBtn" class="btn btn-outline btn-sm" onclick="loadMoreStudents()">次の50件</button>
+        </div>
       </div>
     </div>
 
@@ -956,8 +962,14 @@ tr:hover td{background:#f8fafc}
 
 <div id="toast"></div>
 
+<script src="assets/js/supabase-config.js"></script>
 <script>
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
+const RUNTIME_CONFIG = window.SEISEKI_CONFIG || {};
+const SUPABASE_URL = RUNTIME_CONFIG.supabaseUrl || localStorage.getItem('seisekiSupabaseUrl') || '';
+const SUPABASE_ANON_KEY = RUNTIME_CONFIG.supabaseAnonKey || localStorage.getItem('seisekiSupabaseAnonKey') || '';
+let DATA_SOURCE = localStorage.getItem('seisekiDataSource') || (SUPABASE_URL && SUPABASE_ANON_KEY ? 'supabase' : 'legacy-gas');
+const SUPABASE_ENABLED_ACTIONS = new Set(['getStudents']);
 let schools = [];
 let students = [];
 let allScores = [];
@@ -984,8 +996,8 @@ let _navIdx = -1;
 let _navSkip = false;
 
 let speedChartInst = null;
-// キャッシュ（GAS呼び出し削減）
-let _cache = { students: null, allScores: null };
+// キャッシュ（通信呼び出し削減）
+let _cache = { students: null, allScores: null, allReports: null, allWishes: null, studentDetail: {} };
 let cmpScoreChartInst = null;
 let cmpRpChartInst = null;
 let cmpDiffChartInst = null;
@@ -995,6 +1007,13 @@ let cmpRpData = [];
 let currentEntryInfoStudentId = '';
 let currentEntryGuardian2 = null;
 let currentEntryAiReview = null;
+let _studentPageOffset = 0;
+let studentPageOffset = 0; // backward-compatible alias for stale browser state
+let _studentHasMore = false;
+let _studentFilterTimer = null;
+let _stuSortGrade = true;
+let _stuSortSchool = '';
+let _stuSchoolExclude = new Set(); // チェックを外した学校名
 
 function getNendo(date) {
   const d = date || new Date();
@@ -1055,8 +1074,255 @@ function initGradeSelects() {
 }
 
 // ===== API =====
+function hasSupabaseConfig() {
+  return /^https:\/\/.+\.supabase\.co$/.test(SUPABASE_URL) && !!SUPABASE_ANON_KEY;
+}
+
+function getSupabaseSession() {
+  try {
+    const raw = sessionStorage.getItem('seisekiSupabaseSession');
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    if (!session.access_token || !session.expires_at) return null;
+    if (Date.now() > Number(session.expires_at) * 1000 - 60000) return null;
+    return session;
+  } catch(e) {
+    return null;
+  }
+}
+
+function clearSensitiveCache() {
+  _cache = { students: null, allScores: null, allReports: null, allWishes: null, studentDetail: {} };
+  students = [];
+  allScores = [];
+  allReports = [];
+  meetingMemos = [];
+  adminScores = [];
+  renderedAdminScores = [];
+  renderedAdminReports = [];
+  renderedWishes = [];
+  sessionStorage.removeItem('seisekiStudentsCache');
+}
+
+function setStudentSourceStatus(message, isError) {
+  const el = document.getElementById('stuSourceStatus');
+  if (!el) return;
+  el.style.display = message ? 'block' : 'none';
+  el.style.color = isError ? '#dc2626' : '#64748b';
+  el.textContent = message || '';
+}
+
+function setDataSource(source) {
+  DATA_SOURCE = source;
+  localStorage.setItem('seisekiDataSource', source);
+  if (source !== 'supabase') clearSensitiveCache();
+}
+
+function supabaseHeaders(extra) {
+  const session = getSupabaseSession();
+  return Object.assign({
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: 'Bearer ' + (session?.access_token || SUPABASE_ANON_KEY),
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation'
+  }, extra || {});
+}
+
+async function supabaseSignIn(email, password) {
+  const url = SUPABASE_URL.replace(/\/$/, '') + '/auth/v1/token?grant_type=password';
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email, password })
+  });
+  const json = await r.json().catch(() => ({}));
+  if (!r.ok || !json.access_token) throw new Error('Supabase認証に失敗しました');
+  sessionStorage.setItem('seisekiSupabaseSession', JSON.stringify({
+    access_token: json.access_token,
+    refresh_token: json.refresh_token || '',
+    expires_at: Math.floor(Date.now() / 1000) + Number(json.expires_in || 3600),
+    user_id: json.user?.id || '',
+    email: json.user?.email || email
+  }));
+  return json;
+}
+
+async function supabaseSignOut() {
+  const session = getSupabaseSession();
+  if (session?.access_token && hasSupabaseConfig()) {
+    try {
+      await fetch(SUPABASE_URL.replace(/\/$/, '') + '/auth/v1/logout', {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: 'Bearer ' + session.access_token
+        }
+      });
+    } catch(e) { /* logout must still clear local state */ }
+  }
+  sessionStorage.removeItem('seisekiSupabaseSession');
+}
+
+function sbValue(v) {
+  return v === null || v === undefined ? '' : v;
+}
+
+function sbStudent(row) {
+  return {
+    id: sbValue(row.student_code || row.id),
+    studentCode: sbValue(row.student_code),
+    name: sbValue(row.name),
+    nameKana: sbValue(row.name_kana),
+    campus: sbValue(row.campus),
+    grade: sbValue(row.grade),
+    school: sbValue(row.school_name),
+    flag: row.active === false ? '退塾' : '1',
+    syncedAt: sbValue(row.source_updated_at || row.updated_at)
+  };
+}
+
+function sbScore(row) {
+  return {
+    id: row.id,
+    studentId: sbValue(row.student_code || row.student_id),
+    name: sbValue(row.student_name || row.name),
+    campus: sbValue(row.campus),
+    grade: sbValue(row.grade),
+    school: sbValue(row.school_name),
+    year: row.school_year,
+    term: row.test_number,
+    jpn: row.japanese, soc: row.social, math: row.math, sci: row.science, eng: row.english,
+    mus: row.music, art: row.art, pe: row.health_pe, tech: row.technology_home,
+    total5: row.total_5, total9: row.total_9, rank5: row.rank_5, rank9: row.rank_9,
+    avg_jpn: row.avg_japanese, avg_soc: row.avg_social, avg_math: row.avg_math,
+    avg_sci: row.avg_science, avg_eng: row.avg_english, avg_total5: row.avg_total_5,
+    createdAt: sbValue(row.created_at), updatedAt: sbValue(row.updated_at)
+  };
+}
+
+function sbReport(row) {
+  return {
+    id: row.id,
+    studentId: sbValue(row.student_code || row.student_id),
+    name: sbValue(row.student_name || row.name),
+    campus: sbValue(row.campus),
+    grade: sbValue(row.grade),
+    school: sbValue(row.school_name),
+    year: row.school_year,
+    semester: row.term,
+    rp_jpn: row.japanese, rp_soc: row.social, rp_math: row.math, rp_sci: row.science, rp_eng: row.english,
+    rp_mus: row.music, rp_art: row.art, rp_pe: row.health_pe, rp_tech: row.technology_home,
+    createdAt: sbValue(row.created_at), updatedAt: sbValue(row.updated_at)
+  };
+}
+
+function sbWish(row) {
+  const wishes = row.wishes || {};
+  return Object.assign({
+    id: row.id,
+    studentId: sbValue(row.student_code || row.student_id),
+    name: sbValue(row.student_name || row.name),
+    campus: sbValue(row.campus),
+    grade: sbValue(row.grade),
+    updatedAt: sbValue(row.updated_at),
+    results: row.results || {}
+  }, wishes);
+}
+
+function sbMemo(row) {
+  return {
+    id: row.id,
+    date: row.memo_date,
+    studentId: sbValue(row.student_code || row.student_id),
+    name: sbValue(row.student_name || row.name),
+    campus: sbValue(row.campus),
+    grade: sbValue(row.grade),
+    school: sbValue(row.school_name),
+    counterpart: sbValue(row.contact_person),
+    content: sbValue(row.content),
+    staff: sbValue(row.staff_name),
+    staffEmail: sbValue(row.staff_email),
+    createdAt: sbValue(row.created_at),
+    updatedAt: sbValue(row.updated_at)
+  };
+}
+
+function supabaseUrl(path, params) {
+  const url = new URL(SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/' + path);
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== '' && value !== null && value !== undefined) url.searchParams.set(key, value);
+  });
+  return url.toString();
+}
+
+async function supabaseGet(path, params) {
+  const url = supabaseUrl(path, params);
+  if (path === 'students') console.info('Supabase students request:', url);
+  const r = await fetch(url, { headers: supabaseHeaders() });
+  if (!r.ok) throw new Error('Supabase read failed: ' + r.status);
+  return await r.json();
+}
+
+async function supabaseApi(data) {
+  if (!hasSupabaseConfig()) return { success: false, fallback: true, error: 'Supabase設定がありません' };
+  if (!SUPABASE_ENABLED_ACTIONS.has(data.action)) {
+    return { success: false, fallback: true, error: 'Phase 2ではSupabase対象外です: ' + data.action };
+  }
+  if (!getSupabaseSession()) {
+    return { success: false, fallback: false, authRequired: true, error: 'Supabaseログインが必要です' };
+  }
+  switch (data.action) {
+    case 'getStudents': {
+      const limit = Math.min(Number(data.limit || 50), 50);
+      const offset = Math.max(Number(data.offset || 0), 0);
+      const params = {
+        select: 'id,student_code,name,name_kana,campus,grade,school_name,active',
+        order: 'active.desc,campus.asc,grade.asc,student_code.asc',
+        limit,
+        offset
+      };
+      if (data.activeOnly === true) params.active = 'eq.true';
+      if (data.campus) params.campus = 'eq.' + data.campus;
+      if (data.grade) params.grade = supabaseGradeParam(data.grade);
+      if (data.q) {
+        const q = String(data.q).replace(/[()*.,]/g, ' ').trim();
+        if (q) params.or = `(name.ilike.*${q}*,student_code.ilike.*${q}*)`;
+      }
+      const rows = await supabaseGet('students', {
+        ...params
+      });
+      return { success: true, students: rows.map(sbStudent), source: 'supabase', hasMore: rows.length === limit, limit, offset };
+    }
+    default:
+      return { success: false, fallback: true, error: 'Supabase未対応アクション: ' + data.action };
+  }
+}
+
+function supabaseGradeParam(grade) {
+  const map = {
+    elementary: ['小1','小2','小3','小4','小5','小6'],
+    junior: ['中1','中2','中3'],
+    high: ['高1','高2','高3'],
+    e13: ['小1','小2','小3'],
+    e46: ['小4','小5','小6'],
+    j1: ['中1'],
+    j2: ['中2'],
+    j3: ['中3'],
+    h13: ['高1','高2','高3']
+  };
+  const values = map[grade] || [grade];
+  return 'in.(' + values.join(',') + ')';
+}
+
 async function api(data) {
   try {
+    if (DATA_SOURCE === 'supabase') {
+      const sr = await supabaseApi(data);
+      if (sr.success || !sr.fallback) return sr;
+    }
     const r = await fetch(GAS, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
@@ -1085,14 +1351,31 @@ function closeSidebar(){
   document.getElementById('sideToggleBtn').textContent = '☰';
 }
 
-function doAdminLogin() {
+async function doAdminLogin() {
   const pw = document.getElementById('adminPwIn').value;
+  if (DATA_SOURCE === 'supabase' && hasSupabaseConfig()) {
+    const email = document.getElementById('adminEmailIn').value.trim();
+    if (!email || !pw) {
+      document.getElementById('loginErr').textContent = 'メールアドレスとパスワードを入力してください';
+      return;
+    }
+    try {
+      await supabaseSignIn(email, pw);
+      sessionStorage.setItem('adminLoggedIn', '1');
+      localStorage.removeItem('adminLoggedIn');
+      document.getElementById('loginErr').textContent = '';
+      showMain();
+    } catch(e) {
+      clearSensitiveCache();
+      document.getElementById('loginErr').textContent = 'ログインできませんでした';
+    }
+    return;
+  }
   const saved = localStorage.getItem('adminPass') || 'admin1234';
   if (pw === saved || pw === 'admin1234') {
     if (pw === 'admin1234') localStorage.removeItem('adminPass');
     sessionStorage.setItem('adminLoggedIn', '1');
-    localStorage.setItem('adminLoggedIn', '1');
-    localStorage.setItem('adminPwInput', pw);
+    localStorage.removeItem('adminLoggedIn');
     showMain();
   } else {
     document.getElementById('loginErr').textContent = 'パスワードが違います';
@@ -1118,24 +1401,27 @@ function showMain() {
     loadSpeed();
   }
 }
-function logout() {
+async function logout() {
+  await supabaseSignOut();
+  clearSensitiveCache();
   sessionStorage.removeItem('adminLoggedIn');
   localStorage.removeItem('adminLoggedIn');
+  localStorage.removeItem('adminPwInput');
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('mainHeader').style.display = 'none';
   document.getElementById('mainLayout').style.display = 'none';
   document.getElementById('adminPwIn').value = '';
+  const emailEl = document.getElementById('adminEmailIn');
+  if (emailEl) emailEl.value = '';
 }
 // ページ読み込み時：ログイン済みなら自動ログイン
 (function() {
-  // パスワード入力欄に前回入力を復元
-  const savedPw = localStorage.getItem('adminPwInput');
-  if (savedPw) {
-    const el = document.getElementById('adminPwIn');
-    if (el) el.value = savedPw;
+  const emailFld = document.getElementById('adminEmailFld');
+  if (emailFld && DATA_SOURCE === 'supabase' && hasSupabaseConfig()) {
+    emailFld.style.display = '';
   }
   // セッションが生きていれば自動ログイン
-  if (sessionStorage.getItem('adminLoggedIn') === '1' || localStorage.getItem('adminLoggedIn') === '1') {
+  if (sessionStorage.getItem('adminLoggedIn') === '1' && (DATA_SOURCE !== 'supabase' || getSupabaseSession())) {
     showMain();
   }
 })();
@@ -1152,8 +1438,7 @@ function navToSpeed() {
 }
 
 function reloadData() {
-  _cache.students = null;
-  _cache.allScores = null;
+  clearSensitiveCache();
   const visibleTab = TABS.find(t => {
     const el = document.getElementById('aTab_' + t);
     return el && el.style.display !== 'none';
@@ -1513,23 +1798,19 @@ async function loadSpeed() {
   const campus = document.getElementById('spCampus').value;
   const grade = document.getElementById('spGrade').value;
 
-  // 全データ＋生徒一覧を取得（キャッシュあれば再利用）
-  // キャッシュがなければ取得（showMainでプリロード済みのことが多い）
-  if (!_cache.allScores) {
-    const r = await api({ action: 'getAllScores' });
-    _cache.allScores = r.scores || [];
+  const scoreCacheKey = [year, term, campus].join('|');
+  if (!_cache.allScores || _cache.allScores.key !== scoreCacheKey) {
+    const r = await api({ action: 'getAllScores', year, term, campus });
+    _cache.allScores = { key: scoreCacheKey, rows: r.scores || [] };
   }
   if (!students || students.length === 0) {
     const r = await api({ action: 'getStudents' });
     students = r.students || [];
   }
-  window._allScoresFull = _cache.allScores;
+  window._allScoresFull = _cache.allScores.rows;
 
-  // キャッシュから絞り込み（GAS呼び出しなし）
-  allScores = _cache.allScores.filter(s => {
-    if (year   && String(s.year) !== String(year)) return false;
-    if (term   && String(s.term) !== String(term)) return false;
-    if (campus && s.campus !== campus) return false;
+  // 校舎・年度・回次はAPI側で絞り込み、学年グループだけ画面側で絞り込む
+  allScores = _cache.allScores.rows.filter(s => {
     if (grade  && !gradeMatchesGroup(s.grade, grade)) return false;
     return true;
   });
@@ -1589,10 +1870,10 @@ async function loadSpeed() {
   // 新着バッジ確認
   try {
     const [rr, rw] = await Promise.all([
-      api({ action:'getAllReports' }),
-      api({ action:'getAllWishes' })
+      api({ action:'getAllReports', year, campus }),
+      api({ action:'getAllWishes', campus })
     ]);
-    checkSpeedNewBadges(_cache.allScores || [], rr.data || [], rw.wishes || []);
+    checkSpeedNewBadges(_cache.allScores.rows || [], rr.data || [], rw.wishes || []);
   } catch(e) { /* 無視 */ }
 }
 
@@ -1942,11 +2223,99 @@ function drawSpeedChart(data, subj) {
 }
 
 // ===== 生徒 =====
-async function loadStudents() {
+function studentFilterParams() {
+  return {
+    campus: document.getElementById('stuCampus')?.value || '',
+    grade: document.getElementById('stuGrade')?.value || '',
+    q: (document.getElementById('stuSearch')?.value || '').trim()
+  };
+}
+
+async function loadStudents(opts) {
+  const append = !!(opts && opts.append);
+  if (DATA_SOURCE === 'supabase') {
+    await loadStudentsFromSupabase(append);
+    return;
+  }
+  setStudentSourceStatus('取得元: 従来GAS', false);
+  document.getElementById('stuLegacyBtn').style.display = 'none';
+  document.getElementById('stuPager').style.display = 'none';
   const r = await api({ action: 'getStudents' });
+  if (!r.success && r.error) {
+    setStudentSourceStatus('生徒一覧を取得できませんでした。', true);
+    return;
+  }
   students = r.students || [];
   buildSchoolDropdown();
   filterStudents();
+}
+
+async function loadStudentsFromSupabase(append) {
+  const box = document.getElementById('stuList');
+  const pager = document.getElementById('stuPager');
+  const legacyBtn = document.getElementById('stuLegacyBtn');
+  if (!append) {
+    _studentPageOffset = 0;
+    studentPageOffset = 0;
+    students = [];
+    if (box) box.innerHTML = '<div class="noData">読込中...</div>';
+  }
+  if (!hasSupabaseConfig()) {
+    setStudentSourceStatus('Supabase設定がないため、従来GASで開きます。', false);
+    setDataSource('legacy-gas');
+    await loadStudents();
+    return;
+  }
+  if (!getSupabaseSession()) {
+    setStudentSourceStatus('Supabaseログインが必要です。再ログインしてください。', true);
+    if (legacyBtn) legacyBtn.style.display = '';
+    if (box) box.innerHTML = '<div class="noData">ログイン後に表示します</div>';
+    return;
+  }
+  const params = studentFilterParams();
+  const started = performance.now();
+  const r = await api({
+    action: 'getStudents',
+    ...params,
+    offset: _studentPageOffset,
+    limit: 50
+  });
+  const ms = Math.round(performance.now() - started);
+  if (!r.success) {
+    setStudentSourceStatus('Supabaseから取得できませんでした。再試行するか従来方式で開いてください。', true);
+    if (legacyBtn) legacyBtn.style.display = '';
+    if (box) box.innerHTML = '<div class="noData"><button class="btn btn-outline btn-sm" onclick="loadStudents()">再試行</button></div>';
+    return;
+  }
+  const rows = r.students || [];
+  students = append ? students.concat(rows) : rows;
+  _studentPageOffset += rows.length;
+  studentPageOffset = _studentPageOffset;
+  _studentHasMore = !!r.hasMore;
+  setStudentSourceStatus(`取得元: Supabase / ${ms}ms / 表示 ${students.length}件`, false);
+  if (legacyBtn) legacyBtn.style.display = '';
+  if (pager) pager.style.display = _studentHasMore ? 'flex' : 'none';
+  buildSchoolDropdown();
+  filterStudents({ skipClientFilters: true });
+}
+
+function loadMoreStudents() {
+  loadStudents({ append: true });
+}
+
+function onStudentFilterChange() {
+  if (DATA_SOURCE === 'supabase') {
+    clearTimeout(_studentFilterTimer);
+    _studentFilterTimer = setTimeout(() => loadStudents(), 250);
+    return;
+  }
+  filterStudents();
+}
+
+function openStudentsWithLegacy() {
+  setDataSource('legacy-gas');
+  setStudentSourceStatus('従来GASで開いています。', false);
+  loadStudents();
 }
 function printStudentList() {
   const list = _getFilteredSortedStudents();
@@ -2015,9 +2384,6 @@ function printStudentList() {
 }
 
 // ===== 生徒一覧 並び順・学校チェックドロップダウン =====
-let _stuSortGrade   = true;
-let _stuSortSchool  = '';
-let _stuSchoolExclude = new Set(); // チェックを外した学校名
 
 // ドロップダウン開閉
 function toggleSchoolDrop(e) {
