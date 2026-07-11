@@ -205,8 +205,9 @@ tr:hover td{background:#f8fafc}
       <h2>管理者ログイン</h2>
       <p>成績管理システム 管理画面</p>
     </div>
-    <div class="fld" id="adminEmailFld" style="display:none"><label>管理者メールアドレス</label><input type="email" id="adminEmailIn" placeholder="Supabase Authのメールアドレス"></div>
-    <div class="fld"><label>管理者パスワード</label><input type="password" id="adminPwIn" placeholder="パスワードを入力" onkeydown="if(event.key==='Enter')doAdminLogin()"></div>
+    <div class="fld"><label>講師コード</label><input type="text" id="adminCodeIn" placeholder="講師マスターA列のコード" onkeydown="if(event.key==='Enter')doAdminLogin()"></div>
+    <div class="fld" id="adminEmailFld" style="display:none"><label>Supabase Authメール</label><input type="email" id="adminEmailIn" placeholder="Supabase Authのメールアドレス"></div>
+    <div class="fld"><label>パスワード</label><input type="password" id="adminPwIn" placeholder="講師マスターAJ列のパスワード" onkeydown="if(event.key==='Enter')doAdminLogin()"></div>
     <div class="errMsg" id="loginErr"></div>
     <button class="btn btn-primary btn-full" onclick="doAdminLogin()">🔑 ログイン</button>
   </div>
@@ -1546,39 +1547,73 @@ function closeSidebar(){
 }
 
 async function doAdminLogin() {
+  const code = document.getElementById('adminCodeIn').value.trim();
   const pw = document.getElementById('adminPwIn').value;
+  const errEl = document.getElementById('loginErr');
+  if (!code || !pw) {
+    errEl.textContent = '講師コードとパスワードを入力してください';
+    return;
+  }
+  const staff = await api({ action: 'staffLogin', code, password: pw });
+  if (!staff.success) {
+    errEl.textContent = staff.error || 'ログインできませんでした';
+    return;
+  }
   if (DATA_SOURCE === 'supabase' && hasSupabaseConfig()) {
     const email = document.getElementById('adminEmailIn').value.trim();
     if (!email || !pw) {
-      document.getElementById('loginErr').textContent = 'メールアドレスとパスワードを入力してください';
+      errEl.textContent = 'Supabase Authメールとパスワードを入力してください';
       return;
     }
     try {
       await supabaseSignIn(email, pw);
       sessionStorage.setItem('adminLoggedIn', '1');
+      sessionStorage.setItem('adminStaffCode', staff.code || code);
+      sessionStorage.setItem('adminStaffName', staff.name || '');
+      rememberAdminLogin(code, pw, email);
       localStorage.removeItem('adminLoggedIn');
-      document.getElementById('loginErr').textContent = '';
+      errEl.textContent = '';
       showMain();
     } catch(e) {
       clearSensitiveCache();
-      document.getElementById('loginErr').textContent = 'ログインできませんでした';
+      errEl.textContent = 'Supabase Authにログインできませんでした';
     }
     return;
   }
-  const saved = localStorage.getItem('adminPass') || 'admin1234';
-  if (pw === saved || pw === 'admin1234') {
-    if (pw === 'admin1234') localStorage.removeItem('adminPass');
-    sessionStorage.setItem('adminLoggedIn', '1');
-    localStorage.removeItem('adminLoggedIn');
-    showMain();
-  } else {
-    document.getElementById('loginErr').textContent = 'パスワードが違います';
-  }
+  sessionStorage.setItem('adminLoggedIn', '1');
+  sessionStorage.setItem('adminStaffCode', staff.code || code);
+  sessionStorage.setItem('adminStaffName', staff.name || '');
+  rememberAdminLogin(code, pw, '');
+  localStorage.removeItem('adminLoggedIn');
+  errEl.textContent = '';
+  showMain();
+}
+function rememberAdminLogin(code, password, email) {
+  localStorage.setItem('adminCodeInput', code || '');
+  localStorage.setItem('adminPwInput', password || '');
+  if (email) localStorage.setItem('adminEmailInput', email);
+}
+function restoreAdminLoginInputs() {
+  const codeEl = document.getElementById('adminCodeIn');
+  const pwEl = document.getElementById('adminPwIn');
+  const emailEl = document.getElementById('adminEmailIn');
+  if (codeEl) codeEl.value = localStorage.getItem('adminCodeInput') || '';
+  if (pwEl) pwEl.value = localStorage.getItem('adminPwInput') || '';
+  if (emailEl) emailEl.value = localStorage.getItem('adminEmailInput') || emailEl.value || '';
+}
+function updateAdminLabel() {
+  const label = document.getElementById('adminLabel');
+  if (!label) return;
+  const name = sessionStorage.getItem('adminStaffName') || '';
+  const code = sessionStorage.getItem('adminStaffCode') || '';
+  label.textContent = name ? `${name}（${code}）` : '管理者';
+  label.style.fontSize = '.78rem';
 }
 function showMain() {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('mainHeader').style.display = 'flex';
   document.getElementById('mainLayout').style.display = 'flex';
+  updateAdminLabel();
   initYearSelects();
   initGradeSelects();
   const initialTab = getInitialAdminTab();
@@ -1599,14 +1634,14 @@ async function logout() {
   await supabaseSignOut();
   clearSensitiveCache();
   sessionStorage.removeItem('adminLoggedIn');
+  sessionStorage.removeItem('adminStaffCode');
+  sessionStorage.removeItem('adminStaffName');
   localStorage.removeItem('adminLoggedIn');
-  localStorage.removeItem('adminPwInput');
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('mainHeader').style.display = 'none';
   document.getElementById('mainLayout').style.display = 'none';
-  document.getElementById('adminPwIn').value = '';
-  const emailEl = document.getElementById('adminEmailIn');
-  if (emailEl) emailEl.value = '';
+  document.getElementById('adminLabel').textContent = '管理者';
+  restoreAdminLoginInputs();
 }
 // ページ読み込み時：ログイン済みなら自動ログイン
 (function() {
@@ -1614,6 +1649,7 @@ async function logout() {
   if (emailFld && DATA_SOURCE === 'supabase' && hasSupabaseConfig()) {
     emailFld.style.display = '';
   }
+  restoreAdminLoginInputs();
   // セッションが生きていれば自動ログイン
   if (sessionStorage.getItem('adminLoggedIn') === '1' && (DATA_SOURCE !== 'supabase' || getSupabaseSession())) {
     showMain();
