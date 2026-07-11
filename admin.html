@@ -493,7 +493,7 @@ tr:hover td{background:#f8fafc}
           </select>
           <select id="stuGrade" onchange="onStudentFilterChange();buildSchoolDropdown()">
             <option value="">全学年</option>
-            <option>中1</option><option>中2</option><option>中3</option>
+            <option value="j1">中1</option><option value="j2">中2</option><option value="j3">中3</option>
           </select>
 
           <!-- 学校チェックボックスドロップダウン -->
@@ -1313,7 +1313,9 @@ function supabaseGradeParam(grade) {
     j3: ['中3'],
     h13: ['高1','高2','高3']
   };
-  const values = map[grade] || [grade];
+  const toFullWidthDigit = v => String(v).replace(/[1-6]/g, ch => ({'1':'１','2':'２','3':'３','4':'４','5':'５','6':'６'}[ch]));
+  const baseValues = map[grade] || [normalizeGrade(grade)];
+  const values = [...new Set(baseValues.flatMap(v => [v, toFullWidthDigit(v)]))];
   return 'in.(' + values.join(',') + ')';
 }
 
