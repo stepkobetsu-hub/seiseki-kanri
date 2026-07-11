@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+
+backups/
+sync-previews/
+outputs/
+
+*.log
+*.tmp
