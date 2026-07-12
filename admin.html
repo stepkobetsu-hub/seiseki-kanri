@@ -1568,23 +1568,16 @@ async function doAdminLogin() {
     }
     try {
       await supabaseSignIn(email, pw);
-      sessionStorage.setItem('adminLoggedIn', '1');
-      sessionStorage.setItem('adminStaffCode', staff.code || code);
-      sessionStorage.setItem('adminStaffName', staff.name || '');
-      rememberAdminLogin(code, pw, email);
-      localStorage.removeItem('adminLoggedIn');
-      errEl.textContent = '';
-      showMain();
     } catch(e) {
+      setDataSource('legacy-gas');
       clearSensitiveCache();
-      errEl.textContent = 'Supabase Authにログインできませんでした';
+      toast('Supabase Authに入れなかったため、従来GASで開きます');
     }
-    return;
   }
   sessionStorage.setItem('adminLoggedIn', '1');
   sessionStorage.setItem('adminStaffCode', staff.code || code);
   sessionStorage.setItem('adminStaffName', staff.name || '');
-  rememberAdminLogin(code, pw, '');
+  rememberAdminLogin(code, pw, DATA_SOURCE === 'supabase' ? DEFAULT_SUPABASE_AUTH_EMAIL : '');
   localStorage.removeItem('adminLoggedIn');
   errEl.textContent = '';
   showMain();
