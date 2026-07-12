@@ -206,7 +206,7 @@ tr:hover td{background:#f8fafc}
       <p>成績管理システム 管理画面</p>
     </div>
     <div class="fld"><label>講師コード</label><input type="text" id="adminCodeIn" placeholder="講師マスターA列のコード" onkeydown="if(event.key==='Enter')doAdminLogin()"></div>
-    <div class="fld" id="adminEmailFld" style="display:none"><label>Supabase Authメール</label><input type="email" id="adminEmailIn" placeholder="Supabase Authのメールアドレス"></div>
+    <input type="hidden" id="adminEmailIn" value="stepkobetsu@gmail.com">
     <div class="fld"><label>パスワード</label><input type="password" id="adminPwIn" placeholder="講師マスターAJ列のパスワード" onkeydown="if(event.key==='Enter')doAdminLogin()"></div>
     <div class="errMsg" id="loginErr"></div>
     <button class="btn btn-primary btn-full" onclick="doAdminLogin()">🔑 ログイン</button>
@@ -969,6 +969,7 @@ const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56W
 const RUNTIME_CONFIG = window.SEISEKI_CONFIG || {};
 const SUPABASE_URL = RUNTIME_CONFIG.supabaseUrl || localStorage.getItem('seisekiSupabaseUrl') || '';
 const SUPABASE_ANON_KEY = RUNTIME_CONFIG.supabaseAnonKey || localStorage.getItem('seisekiSupabaseAnonKey') || '';
+const DEFAULT_SUPABASE_AUTH_EMAIL = RUNTIME_CONFIG.supabaseAdminEmail || localStorage.getItem('seisekiSupabaseAdminEmail') || 'stepkobetsu@gmail.com';
 let DATA_SOURCE = localStorage.getItem('seisekiDataSource') || (SUPABASE_URL && SUPABASE_ANON_KEY ? 'supabase' : 'legacy-gas');
 const SUPABASE_ENABLED_ACTIONS = new Set(['getStudents', 'syncStudents', 'applySyncResult', 'getSyncLog']);
 let schools = [];
@@ -1560,9 +1561,9 @@ async function doAdminLogin() {
     return;
   }
   if (DATA_SOURCE === 'supabase' && hasSupabaseConfig()) {
-    const email = document.getElementById('adminEmailIn').value.trim();
+    const email = (document.getElementById('adminEmailIn')?.value || DEFAULT_SUPABASE_AUTH_EMAIL).trim();
     if (!email || !pw) {
-      errEl.textContent = 'Supabase Authメールとパスワードを入力してください';
+      errEl.textContent = '講師コードとパスワードを入力してください';
       return;
     }
     try {
@@ -1599,7 +1600,7 @@ function restoreAdminLoginInputs() {
   const emailEl = document.getElementById('adminEmailIn');
   if (codeEl) codeEl.value = localStorage.getItem('adminCodeInput') || '';
   if (pwEl) pwEl.value = localStorage.getItem('adminPwInput') || '';
-  if (emailEl) emailEl.value = localStorage.getItem('adminEmailInput') || emailEl.value || '';
+  if (emailEl) emailEl.value = localStorage.getItem('adminEmailInput') || DEFAULT_SUPABASE_AUTH_EMAIL;
 }
 function updateAdminLabel() {
   const label = document.getElementById('adminLabel');
@@ -1645,10 +1646,6 @@ async function logout() {
 }
 // ページ読み込み時：ログイン済みなら自動ログイン
 (function() {
-  const emailFld = document.getElementById('adminEmailFld');
-  if (emailFld && DATA_SOURCE === 'supabase' && hasSupabaseConfig()) {
-    emailFld.style.display = '';
-  }
   restoreAdminLoginInputs();
   // セッションが生きていれば自動ログイン
   if (sessionStorage.getItem('adminLoggedIn') === '1' && (DATA_SOURCE !== 'supabase' || getSupabaseSession())) {
