@@ -9,6 +9,10 @@ const TEACHER_SPREADSHEET_ID = '1L5aFDXAmfUDkBg8d7X3WqJgMhdMq5tM5sfUZ2G-M58E'; /
 
 const MASTER_SHEET_NAME = '☆マスタ';
 const TEACHER_SHEET_NAME = '講師マスター';
+const STAFF_APP_PERMISSION_LEVELS = ['1', '2', '3', '4'];
+const STUDENT_QR_PERMISSION_LEVELS = ['2', '3', '4'];
+const STUDENT_QR_SESSION_PREFIX = 'studentQrSession:';
+const STUDENT_QR_SESSION_SECONDS = 6 * 60 * 60;
 const TARGET_MASTER_FLAGS = ['1', '0']; // ☆マスタB列: 1=在籍, 0=保留中
 const SCHOOL_MASTER_COLS = ['学校名','年間テスト回数','学期制','登録日時','定期テスト日程JSON','予定表URL','日程メモ'];
 const MEETING_MEMO_COLS = ['ID','日付','生徒ID','氏名','校舎','学年','中学校','相手','内容','担当','登録日時','更新日時'];
@@ -138,6 +142,9 @@ function route(e) {
       case 'getAllScores':        result = getAllScores(data); break;
       case 'getStudentDetail':   result = getStudentDetail(data); break;
       case 'staffLogin':         result = staffLogin(data); break;
+      case 'studentQrLogin':     result = studentQrLogin(data); break;
+      case 'studentQrVerify':    result = studentQrVerify(data); break;
+      case 'studentQrLogout':    result = studentQrLogout(data); break;
       case 'saveQrData':         result = saveQrData(data); break;
       // 通知表
       case 'getReport':          result = getReport(data); break;
@@ -1586,24 +1593,118 @@ function staffLogin(data) {
   const password = String(data.password || '');
   if (!code) return { success: false, error: '講師番号を入力してください。' };
 
+  const auth = getTeacherAuthByCode_(code);
+  if (!auth) return { success: false, error: '管理者の入室の許可をもらってください。' };
+  if (!STAFF_APP_PERMISSION_LEVELS.includes(auth.permissionLevel)) {
+    return { success: false, error: '管理者の入室の許可をもらってください。' };
+  }
+  if (auth.savedPassword && password !== auth.savedPassword) {
+    return { success: false, error: 'パスワードが違います。' };
+  }
+  return {
+    success: true,
+    code,
+    loginId: code,
+    name: auth.name,
+    permissionLevel: auth.permissionLevel,
+    passwordRequired: !!auth.savedPassword
+  };
+}
+
+function studentQrLogin(data) {
+  const code = String(data.code || data.loginId || data.username || '').trim();
+  const password = String(data.password || '');
+  const failure = { success: false, error: 'ID、パスワード、または利用権限を確認してください。' };
+  if (!code) return failure;
+
+  const auth = getTeacherAuthByCode_(code);
+  if (!auth) return failure;
+  if (auth.savedPassword && password !== auth.savedPassword) return failure;
+  if (!STUDENT_QR_PERMISSION_LEVELS.includes(auth.permissionLevel)) return failure;
+
+  const session = createStudentQrSession_(auth);
+  return {
+    success: true,
+    loginId: auth.code,
+    code: auth.code,
+    name: auth.name,
+    permissionLevel: auth.permissionLevel,
+    sessionToken: session.sessionToken,
+    expiresAt: session.expiresAt
+  };
+}
+
+function studentQrVerify(data) {
+  const token = String(data.sessionToken || data.token || '').trim();
+  if (!token) return { success: false, error: 'ログインしてください。' };
+
+  const cached = CacheService.getScriptCache().get(STUDENT_QR_SESSION_PREFIX + token);
+  if (!cached) return { success: false, error: 'ログインしてください。' };
+
+  let session;
+  try {
+    session = JSON.parse(cached);
+  } catch (e) {
+    return { success: false, error: 'ログインしてください。' };
+  }
+  if (!session.loginId || !session.expiresAt || new Date(session.expiresAt).getTime() <= Date.now()) {
+    CacheService.getScriptCache().remove(STUDENT_QR_SESSION_PREFIX + token);
+    return { success: false, error: 'ログインしてください。' };
+  }
+
+  const auth = getTeacherAuthByCode_(session.loginId);
+  if (!auth || !STUDENT_QR_PERMISSION_LEVELS.includes(auth.permissionLevel)) {
+    CacheService.getScriptCache().remove(STUDENT_QR_SESSION_PREFIX + token);
+    return { success: false, error: 'この機能を利用する権限がありません。管理者へ確認してください。' };
+  }
+
+  return {
+    success: true,
+    loginId: auth.code,
+    code: auth.code,
+    name: auth.name,
+    permissionLevel: auth.permissionLevel,
+    sessionToken: token,
+    expiresAt: session.expiresAt
+  };
+}
+
+function studentQrLogout(data) {
+  const token = String(data.sessionToken || data.token || '').trim();
+  if (token) CacheService.getScriptCache().remove(STUDENT_QR_SESSION_PREFIX + token);
+  return { success: true };
+}
+
+function getTeacherAuthByCode_(code) {
   const sh = getTeacherMasterSheet_();
   const rows = sh.getDataRange().getValues();
   for (let i = 1; i < rows.length; i++) {
     const rowCode = String(rows[i][0] || '').trim(); // A列
     if (rowCode !== code) continue;
-
-    const name = String(rows[i][1] || '').trim(); // B列
-    const savedPassword = String(rows[i][35] || ''); // AJ列
-    const allowed = String(rows[i][36] || '').trim(); // AK列
-    if (allowed !== '1') {
-      return { success: false, error: '管理者の入室の許可をもらってください。' };
-    }
-    if (savedPassword && password !== savedPassword) {
-      return { success: false, error: 'パスワードが違います。' };
-    }
-    return { success: true, code, name, passwordRequired: !!savedPassword };
+    return {
+      code: rowCode,
+      name: String(rows[i][1] || '').trim(), // B列
+      savedPassword: String(rows[i][35] || ''), // AJ列
+      permissionLevel: String(rows[i][36] || '').trim() // AK列
+    };
   }
-  return { success: false, error: '管理者の入室の許可をもらってください。' };
+  return null;
+}
+
+function createStudentQrSession_(auth) {
+  const sessionToken = Utilities.getUuid() + '-' + Utilities.getUuid();
+  const expiresAt = new Date(Date.now() + STUDENT_QR_SESSION_SECONDS * 1000).toISOString();
+  CacheService.getScriptCache().put(
+    STUDENT_QR_SESSION_PREFIX + sessionToken,
+    JSON.stringify({
+      loginId: auth.code,
+      name: auth.name,
+      permissionLevel: auth.permissionLevel,
+      expiresAt: expiresAt
+    }),
+    STUDENT_QR_SESSION_SECONDS
+  );
+  return { sessionToken: sessionToken, expiresAt: expiresAt };
 }
 
 function getTeacherMasterSheet_() {

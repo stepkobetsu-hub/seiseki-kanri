@@ -332,7 +332,7 @@ textarea{
         <div class="go">開く</div>
       </button>
 
-      <a class="app" href="https://stepkobetsu-hub.github.io/student-QR/student_qr_register.html" target="_blank" rel="noopener noreferrer">
+      <a class="app" id="studentQrAppCard" href="https://stepkobetsu-hub.github.io/student-QR/student_qr_register.html" target="_blank" rel="noopener noreferrer">
         <div>
           <div class="appTitle"><span class="ico">▦</span><span>生徒・講師QR／入退室管理</span></div>
           <p class="desc">生徒・講師のQRコード作成、登録、確認など、入退室管理に必要な設定を行います。</p>
@@ -460,20 +460,25 @@ async function staffLogin(isAuto){
       code,
       password: password || '',
       name: result.name || '',
+      permissionLevel: result.permissionLevel || '',
       savedAt: new Date().toISOString()
     }));
-    showStaffHome(result.name || '');
+    showStaffHome(result.name || '', result.permissionLevel || '');
   }catch(err){
     localStorage.removeItem(STAFF_AUTH_KEY);
     setLoginMsg(err.message || 'ログインできませんでした');
   }
 }
 
-function showStaffHome(name){
+function showStaffHome(name, permissionLevel){
   document.getElementById('loginPage').classList.add('hidden');
   document.getElementById('homePage').classList.remove('hidden');
   const label = document.getElementById('staffNameLabel');
   label.textContent = name ? name + 'さん / ' : '';
+  const studentQrCard = document.getElementById('studentQrAppCard');
+  if (studentQrCard) {
+    studentQrCard.classList.toggle('hidden', String(permissionLevel || '').trim() === '1');
+  }
 }
 
 function staffLogout(){
@@ -484,6 +489,8 @@ function staffLogout(){
   document.getElementById('homePage').classList.add('hidden');
   document.getElementById('adminQrPage').classList.add('hidden');
   document.getElementById('loginPage').classList.remove('hidden');
+  const studentQrCard = document.getElementById('studentQrAppCard');
+  if (studentQrCard) studentQrCard.classList.remove('hidden');
   setLoginMsg('');
 }
 
