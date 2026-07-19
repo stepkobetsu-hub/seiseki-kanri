@@ -324,6 +324,14 @@ textarea{
         <div class="go">開く</div>
       </a>
 
+      <a class="app primary hidden" id="systemPortalCard" href="system_portal.html">
+        <div>
+          <div class="appTitle"><span class="ico">🧭</span><span>STEP総合管理ポータル</span></div>
+          <p class="desc">全システム、管理用リンク、共有用URLを一か所から確認します。権限4専用です。</p>
+        </div>
+        <div class="go">開く</div>
+      </a>
+
       <button class="app" type="button" onclick="showAdminQr()">
         <div>
           <div class="appTitle"><span class="ico"><img src="icons/admin-qr-icon.png" alt=""></span><span>管理者QR登録</span></div>
@@ -469,6 +477,8 @@ async function staffLogin(isAuto){
       password: password || '',
       name: result.name || '',
       permissionLevel: result.permissionLevel || '',
+      systemPortalSessionToken: result.systemPortalSessionToken || '',
+      systemPortalExpiresAt: result.systemPortalExpiresAt || '',
       savedAt: new Date().toISOString()
     }));
     showStaffHome(result.name || '', result.permissionLevel || '');
@@ -487,6 +497,10 @@ function showStaffHome(name, permissionLevel){
   if (studentQrCard) {
     studentQrCard.classList.toggle('hidden', String(permissionLevel || '').trim() === '1');
   }
+  const systemPortalCard = document.getElementById('systemPortalCard');
+  if (systemPortalCard) {
+    systemPortalCard.classList.toggle('hidden', String(permissionLevel || '').trim() !== '4');
+  }
 }
 
 function staffLogout(){
@@ -499,6 +513,8 @@ function staffLogout(){
   document.getElementById('loginPage').classList.remove('hidden');
   const studentQrCard = document.getElementById('studentQrAppCard');
   if (studentQrCard) studentQrCard.classList.remove('hidden');
+  const systemPortalCard = document.getElementById('systemPortalCard');
+  if (systemPortalCard) systemPortalCard.classList.add('hidden');
   setLoginMsg('');
 }
 
