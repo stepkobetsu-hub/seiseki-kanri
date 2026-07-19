@@ -13,6 +13,10 @@ const STAFF_APP_PERMISSION_LEVELS = ['1', '2', '3', '4'];
 const STUDENT_QR_PERMISSION_LEVELS = ['2', '3', '4'];
 const STUDENT_QR_SESSION_PREFIX = 'studentQrSession:';
 const STUDENT_QR_SESSION_SECONDS = 6 * 60 * 60;
+const SYSTEM_PORTAL_PERMISSION_LEVEL = '4';
+const SYSTEM_PORTAL_SESSION_PREFIX = 'systemPortalSession:';
+const SYSTEM_PORTAL_SESSION_SECONDS = 6 * 60 * 60;
+const SYSTEM_REGISTRY_SHEET_NAME = 'システム台帳';
 const TARGET_MASTER_FLAGS = ['1', '0']; // ☆マスタB列: 1=在籍, 0=保留中
 const SCHOOL_MASTER_COLS = ['学校名','年間テスト回数','学期制','登録日時','定期テスト日程JSON','予定表URL','日程メモ'];
 const MEETING_MEMO_COLS = ['ID','日付','生徒ID','氏名','校舎','学年','中学校','相手','内容','担当','登録日時','更新日時'];
@@ -142,6 +146,9 @@ function route(e) {
       case 'getAllScores':        result = getAllScores(data); break;
       case 'getStudentDetail':   result = getStudentDetail(data); break;
       case 'staffLogin':         result = staffLogin(data); break;
+      case 'getSystemRegistry':  result = getSystemRegistry(data); break;
+      case 'verifySystemPortal': result = verifySystemPortal(data); break;
+      case 'logoutSystemPortal': result = logoutSystemPortal(data); break;
       case 'studentQrLogin':     result = studentQrLogin(data); break;
       case 'studentQrVerify':    result = studentQrVerify(data); break;
       case 'studentQrLogout':    result = studentQrLogout(data); break;
@@ -1601,14 +1608,91 @@ function staffLogin(data) {
   if (auth.savedPassword && password !== auth.savedPassword) {
     return { success: false, error: 'パスワードが違います。' };
   }
+  const systemPortalSession = auth.permissionLevel === SYSTEM_PORTAL_PERMISSION_LEVEL
+    ? createSystemPortalSession_(auth)
+    : null;
   return {
     success: true,
     code,
     loginId: code,
     name: auth.name,
     permissionLevel: auth.permissionLevel,
-    passwordRequired: !!auth.savedPassword
+    passwordRequired: !!auth.savedPassword,
+    systemPortalSessionToken: systemPortalSession ? systemPortalSession.sessionToken : '',
+    systemPortalExpiresAt: systemPortalSession ? systemPortalSession.expiresAt : ''
   };
+}
+
+function createSystemPortalSession_(auth) {
+  if (!auth || auth.permissionLevel !== SYSTEM_PORTAL_PERMISSION_LEVEL) {
+    throw new Error('STEP総合管理ポータルを利用する権限がありません。');
+  }
+  const sessionToken = Utilities.getUuid() + '-' + Utilities.getUuid();
+  const expiresAt = new Date(Date.now() + SYSTEM_PORTAL_SESSION_SECONDS * 1000).toISOString();
+  CacheService.getScriptCache().put(
+    SYSTEM_PORTAL_SESSION_PREFIX + sessionToken,
+    JSON.stringify({ loginId: auth.code, name: auth.name, permissionLevel: auth.permissionLevel, expiresAt: expiresAt }),
+    SYSTEM_PORTAL_SESSION_SECONDS
+  );
+  return { sessionToken: sessionToken, expiresAt: expiresAt };
+}
+
+function requireSystemPortalAdmin_(data) {
+  const token = String(data.systemPortalSessionToken || data.sessionToken || '').trim();
+  if (!token) throw new Error('セッションが切れました。再ログインしてください。');
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get(SYSTEM_PORTAL_SESSION_PREFIX + token);
+  if (!cached) throw new Error('セッションが切れました。再ログインしてください。');
+  let session;
+  try { session = JSON.parse(cached); } catch (e) { session = null; }
+  if (!session || !session.loginId || !session.expiresAt || new Date(session.expiresAt).getTime() <= Date.now()) {
+    cache.remove(SYSTEM_PORTAL_SESSION_PREFIX + token);
+    throw new Error('セッションが切れました。再ログインしてください。');
+  }
+  const auth = getTeacherAuthByCode_(session.loginId);
+  if (!auth || auth.permissionLevel !== SYSTEM_PORTAL_PERMISSION_LEVEL) {
+    cache.remove(SYSTEM_PORTAL_SESSION_PREFIX + token);
+    throw new Error('STEP総合管理ポータルを利用する権限がありません。');
+  }
+  return { auth: auth, token: token, expiresAt: session.expiresAt };
+}
+
+function verifySystemPortal(data) {
+  const verified = requireSystemPortalAdmin_(data);
+  return {
+    success: true,
+    code: verified.auth.code,
+    name: verified.auth.name,
+    permissionLevel: verified.auth.permissionLevel,
+    expiresAt: verified.expiresAt
+  };
+}
+
+function logoutSystemPortal(data) {
+  const token = String(data.systemPortalSessionToken || data.sessionToken || '').trim();
+  if (token) CacheService.getScriptCache().remove(SYSTEM_PORTAL_SESSION_PREFIX + token);
+  return { success: true };
+}
+
+function getSystemRegistry(data) {
+  const verified = requireSystemPortalAdmin_(data);
+  const sh = getDataSS().getSheetByName(SYSTEM_REGISTRY_SHEET_NAME);
+  if (!sh) {
+    return { success: false, error: 'システム台帳シートがありません。管理者へ確認してください。' };
+  }
+  const values = sh.getDataRange().getDisplayValues();
+  if (!values.length) return { success: true, systems: [], expiresAt: verified.expiresAt };
+  const headers = values[0].map(function(v) { return String(v || '').trim(); });
+  const systems = values.slice(1).filter(function(row) {
+    return row.some(function(v) { return String(v || '').trim() !== ''; });
+  }).map(function(row) {
+    const item = {};
+    headers.forEach(function(header, index) {
+      if (header) item[header] = String(row[index] || '').trim();
+    });
+    return item;
+  });
+  return { success: true, systems: systems, expiresAt: verified.expiresAt };
 }
 
 function studentQrLogin(data) {
