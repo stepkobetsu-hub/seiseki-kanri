@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>過去問保管DB</title>
+<link rel="icon" type="image/png" sizes="32x32" href="images/past-exam/favicon.png">
+<link rel="apple-touch-icon" href="images/past-exam/apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -30,6 +32,7 @@ body { font-family:'Noto Sans JP',sans-serif; background:var(--page-bg); color:v
 .login-error { color:#dc2626; font-size:clamp(14px,3.8vw,15px); margin-top:12px; min-height:22px; }
 header { background:var(--navy); color:white; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; box-shadow:0 2px 16px rgba(27,58,107,.35); position:sticky; top:0; z-index:50; }
 .hd-left { display:flex; align-items:center; gap:12px; }
+.app-icon { width:42px; height:42px; border-radius:10px; object-fit:cover; flex:none; }
 .back-btn { background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.3); color:white; padding:5px 13px; border-radius:20px; font-family:inherit; font-size:13px; cursor:pointer; transition:background .15s; }
 .back-btn:hover { background:rgba(255,255,255,.28); }
 .hd-title { font-family:'Noto Serif JP',serif; font-size:18px; font-weight:700; letter-spacing:.08em; }
@@ -185,6 +188,7 @@ input[type=file] { display:none; }
 <div id="pageMain" style="display:none;">
   <header>
     <div class="hd-left">
+      <img class="app-icon" src="images/past-exam/app-icon-192.png" alt="">
       <button class="back-btn" id="backBtn" onclick="goTop()" style="display:none">← 一覧へ</button>
       <div>
         <div class="hd-title" id="hTitle">過去問保管DB</div>
