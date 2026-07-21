@@ -440,9 +440,9 @@ function initStaffAppLogin(){
   const savedCode = saved?.code || localStorage.getItem(STAFF_CODE_KEY) || '';
   if (savedCode) {
     document.getElementById('staffCode').value = savedCode;
-    document.getElementById('staffPassword').value = saved?.password || '';
-    setLoginMsg('自動ログインしています...');
-    staffLogin(true);
+  }
+  if (saved?.systemPortalSessionToken && ['2','3','4'].includes(String(saved.permissionLevel || ''))) {
+    showStaffHome(saved.name || '', saved.permissionLevel || '');
   }
 }
 
@@ -474,7 +474,6 @@ async function staffLogin(isAuto){
     localStorage.setItem(STAFF_CODE_KEY, code);
     localStorage.setItem(STAFF_AUTH_KEY, JSON.stringify({
       code,
-      password: password || '',
       name: result.name || '',
       permissionLevel: result.permissionLevel || '',
       systemPortalSessionToken: result.systemPortalSessionToken || '',
@@ -499,7 +498,7 @@ function showStaffHome(name, permissionLevel){
   }
   const systemPortalCard = document.getElementById('systemPortalCard');
   if (systemPortalCard) {
-    systemPortalCard.classList.toggle('hidden', String(permissionLevel || '').trim() !== '4');
+    systemPortalCard.classList.toggle('hidden', !['2','3','4'].includes(String(permissionLevel || '').trim()));
   }
 }
 

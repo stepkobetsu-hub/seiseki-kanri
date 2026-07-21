@@ -13,7 +13,7 @@ const STAFF_APP_PERMISSION_LEVELS = ['1', '2', '3', '4'];
 const STUDENT_QR_PERMISSION_LEVELS = ['2', '3', '4'];
 const STUDENT_QR_SESSION_PREFIX = 'studentQrSession:';
 const STUDENT_QR_SESSION_SECONDS = 6 * 60 * 60;
-const SYSTEM_PORTAL_PERMISSION_LEVEL = '4';
+const SYSTEM_PORTAL_PERMISSION_LEVELS = ['2', '3', '4'];
 const SYSTEM_PORTAL_SESSION_PREFIX = 'systemPortalSession:';
 const SYSTEM_PORTAL_SESSION_SECONDS = 6 * 60 * 60;
 const SYSTEM_REGISTRY_SHEET_NAME = 'システム台帳';
@@ -1608,7 +1608,7 @@ function staffLogin(data) {
   if (auth.savedPassword && password !== auth.savedPassword) {
     return { success: false, error: 'パスワードが違います。' };
   }
-  const systemPortalSession = auth.permissionLevel === SYSTEM_PORTAL_PERMISSION_LEVEL
+  const systemPortalSession = SYSTEM_PORTAL_PERMISSION_LEVELS.includes(auth.permissionLevel)
     ? createSystemPortalSession_(auth)
     : null;
   return {
@@ -1624,7 +1624,7 @@ function staffLogin(data) {
 }
 
 function createSystemPortalSession_(auth) {
-  if (!auth || auth.permissionLevel !== SYSTEM_PORTAL_PERMISSION_LEVEL) {
+  if (!auth || !SYSTEM_PORTAL_PERMISSION_LEVELS.includes(auth.permissionLevel)) {
     throw new Error('STEP総合管理ポータルを利用する権限がありません。');
   }
   const sessionToken = Utilities.getUuid() + '-' + Utilities.getUuid();
@@ -1650,7 +1650,7 @@ function requireSystemPortalAdmin_(data) {
     throw new Error('セッションが切れました。再ログインしてください。');
   }
   const auth = getTeacherAuthByCode_(session.loginId);
-  if (!auth || auth.permissionLevel !== SYSTEM_PORTAL_PERMISSION_LEVEL) {
+  if (!auth || !SYSTEM_PORTAL_PERMISSION_LEVELS.includes(auth.permissionLevel)) {
     cache.remove(SYSTEM_PORTAL_SESSION_PREFIX + token);
     throw new Error('STEP総合管理ポータルを利用する権限がありません。');
   }
