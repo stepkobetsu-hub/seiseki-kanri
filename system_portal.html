@@ -1,7 +1,6 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta http-equiv="refresh" content="0; url=https://stepkobetsu-hub.github.io/step-hub/system/">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>STEP総合管理ポータル</title>
@@ -28,7 +27,7 @@
 <body>
   <main class="shell">
     <header>
-      <div class="brand"><img class="brand-icon" src="images/system-portal/app-icon-192.png?v=20260720" alt="STEP総合管理ポータル"><div><h1>STEP総合管理ポータル</h1><p class="lead">権限4の管理者専用。利用・管理・共有用の入口をまとめて確認できます。</p></div></div>
+      <div class="brand"><img class="brand-icon" src="images/system-portal/app-icon-192.png?v=20260720" alt="STEP総合管理ポータル"><div><h1>STEP総合管理ポータル</h1><p class="lead">権限2・3・4で利用できます。利用・管理・共有用の入口をまとめて確認できます。</p></div></div>
       <div class="top-actions"><a class="btn" href="index.html">スタッフ用アプリへ戻る</a><button class="btn" id="logoutBtn" type="button">ログアウト</button></div>
     </header>
     <section id="denied" class="notice hidden" role="alert"></section>
@@ -63,7 +62,7 @@ document.getElementById('logoutBtn').addEventListener('click',logout);
 
 function auth(){try{return JSON.parse(localStorage.getItem(AUTH_KEY)||'null')}catch(e){return null}}
 async function api(action,extra){const a=auth();const res=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({action,systemPortalSessionToken:a?.systemPortalSessionToken||''},extra||{})),redirect:'follow'});return res.json()}
-async function init(){const a=auth();if(!a||String(a.permissionLevel)!=='4'||!a.systemPortalSessionToken)return deny('権限4で再ログインしてください。');try{const out=await api('getSystemRegistry');if(!out.success)throw new Error(out.error||'台帳を取得できませんでした。');systems=Array.isArray(out.systems)?out.systems:[];fillFilters();document.getElementById('portal').classList.remove('hidden');render()}catch(e){deny(e.message||'権限を確認できませんでした。再ログインしてください。')}}
+async function init(){const a=auth();if(!a||!['2','3','4'].includes(String(a.permissionLevel))||!a.systemPortalSessionToken)return deny('権限2・3・4で再ログインしてください。');try{const out=await api('getSystemRegistry');if(!out.success)throw new Error(out.error||'台帳を取得できませんでした。');systems=Array.isArray(out.systems)?out.systems:[];fillFilters();document.getElementById('portal').classList.remove('hidden');render()}catch(e){deny(e.message||'権限を確認できませんでした。再ログインしてください。')}}
 function deny(message){document.getElementById('portal').classList.add('hidden');const el=document.getElementById('denied');el.textContent=message;el.classList.remove('hidden')}
 async function logout(){try{await api('logoutSystemPortal')}catch(e){}localStorage.removeItem(AUTH_KEY);location.href='index.html'}
 function fillFilters(){fill('category',unique(systems.map(x=>x['分類'])));fill('status',unique(systems.map(x=>x['状態'])))}
