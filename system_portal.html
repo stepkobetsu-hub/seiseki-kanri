@@ -57,15 +57,15 @@
 const GAS='https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 const AUTH_KEY='stepStaffAppAuth';
 const GROUPS=[
-  {title:'利用する',fields:[['利用者向けURL','利用者向けアプリを開く'],['読み取りURL','読み取りアプリを開く'],['印刷URL','印刷ページを開く'],['Apps Script WebアプリURL','Webアプリを開く'],['GitHub Pages URL','公開ページを開く']]},
-  {title:'管理する',fields:[['管理者向けURL','管理者向けアプリを開く'],['Google Sheet URL','Google Sheetを開く'],['Supabase URL','Supabase管理画面を開く'],['入力フォームURL','登録画面を開く']]},
+  {title:'利用する',fields:[['利用者向けURL','利用者向けアプリを開く'],['読み取りURL','読み取りアプリを開く'],['印刷URL','印刷ページを開く'],['Apps Script WebアプリURL','Webアプリを開く'],['WebアプリURL v12','Webアプリを開く'],['WebアプリURL v6','Webアプリを開く'],['WebアプリURL v5','Webアプリを開く'],['GitHub Pages URL','公開ページを開く']]},
+  {title:'管理する',fields:[['管理者向けURL','管理者向けアプリを開く'],['Google Sheet URL','Google Sheetを開く'],['Google Sheet URL 2','Google Sheetを開く'],['Supabase URL','Supabase管理画面を開く'],['入力フォームURL','登録画面を開く']]},
   {title:'修正する',fields:[['GitHub URL','GitHubを開く'],['Apps Script編集URL','Apps Scriptを編集']]},
   {title:'メモ・保管場所',fields:[['DriveファイルURL','Driveファイルを開く'],['DriveフォルダURL','Driveフォルダを開く'],['仕様書URL','仕様書を開く'],['バックアップURL','バックアップを開く'],['GitHubドキュメントURL','GitHubドキュメントを開く'],['その他保管場所URL','その他の保管場所を開く']]},
   {title:'関連・旧版',fields:[['旧版URL','旧版を開く']]}
 ];
 const ASSET_SECTIONS=[
-  {title:'保存先',fields:[['保存基盤','保存基盤'],['保存先Spreadsheet ID','Spreadsheet ID'],['Google Sheet名','Google Sheet名'],['管理対象','管理対象'],['使用シート名','使用シート'],['電話番号列','電話番号列'],['電話番号形式','電話番号形式'],['データベース名','データベース名']]},
-  {title:'Apps Script',fields:[['Apps Script種別','Apps Script種別'],['Apps Script概要','主な処理'],['Webアプリ設定','Webアプリ設定'],['トリガー','トリガー'],['Apps Script確認','編集URLの登録状況']]},
+  {title:'保存先',fields:[['保存基盤','保存基盤'],['保存先Spreadsheet ID','Spreadsheet ID'],['正式Spreadsheet名','正式Spreadsheet名'],['Google Sheet名','Google Sheet名'],['Google Sheet 2','追加Google Sheet'],['管理対象','管理対象'],['使用シート名','使用シート'],['用途','用途'],['電話番号列','電話番号列'],['電話番号形式','電話番号形式'],['データベース名','データベース名']]},
+  {title:'Apps Script',fields:[['Apps Scriptプロジェクト名','プロジェクト名'],['Apps Script種別','Apps Script種別'],['Apps Script概要','主な処理'],['GASファイル一覧','ファイル'],['高度なGoogleサービス','高度なGoogleサービス'],['主要関数','主要関数'],['Webアプリ設定','Webアプリ設定'],['Webアプリ一覧','有効なデプロイ'],['トリガー','トリガー'],['Apps Script確認','編集URLの登録状況'],['旧GAS版Apps Script','旧GAS版Apps Script']]},
   {title:'関連システム',fields:[['参照システム','参照しているシステム'],['被参照システム','参照されているシステム'],['共有マスタ','共有マスタ'],['影響先','変更時の影響先']]},
   {title:'連携メモ',fields:[['連携メモ','連携メモ'],['連絡先運用','連絡先運用']]},
   {title:'正本・最新版',fields:[['正本ファイル','正本ファイル'],['API処理ファイル','API処理ファイル'],['最新版の場所','最新版の場所'],['確認日','確認日'],['確認根拠','確認根拠']]},
@@ -108,6 +108,29 @@ function linkUrl(item,field,value){if(item['ID']==='past-exams'){if(['利用者�
 function linkRow(label,url){const row=el('div','link-row');row.append(el('span','link-name',label));const a=el('a','open','開く');a.href=url;a.target='_blank';a.rel='noopener noreferrer';const b=el('button','copy','URLをコピー');b.type='button';b.addEventListener('click',()=>copyUrl(url));row.append(a,b);return row}
 async function copyUrl(url){try{await navigator.clipboard.writeText(url)}catch(e){const t=document.createElement('textarea');t.value=url;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove()}const toast=document.getElementById('toast');toast.classList.remove('hidden');clearTimeout(copyUrl.timer);copyUrl.timer=setTimeout(()=>toast.classList.add('hidden'),1800)}
 function el(tag,className,text){const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node}
+</script>
+<script>
+const applyAssetInfoBase=applyAssetInfo;
+applyAssetInfo=function(item){
+  const base=applyAssetInfoBase(item);const name=String(base['システム名']||'');const patch={};
+  if(name.includes('生徒マスタ'))Object.assign(patch,{
+    'Google Sheet URL':'https://docs.google.com/spreadsheets/d/1CIJkTlYUcUkbb8jBdFc6L8D5ubTGsxwNxFv01ten-Zk/edit?gid=674620482#gid=674620482','Google Sheet名':'生徒マスタ','正式Spreadsheet名':'★生徒マスタ202606-','保存先Spreadsheet ID':'1CIJkTlYUcUkbb8jBdFc6L8D5ubTGsxwNxFv01ten-Zk','使用シート名':'☆マスタ',
+    'Apps Script編集URL':'https://script.google.com/u/0/home/projects/16AP-Q7ySiFZJe5NC4uFbD5ymZjXOjQwS6XfUYnkldE95vDvRHrYLdr45/edit','Apps Scriptプロジェクト名':'生徒名簿','Apps Script種別':'Google Sheetバインド型','Apps Script概要':'生徒管理メニュー、時間割マスタ更新、Google連絡先登録・更新、名簿・外部CSV・DOJO/PLUS用Excel出力、登録フォームWebアプリ',
+    'GASファイル一覧':['appsscript.json','生徒名簿.gs','登録フォーム.gs','index.html','テス.gs','テス２.gs'],'高度なGoogleサービス':'People API','主要関数':['onOpen：生徒管理用メニュー','onEdit：シート編集時の処理（詳細範囲未確認）','時間割マスタを更新','MF連携テスト','電話番号をGoogle連絡先に登録','Google連絡先更新位置をリセット','名前カードの色を変更','生徒名簿を出力／生徒名簿を出力_実行','doGet：登録フォームのGET応答・稼働確認','checkRunningAccount','外部CSV初期設定','DOJO用Excelを出力','PLUS用Excelを出力','myFunction：空の初期関数'],
+    'トリガー':'インストール型0件（単純トリガー onOpen / onEdit あり）','Apps Script確認':'コード・編集URL確認済み','Apps Script WebアプリURL':'https://script.google.com/macros/s/AKfycbyMqCoqTW9gTUAjJPeV27mCAwx6euMDnyK_TAcZyn7PQfEO6smvy6aWd4Vc5GxgBH2A/exec','WebアプリURL v12':'https://script.google.com/macros/s/AKfycbzV8PZmAv4soUitOVYPDuVqPSAfXZeL_7i_FOWjaBRBlTxTWYJqhQOgbhbmZRlOsPhF/exec','WebアプリURL v6':'https://script.google.com/macros/s/AKfycbzKneRNf-5pBNYQ7H_rj4bxXL4CLKgqE2XNrT34kj-AIxvXCSll05i8AzP6EkeCWyU/exec','WebアプリURL v5':'https://script.google.com/macros/s/AKfycbwRTsETs3ddYl-b0otv1IgwC25biEdXJs3d_wyH5ktk_UL_HxiVYtXwz0om7IjXaPgf/exec',
+    'Webアプリ設定':'公開あり／有効4件／実行ユーザー：自分／アクセス権：全員','Webアプリ一覧':['v15（2026/07/17） AKfycbyMqCoqTW9gTUAjJPeV27mCAwx6euMDnyK_TAcZyn7PQfEO6smvy6aWd4Vc5GxgBH2A','v12（2026/07/01） AKfycbzV8PZmAv4soUitOVYPDuVqPSAfXZeL_7i_FOWjaBRBlTxTWYJqhQOgbhbmZRlOsPhF','v6（2026/06/21） AKfycbzKneRNf-5pBNYQ7H_rj4bxXL4CLKgqE2XNrT34kj-AIxvXCSll05i8AzP6EkeCWyU','v5（2026/06/16） AKfycbwRTsETs3ddYl-b0otv1IgwC25biEdXJs3d_wyH5ktk_UL_HxiVYtXwz0om7IjXaPgf'],
+    '確認根拠':'対象Spreadsheetの「拡張機能」→「Apps Script」から直接開いたプロジェクト。成績管理 gas_code.js でも同じSpreadsheet IDと☆マスタを参照。','確認済み事項':['正式Spreadsheet名・ID・使用シート','バインドApps Scriptのプロジェクト名・編集URL','GASファイル・主要関数・People API','インストール型トリガー0件','有効なWebアプリ4件'],'未確認項目':['実運用で主に使用しているWebアプリURL','各デプロイの具体的な利用先','onEditの詳細な処理範囲','アーカイブ済み11デプロイの詳細'],'確認状況':'Google Sheet・バインドApps Script・有効デプロイ確認済み'
+  });
+  if(name.includes('講師スケジュール')||name.includes('講師予定')||name.includes('夏休み出勤'))Object.assign(patch,{
+    '保存基盤':'Supabase（現行の講師提出・授業枠設定）','Google Sheet URL':'https://docs.google.com/spreadsheets/d/1vlCqsHYq837RyKfzTDk6gIwhChJvr1wxS0jDpN7xrJk/edit?gid=0#gid=0','Google Sheet名':'神領校：夏期講習時間割','保存先Spreadsheet ID':'1vlCqsHYq837RyKfzTDk6gIwhChJvr1wxS0jDpN7xrJk','使用シート名':'全体時間割','用途':'講師が提出した出勤可能データを神領校の夏期講習「全体時間割」へ転記・出力',
+    'Google Sheet URL 2':'https://docs.google.com/spreadsheets/d/1LMbLBRwRXDt7hi8_mouk2GNs7425RIXsNv_diTfCAbg/edit?gid=142388158#gid=142388158','Google Sheet 2':'大手町校：夏期講習時間割／ID 1LMbLBRwRXDt7hi8_mouk2GNs7425RIXsNv_diTfCAbg／使用シート 全体時間割','正本ファイル':'teacher_schedule/teacher_app.html / admin.html','最新版の場所':'stepkobetsu-hub/teacher_schedule',
+    '旧GAS版Apps Script':'先生出勤登録アプリ2（バインド型）／データSheet ID 1pPID9hCnSHAzs155KQYRW7ZymgeA1fSyHmnkRqVwFGE／コード.gs／インストール型トリガー0件／有効デプロイ4件','確認根拠':'現行GitHub PagesはSupabaseの teachers・class_days・deadlines・availability を直接参照。管理画面はSupabaseのavailabilityを2校の時間割Sheetへ転記。旧GAS版コードのDATA_SS_IDは候補2。',
+    '確認済み事項':['現行の提出・授業枠設定の正本：Supabase','神領校・大手町校のGoogle Sheetは夏期講習時間割の出力先','旧GAS版の参照先：候補2（夏期講習_出勤可否データ）','候補1（休み講習出勤確認）は現行GitHubから参照なし'],'未確認項目':['候補1のバインドApps Script詳細（権限上確認できず）','候補1が旧版・複製・バックアップのどれかの最終確定','旧GAS版4デプロイの個別利用先'],'確認状況':'現行正本と出力先を確認済み／候補1の最終位置付けは未確認'
+  });
+  return Object.assign({},base,patch);
+};
+const linkLabelBase=linkLabel;
+linkLabel=function(item,field,fallback){const name=String(item['システム名']||'');if(name.includes('生徒マスタ')){if(field==='Apps Script編集URL')return 'Apps Script（生徒名簿）を開く';if(field==='Apps Script WebアプリURL')return 'Webアプリ（v15・最新の有効デプロイ）を開く';if(field.startsWith('WebアプリURL '))return `Webアプリ（${field.replace('WebアプリURL ','')}）を開く`}if(name.includes('講師スケジュール')||name.includes('講師予定')||name.includes('夏休み出勤')){if(field==='Google Sheet URL')return 'Google Sheet（神領校：夏期講習時間割）を開く';if(field==='Google Sheet URL 2')return 'Google Sheet（大手町校：夏期講習時間割）を開く'}return linkLabelBase(item,field,fallback)};
 </script>
 </body>
 </html>
