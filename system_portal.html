@@ -239,6 +239,7 @@ applyAssetInfo=function(item){
     '旧GAS版Apps Script':['スタンドアロン：夏期講習_先生出勤管理／コード.gs／doGet・doPost・handleSaveAvailability・reflectToTimetable／有効Webアプリ1件（v3・2026/06/26）／最近の実行なし','バインド型候補：先生出勤登録アプリ／プロジェクト1l9s…／公開URLは有効だが編集権限上、プロジェクト名・バインド先・デプロイ日時・実行履歴は未確認','候補2バインド型：先生出勤登録アプリ2／コード.gs／候補2の旧名「出勤可否」を参照／有効デプロイ4件（最新確認v52・2026/06/28）／最近の実行なし'],'連携メモ':['現行：講師入力 → Supabase availability → 管理画面の転記ボタン → 校舎別Apps Script一括転記API → 全体時間割','スタンドアロン旧GAS：講師入力 → doPost → 出勤可否_神領／出勤可否_大手町 → reflectToTimetable → 全体時間割 → メール通知','バインド旧GAS：getActiveSpreadsheet()の出勤可否／出勤可否_大手町へ保存。bulkWriteは神領Sheet固定の不具合候補あり','現行GitHub Pagesは旧GAS入力Webアプリを呼び出さず、講師保存時のメール送信も実装していない','講師マスターIDの実値は生徒マスタIDと異なり、コードコメントと不一致'],'確認根拠':'本番GitHub PagesはSupabaseを直接参照。旧GAS各URLはGitHub内に参照がなく、確認可能な2プロジェクトの最近の実行履歴もない。候補2には複数世代の旧GAS用シートが残る。',
     '確認済み事項':['現行の講師入力・授業枠設定の正本：Supabase','神領校・大手町校のGoogle Sheetは夏期講習時間割の出力先','旧GAS版の保存先：候補2（夏期講習_出勤可否データ）','スタンドアロン旧GAS：夏期講習_先生出勤管理／有効Webアプリ1件','候補2バインド型：先生出勤登録アプリ2／別プロジェクト','現行Pagesから旧GAS入力Webアプリの呼び出しなし','追加指定の旧WebアプリURLは現在も有効'],'未確認項目':['プロジェクト1l9s…のバインド先・デプロイ一覧・実行履歴（編集権限上確認不可）','候補1がプロジェクト1l9s…のバインド先かどうか','旧HTML・個人ブックマークから旧Webアプリを開いている利用者の有無'],'確認状況':'現行Supabase経路を使用／旧GAS入力経路の現行利用は確認できず'
   });
+  if(name.includes('請求管理'))Object.assign(patch,{'Apps Script編集URL':'https://script.google.com/u/0/home/projects/1FQElz87j5yB-FNwuDE9LJ3_nD8rzF_vIGTTWKDr15KDygGxXnZLlXhIp/edit'});
   return Object.assign({},base,patch);
 };
 const linkLabelBase=linkLabel;
