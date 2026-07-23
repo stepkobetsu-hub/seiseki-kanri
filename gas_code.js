@@ -387,7 +387,7 @@ function getStudents() {
   const rows = sh.getDataRange().getValues();
   const students = [];
   for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0]) {
+    if (rows[i][0] && String(rows[i][6]).trim() !== '退塾') {
       students.push({
         id: rows[i][0], name: rows[i][1], campus: rows[i][2],
         grade: rows[i][3], school: rows[i][4], flag: rows[i][6], syncedAt: rows[i][7]
@@ -511,7 +511,7 @@ function syncStudentsFromMaster(data) {
 
   // 元データに存在しなくなった（空欄になった）生徒
   for (const [id, ls] of Object.entries(localStudents)) {
-    if (!masterStudents[id]) {
+    if (!masterStudents[id] && ls.flag !== '退塾') {
       toDeactivate.push({ id, name: ls.name, campus: ls.campus, grade: ls.grade });
     }
   }
@@ -536,7 +536,7 @@ function applySyncResult(data) {
     if (rows[i][0]) idToRow[String(rows[i][0])] = i + 1;
   }
 
-  const { toAdd, toUpdate, toDeactivate, deleteDeactivated } = data;
+  const { toAdd, toUpdate, toDeactivate } = data;
   const logs = [];
 
   // 追加
@@ -571,23 +571,13 @@ function applySyncResult(data) {
       if (freshRows2[i][0]) freshIdx2[String(freshRows2[i][0])] = i + 1;
     }
 
-    // 削除対象のIDをソートして後ろから削除（行番号ずれ防止）
-    const sortedDeactivate = [...toDeactivate].sort((a, b) => {
-      return (freshIdx2[String(b.id)] || 0) - (freshIdx2[String(a.id)] || 0);
-    });
-
-    sortedDeactivate.forEach(s => {
+    toDeactivate.forEach(s => {
       const rn = freshIdx2[String(s.id)];
       if (!rn) return;
-      if (deleteDeactivated) {
-        sh.deleteRow(rn);
-        logs.push([now, '削除', `${s.name}（${s.id}）`]);
-      } else {
-        // フラグを'退塾'に変更（行は残す）
-        sh.getRange(rn, 7).setValue('退塾');
-        sh.getRange(rn, 8).setValue(now);
-        logs.push([now, '退塾マーク', `${s.name}（${s.id}）`]);
-      }
+      // 既存仕様どおりフラグを「退塾」に変更し、行と履歴は残す
+      sh.getRange(rn, 7).setValue('退塾');
+      sh.getRange(rn, 8).setValue(now);
+      logs.push([now, '退塾マーク', `${s.name}（${s.id}）`]);
     });
   }
 
@@ -621,10 +611,9 @@ function autoSync() {
 
     if (total === 0 && toDeactivate.length === 0) return; // 変更なし
 
-    // 自動同期では退塾は削除せず「退塾マーク」のみ（削除は手動確認）
+    // 自動同期でも退塾は削除せず、既存の「退塾マーク」仕様を適用する
     applySyncResult({
-      toAdd, toUpdate, toDeactivate,
-      deleteDeactivated: false
+      toAdd, toUpdate, toDeactivate
     });
   } catch(e) {
     writeSyncError(e.message);

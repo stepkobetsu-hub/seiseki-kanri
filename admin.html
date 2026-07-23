@@ -193,9 +193,9 @@ tr:hover td{background:#f8fafc}
 <header id="mainHeader" style="display:none">
   <h1 style="margin:0;display:flex;align-items:center;gap:8px;cursor:pointer" onclick="navToSpeed()" title="速報へ戻る">
     ⚡ 成績管理システム <span>ADMIN</span>
-    <button id="navBackBtn"  onclick="navBack()"    title="戻る" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>◀</button>
+    <button id="navBackBtn"  onclick="event.stopPropagation();navBack()" title="戻る" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>◀</button>
     <button title="現在のページを更新" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#64748b;transition:all .15s;font-weight:400" onclick="event.stopPropagation();reloadData()">🔄</button>
-    <button id="navFwdBtn"   onclick="navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
+    <button id="navFwdBtn"   onclick="event.stopPropagation();navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
     <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v7.0</span>
@@ -240,7 +240,7 @@ tr:hover td{background:#f8fafc}
     <div class="sideSection">システム</div>
     <div class="sideItem" onclick="aNav('wish',this)"><span class="ico">🏫</span> 志望校</div>
     <div class="sideItem" onclick="aNav('entry',this)"><span class="ico">📝</span> 入塾書類</div>
-    <div class="sideItem" onclick="aNav('sync',this)"><span class="ico">🔄</span> 同期</div>
+    <div class="sideItem" onclick="openStudentSyncPreview()"><span class="ico">🔄</span> 同期</div>
     <a class="sideItem" href="https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec" target="_blank" rel="noopener" style="text-decoration:none">
       <span class="ico">📚</span>
       <span><span>過去問DB</span><span style="display:block;font-size:.72rem;color:#64748b;margin-top:2px">Pass: step123</span></span>
@@ -535,6 +535,7 @@ tr:hover td{background:#f8fafc}
 
           <button class="btn btn-outline btn-sm" onclick="printStudentList()">🖨️ 印刷</button>
           <button id="stuLegacyBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="openStudentsWithLegacy()">従来方式で開く</button>
+          <button class="btn btn-primary btn-sm" onclick="openStudentSyncPreview()">🔄 同期</button>
         </div>
 
         <!-- 並び順行 -->
@@ -4203,29 +4204,15 @@ async function runSync() {
   if (toDeactivate.length) html += sect('⚠️', `削除候補 ${toDeactivate.length}名`, toDeactivate.map(s => `<div class="syncItem"><strong>${s.name}</strong>（${s.id}）</div>`).join(''));
   document.getElementById('syncModalBody').innerHTML = html;
 
-  // フッターボタンを動的生成：削除候補がいるときだけ退塾ボタンを追加
+  // 退塾候補を含め、同期は常に1回の操作で適用する
   const foot = document.getElementById('syncModalFoot');
-  if (toDeactivate.length === 0) {
-    // シンプルに「同期する」1ボタン
-    foot.innerHTML = `
-      <button class="btn btn-ghost btn-sm" onclick="closeSyncModal()">キャンセル</button>
-      <button class="btn btn-primary btn-sm" onclick="applySync(false)">同期する</button>`;
-  } else {
-    // 削除候補がいる場合は追加ボタンを表示
-    foot.innerHTML = `
-      <button class="btn btn-ghost btn-sm" onclick="closeSyncModal()">キャンセル</button>
-      <button class="btn btn-primary btn-sm" onclick="applySync(false)">同期する</button>
-      <div style="width:100%;margin-top:8px;padding-top:8px;border-top:1px solid #e2e8f0">
-        <div style="font-size:.74rem;color:#ef4444;margin-bottom:6px;font-weight:600">⚠️ 削除候補者への対応（任意）</div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-warn btn-sm" onclick="applySync(false)" style="flex:1">退塾マークをつける</button>
-          <button class="btn btn-sm" style="flex:1;background:#ef4444;color:#fff;border-color:#ef4444" onclick="applySync(true)">データごと削除する</button>
-        </div>
-      </div>`;
-  }
+  foot.innerHTML = `
+    <button class="btn btn-ghost btn-sm" onclick="closeSyncModal()">キャンセル</button>
+    <button class="btn btn-primary btn-sm" onclick="applySync()">同期する</button>`;
 
   document.getElementById('syncModal').classList.add('show');
 }
+function openStudentSyncPreview() { return runSync(); }
 function closeSyncModal() { document.getElementById('syncModal').classList.remove('show'); }
 
 // ===== 編集モーダル =====
@@ -4415,7 +4402,7 @@ async function saveWishEditModal() {
     toast('保存できませんでした: ' + (r.error || ''));
   }
 }
-async function applySync(deleteOld) {
+async function applySync() {
   if (!pendingSync) return;
   closeSyncModal();
   toast('⏳ 同期中...');
@@ -4423,8 +4410,7 @@ async function applySync(deleteOld) {
     action: 'applySyncResult',
     toAdd: pendingSync.toAdd || [],
     toUpdate: pendingSync.toUpdate || [],
-    toDeactivate: pendingSync.toDeactivate || [],
-    deleteDeactivated: deleteOld
+    toDeactivate: pendingSync.toDeactivate || []
   });
   if (r.success) {
     toast(`✅ 同期完了（${r.applied}件）`);
