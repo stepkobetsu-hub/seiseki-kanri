@@ -99,6 +99,15 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 .filterRow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:center}
 .filterRow select,.filterRow input[type=text]{background:#fff;border:1px solid var(--border2);border-radius:8px;padding:7px 10px;color:#1e293b;font-size:.8rem;outline:none}
 .filterRow select:focus,.filterRow input[type=text]:focus{border-color:var(--primary)}
+.stuGradeFilter{display:flex;flex-direction:column;gap:6px;padding:8px 10px;background:#f8fafc;border:1px solid var(--border);border-radius:10px;flex-basis:100%}
+.stuGradeFilterRow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.stuGradeFilterLabel{font-size:.72rem;color:var(--sub);font-weight:700;min-width:34px}
+.stuGradeBtn{border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:7px;padding:5px 10px;font-size:.76rem;font-weight:700;cursor:pointer;transition:.15s}
+.stuGradeBtn:hover{background:#f1f5f9}
+.stuGradeBtn.group.on{background:#2563eb;border-color:#2563eb;color:#fff}
+.stuGradeBtn.grade.on{background:#e87918;border-color:#e87918;color:#fff}
+.stuGradeBtn.clear{background:#aebbc1;border-color:#aebbc1;color:#fff}
+.stuGradeSummary{font-size:.72rem;color:var(--primary);font-weight:700;margin-left:4px}
 
 /* SEARCH INPUT */
 .searchWrap{position:relative;flex:1;max-width:260px}
@@ -492,10 +501,21 @@ tr:hover td{background:#f8fafc}
             <option>神領</option>
             <option>大手</option>
           </select>
-          <select id="stuGrade" onchange="onStudentFilterChange();buildSchoolDropdown()">
-            <option value="">全学年</option>
-            <option value="j1">中1</option><option value="j2">中2</option><option value="j3">中3</option>
-          </select>
+          <div class="stuGradeFilter" aria-label="学年（複数選択可）">
+            <div class="stuGradeFilterRow">
+              <span class="stuGradeFilterLabel">学年</span>
+              <button type="button" class="stuGradeBtn group" data-grade-group="elementary" onclick="selectStuGradeGroup('elementary')">小学生</button>
+              <button type="button" class="stuGradeBtn group" data-grade-group="junior" onclick="selectStuGradeGroup('junior')">中学生</button>
+              <button type="button" class="stuGradeBtn group" data-grade-group="high" onclick="selectStuGradeGroup('high')">高校生</button>
+              <button type="button" class="stuGradeBtn group" data-grade-group="all" onclick="selectStuGradeGroup('all')">全員</button>
+              <button type="button" class="stuGradeBtn clear" onclick="selectStuGradeGroup('clear')">クリア</button>
+              <span id="stuGradeSummary" class="stuGradeSummary">全学年</span>
+            </div>
+            <div class="stuGradeFilterRow">
+              <span class="stuGradeFilterLabel">個別</span>
+              <button type="button" class="stuGradeBtn grade" data-grade="小1" onclick="toggleStuGrade('小1')">小1</button><button type="button" class="stuGradeBtn grade" data-grade="小2" onclick="toggleStuGrade('小2')">小2</button><button type="button" class="stuGradeBtn grade" data-grade="小3" onclick="toggleStuGrade('小3')">小3</button><button type="button" class="stuGradeBtn grade" data-grade="小4" onclick="toggleStuGrade('小4')">小4</button><button type="button" class="stuGradeBtn grade" data-grade="小5" onclick="toggleStuGrade('小5')">小5</button><button type="button" class="stuGradeBtn grade" data-grade="小6" onclick="toggleStuGrade('小6')">小6</button><button type="button" class="stuGradeBtn grade" data-grade="中1" onclick="toggleStuGrade('中1')">中1</button><button type="button" class="stuGradeBtn grade" data-grade="中2" onclick="toggleStuGrade('中2')">中2</button><button type="button" class="stuGradeBtn grade" data-grade="中3" onclick="toggleStuGrade('中3')">中3</button><button type="button" class="stuGradeBtn grade" data-grade="高1" onclick="toggleStuGrade('高1')">高1</button><button type="button" class="stuGradeBtn grade" data-grade="高2" onclick="toggleStuGrade('高2')">高2</button><button type="button" class="stuGradeBtn grade" data-grade="高3" onclick="toggleStuGrade('高3')">高3</button>
+            </div>
+          </div>
 
           <!-- 学校チェックボックスドロップダウン -->
           <div id="stuSchoolDropWrap" style="position:relative">
@@ -1314,7 +1334,8 @@ async function supabaseApi(data) {
       };
       if (data.activeOnly === true) params.active = 'eq.true';
       if (data.campus) params.campus = 'eq.' + data.campus;
-      if (data.grade) params.grade = supabaseGradeParam(data.grade);
+      if (Array.isArray(data.grades) && data.grades.length) params.grade = supabaseGradesParam(data.grades);
+      else if (data.grade) params.grade = supabaseGradeParam(data.grade);
       if (data.q) {
         const q = String(data.q).replace(/[()*.,]/g, ' ').trim();
         if (q) params.or = `(name.ilike.*${q}*,student_code.ilike.*${q}*)`;
@@ -1493,6 +1514,15 @@ function addSupabaseSyncLog(applied, upserted, deactivated, deleted) {
     detail: `Supabase生徒マスタ同期: ${applied}件（追加/更新 ${upserted}件、${deleted ? '削除' : '退塾'} ${deactivated}件）`
   });
   localStorage.setItem('seisekiSupabaseSyncLogs', JSON.stringify(logs.slice(0, 50)));
+}
+
+function supabaseGradesParam(grades) {
+  const toFullWidthDigit = v => String(v).replace(/[1-6]/g, ch => ({'1':'１','2':'２','3':'３','4':'４','5':'５','6':'６'}[ch]));
+  const values = [...new Set((grades || []).flatMap(v => {
+    const normalized = normalizeGrade(v);
+    return [normalized, toFullWidthDigit(normalized)];
+  }))];
+  return 'in.(' + values.join(',') + ')';
 }
 
 function supabaseGradeParam(grade) {
@@ -2443,10 +2473,63 @@ function drawSpeedChart(data, subj) {
 }
 
 // ===== 生徒 =====
+const STU_GRADE_GROUPS = {
+  elementary: ['小1','小2','小3','小4','小5','小6'],
+  junior: ['中1','中2','中3'],
+  high: ['高1','高2','高3']
+};
+const STU_ALL_GRADES = [...STU_GRADE_GROUPS.elementary, ...STU_GRADE_GROUPS.junior, ...STU_GRADE_GROUPS.high];
+const _stuGrades = new Set();
+
+function selectedStuGrades() {
+  return [..._stuGrades];
+}
+
+function _sameStuGrades(grades) {
+  return grades.length === _stuGrades.size && grades.every(g => _stuGrades.has(g));
+}
+
+function _renderStuGradeButtons() {
+  document.querySelectorAll('[data-grade]').forEach(btn => btn.classList.toggle('on', _stuGrades.has(btn.dataset.grade)));
+  document.querySelectorAll('[data-grade-group]').forEach(btn => {
+    const key = btn.dataset.gradeGroup;
+    const grades = key === 'all' ? STU_ALL_GRADES : (STU_GRADE_GROUPS[key] || []);
+    btn.classList.toggle('on', _sameStuGrades(grades));
+  });
+  const summary = document.getElementById('stuGradeSummary');
+  if (summary) {
+    const grades = selectedStuGrades();
+    summary.textContent = grades.length === 0 || grades.length === STU_ALL_GRADES.length
+      ? '全学年'
+      : grades.join('・');
+  }
+}
+
+function _applyStuGradeChange() {
+  _renderStuGradeButtons();
+  _stuSchoolExclude.clear();
+  if (DATA_SOURCE === 'supabase') onStudentFilterChange();
+  else buildSchoolDropdown();
+}
+
+function toggleStuGrade(grade) {
+  if (_stuGrades.has(grade)) _stuGrades.delete(grade);
+  else _stuGrades.add(grade);
+  _applyStuGradeChange();
+}
+
+function selectStuGradeGroup(group) {
+  _stuGrades.clear();
+  if (group === 'all') STU_ALL_GRADES.forEach(g => _stuGrades.add(g));
+  else if (STU_GRADE_GROUPS[group]) STU_GRADE_GROUPS[group].forEach(g => _stuGrades.add(g));
+  _applyStuGradeChange();
+}
+
 function studentFilterParams() {
+  const grades = selectedStuGrades();
   return {
     campus: document.getElementById('stuCampus')?.value || '',
-    grade: document.getElementById('stuGrade')?.value || '',
+    grades: grades.length > 0 && grades.length < STU_ALL_GRADES.length ? grades : [],
     q: (document.getElementById('stuSearch')?.value || '').trim()
   };
 }
@@ -2539,14 +2622,15 @@ function openStudentsWithLegacy() {
 }
 function printStudentList() {
   const list = _getFilteredSortedStudents();
-  const grade  = document.getElementById('stuGrade').value;
+  const grades = selectedStuGrades();
   const campus = document.getElementById('stuCampus').value;
   const q      = document.getElementById('stuSearch').value;
 
   // タイトル行の条件説明
   let conds = [];
   if (campus) conds.push(campus);  else conds.push('全校舎');
-  if (grade)  conds.push(grade);   else conds.push('全学年');
+  if (grades.length > 0 && grades.length < STU_ALL_GRADES.length) conds.push(grades.join('・'));
+  else conds.push('全学年');
   if (q) conds.push(`「${q}」で検索`);
   if (_stuSchoolExclude.size > 0) conds.push('学校絞込あり');
   const title = conds.join(' ／ ');
@@ -2619,10 +2703,10 @@ document.addEventListener('click', () => {
 
 function _stuSchoolList() {
   const campus = document.getElementById('stuCampus').value;
-  const grade  = document.getElementById('stuGrade').value;
+  const grades = selectedStuGrades();
   let base = students;
   if (campus) base = base.filter(s => s.campus === campus);
-  if (grade)  base = base.filter(s => gradeMatchesGroup(s.grade, grade));
+  if (grades.length > 0 && grades.length < STU_ALL_GRADES.length) base = base.filter(s => grades.includes(normalizeGrade(s.grade)));
   return [...new Set(base.map(s => s.school || '').filter(Boolean))].sort((a,b) => a.localeCompare(b,'ja'));
 }
 
@@ -2701,11 +2785,11 @@ function setStuSchoolSort(val) {
 
 function _getFilteredSortedStudents() {
   const q      = (document.getElementById('stuSearch').value || '').toLowerCase();
-  const grade  = document.getElementById('stuGrade').value;
+  const grades = selectedStuGrades();
   const campus = document.getElementById('stuCampus').value;
   let list = [...students];
   if (q)      list = list.filter(s => s.name.toLowerCase().includes(q) || String(s.id).includes(q));
-  if (grade)  list = list.filter(s => gradeMatchesGroup(s.grade, grade));
+  if (grades.length > 0 && grades.length < STU_ALL_GRADES.length) list = list.filter(s => grades.includes(normalizeGrade(s.grade)));
   if (campus) list = list.filter(s => s.campus === campus);
   if (_stuSchoolExclude.size > 0) list = list.filter(s => !_stuSchoolExclude.has(s.school || ''));
 
