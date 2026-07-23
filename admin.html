@@ -38,6 +38,15 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 .hdrRight{display:flex;align-items:center;gap:12px;font-size:.8rem;color:#64748b}
 .hdrBtn{background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;padding:5px 14px;border-radius:20px;cursor:pointer;font-size:.76rem;transition:.15s}
 .hdrBtn:hover{background:#e2e8f0}
+.header-refresh-button{
+  transition:transform .08s ease,box-shadow .08s ease,background-color .08s ease;
+  touch-action:manipulation;
+}
+.header-refresh-button:active,.header-refresh-button.is-pressed{
+  transform:translateY(2px);
+  box-shadow:inset 0 2px 4px rgba(0,0,0,.18);
+  background-color:#e8edf4;
+}
 
 /* LOGIN */
 .loginWrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f0f7f4}
@@ -194,7 +203,7 @@ tr:hover td{background:#f8fafc}
   <h1 style="margin:0;display:flex;align-items:center;gap:8px;cursor:pointer" onclick="navToSpeed()" title="速報へ戻る">
     ⚡ 成績管理システム <span>ADMIN</span>
     <button id="navBackBtn"  onclick="event.stopPropagation();navBack()" title="戻る" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>◀</button>
-    <button title="現在のページを更新" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#64748b;transition:all .15s;font-weight:400" onclick="event.stopPropagation();reloadData()">🔄</button>
+    <button class="header-refresh-button" title="現在のページを更新" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#64748b;font-weight:400" onclick="event.stopPropagation();reloadData()" onpointerdown="this.classList.add('is-pressed')" onpointerup="this.classList.remove('is-pressed')" onpointercancel="this.classList.remove('is-pressed')" onpointerleave="this.classList.remove('is-pressed')">🔄</button>
     <button id="navFwdBtn"   onclick="event.stopPropagation();navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
@@ -2827,7 +2836,7 @@ function filterStudents() {
     <div class="listRow" onclick="goToCompare('${s.id}')" style="cursor:pointer">
       <div style="flex:1">
         <strong>${s.name}</strong>（${s.id}）
-        <div class="listRowSub">${s.campus} ／ ${s.grade} ／ ${s.school||'-'} ／ ${s.flag===''||s.flag===null?'⚠退塾':'在籍'}</div>
+        <div class="listRowSub">${s.campus} ／ ${s.grade} ／ ${s.school||'-'} ／ ${['0','退塾'].includes(String(s.flag).trim())?'<strong style="color:#dc2626">退塾</strong>':'在籍'}</div>
       </div>
       <div style="color:#94a3b8;font-size:.8rem">📊→</div>
     </div>`).join('');
@@ -4200,6 +4209,12 @@ async function runSync() {
   const sect = (icon, title, body) => body ? `<div style="margin-bottom:10px"><div style="font-size:.78rem;color:var(--sub);margin-bottom:4px">${icon} ${title}</div>${body}</div>` : '';
   if (toAdd.length) html += sect('➕', `新規追加 ${toAdd.length}名`, toAdd.map(s => `<div class="syncItem"><strong>${s.name}</strong>（${s.id}）${s.campus} / ${s.grade}</div>`).join(''));
   if (toUpdate.length) html += sect('✏️', `情報更新 ${toUpdate.length}名`, toUpdate.map(s => `<div class="syncItem"><strong>${s.name}</strong>（${s.id}）<div class="syncChanges">${(s.changes||[]).join(' / ')}</div></div>`).join(''));
+  const hasFlagChange = toUpdate.some(s => (s.changes || []).some(c => /^(在籍フラグ|在籍):/.test(c)));
+  if (hasFlagChange || toDeactivate.length) html += `
+    <div style="margin:8px 0 10px;padding:9px 11px;border:1px solid #f6c453;border-radius:7px;background:#fff7db;color:#7c5a00;font-size:.76rem;line-height:1.7">
+      在籍フラグ「1→0」は「在籍→<strong style="color:#dc2626">退塾</strong>」となりますが、名簿に名前は残ります。<br>
+      「1→（数字なし）」や「0→（数字なし）」の場合に、名簿から名前が<strong style="color:#dc2626">削除されます</strong>。
+    </div>`;
   if (passChanged.length) html += sect('🔑', `PW変更 ${passChanged.length}名`, passChanged.map(s => `<div class="syncItem"><strong>${s.name}</strong>（${s.id}）<div class="syncChanges">${s.oldPass} → ${s.newPass}</div></div>`).join(''));
   if (toDeactivate.length) html += sect('⚠️', `削除候補 ${toDeactivate.length}名`, toDeactivate.map(s => `<div class="syncItem"><strong>${s.name}</strong>（${s.id}）</div>`).join(''));
   document.getElementById('syncModalBody').innerHTML = html;
