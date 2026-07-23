@@ -47,6 +47,19 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
   box-shadow:inset 0 2px 4px rgba(0,0,0,.18);
   background-color:#e8edf4;
 }
+.student-sync-button{
+  transition:transform .08s ease,box-shadow .08s ease,background-color .08s ease;
+  touch-action:manipulation;
+}
+.student-sync-button:active,.student-sync-button.is-pressed{
+  transform:translateY(2px);
+  box-shadow:inset 0 3px 5px rgba(0,0,0,.2);
+  background-color:#124986;
+}
+.enrollmentFilter{display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap;padding:4px 8px;border:1px solid #e2e8f0;border-radius:7px;background:#f8fafc;font-size:.74rem;color:#475569;white-space:nowrap}
+.enrollmentFilter label{display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+.enrollmentFilter input{accent-color:#1a56a0}
+.withdrawnBadge{display:inline-block;margin-left:5px;padding:1px 6px;border-radius:10px;background:#fee2e2;color:#b91c1c;font-size:.68rem;font-weight:700;vertical-align:middle;text-decoration:none}
 
 /* LOGIN */
 .loginWrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f0f7f4}
@@ -246,8 +259,8 @@ tr:hover td{background:#f8fafc}
     <div class="sideItem" onclick="aNav('schools',this)"><span class="ico">🏫</span> 学校</div>
     <div class="sideItem" onclick="aNav('scores',this)"><span class="ico">🧾</span> テスト成績</div>
     <div class="sideItem" onclick="aNav('report',this)"><span class="ico">📒</span> 通知表</div>
-    <div class="sideSection">システム</div>
     <div class="sideItem" onclick="aNav('wish',this)"><span class="ico">🏫</span> 志望校</div>
+    <div class="sideSection">システム</div>
     <div class="sideItem" onclick="aNav('entry',this)"><span class="ico">📝</span> 入塾書類</div>
     <div class="sideItem" onclick="openStudentSyncPreview()"><span class="ico">🔄</span> 同期</div>
     <a class="sideItem" href="https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec" target="_blank" rel="noopener" style="text-decoration:none">
@@ -510,6 +523,10 @@ tr:hover td{background:#f8fafc}
             <option>神領</option>
             <option>大手</option>
           </select>
+          <span class="enrollmentFilter">
+            <label><input type="checkbox" id="stuShowActive" checked onchange="onStudentEnrollmentChange()">在籍生</label>
+            <label><input type="checkbox" id="stuShowWithdrawn" onchange="onStudentEnrollmentChange()">退塾生</label>
+          </span>
           <div class="stuGradeFilter" aria-label="学年（複数選択可）">
             <div class="stuGradeFilterRow">
               <span class="stuGradeFilterLabel">学年</span>
@@ -544,7 +561,7 @@ tr:hover td{background:#f8fafc}
 
           <button class="btn btn-outline btn-sm" onclick="printStudentList()">🖨️ 印刷</button>
           <button id="stuLegacyBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="openStudentsWithLegacy()">従来方式で開く</button>
-          <button class="btn btn-primary btn-sm" onclick="openStudentSyncPreview()">🔄 同期</button>
+          <button class="btn btn-primary btn-sm student-sync-button" onclick="openStudentSyncPreview()" onpointerdown="this.classList.add('is-pressed')" onpointerup="this.classList.remove('is-pressed')" onpointercancel="this.classList.remove('is-pressed')" onpointerleave="this.classList.remove('is-pressed')">🔄 同期</button>
         </div>
 
         <!-- 並び順行 -->
@@ -635,6 +652,10 @@ tr:hover td{background:#f8fafc}
             <button id="meetListCampusOte" class="btn btn-ghost btn-sm" type="button" onclick="selectMeetingListCampus('大手')">大手町</button>
           </div>
           <div class="searchWrap"><input id="meetSearch" placeholder="名前・ID・内容で検索" oninput="loadMeetingMemos()"></div>
+          <span class="enrollmentFilter">
+            <label><input type="checkbox" id="meetShowActive" checked onchange="loadMeetingMemos()">在籍生</label>
+            <label><input type="checkbox" id="meetShowWithdrawn" onchange="loadMeetingMemos()">退塾生</label>
+          </span>
           <select id="meetFilterStaff" onchange="loadMeetingMemos()"><option value="">全担当</option></select>
           <select id="meetFilterCounterpart" onchange="loadMeetingMemos()">
             <option value="">相手すべて</option><option>母</option><option>父</option><option>本人</option><option>他</option>
@@ -681,6 +702,10 @@ tr:hover td{background:#f8fafc}
           <div class="searchWrap">
             <input type="text" id="scASearch" placeholder="名前・IDで検索" oninput="filterAdminScores()">
           </div>
+          <span class="enrollmentFilter">
+            <label><input type="checkbox" id="scAShowActive" checked onchange="filterAdminScores()">在籍生</label>
+            <label><input type="checkbox" id="scAShowWithdrawn" onchange="filterAdminScores()">退塾生</label>
+          </span>
           <select id="scAYear"></select>
           <select id="scATerm">
             <option value="">全回</option>
@@ -719,6 +744,10 @@ tr:hover td{background:#f8fafc}
           <div class="searchWrap">
             <input type="text" id="rpASearch" placeholder="名前・IDで検索" oninput="filterAdminReport()">
           </div>
+          <span class="enrollmentFilter">
+            <label><input type="checkbox" id="rpAShowActive" checked onchange="filterAdminReport()">在籍生</label>
+            <label><input type="checkbox" id="rpAShowWithdrawn" onchange="filterAdminReport()">退塾生</label>
+          </span>
           <select id="rpAYear"></select>
           <select id="rpASemester">
             <option value="">全学期</option>
@@ -779,6 +808,10 @@ tr:hover td{background:#f8fafc}
           <div class="searchWrap">
             <input type="text" id="wishSearch" placeholder="名前・IDで検索" oninput="filterWishStudents()">
           </div>
+          <span class="enrollmentFilter">
+            <label><input type="checkbox" id="wishShowActive" checked onchange="filterWishStudents()">在籍生</label>
+            <label><input type="checkbox" id="wishShowWithdrawn" onchange="filterWishStudents()">退塾生</label>
+          </span>
         </div>
         <div style="overflow-x:auto">
           <table style="font-size:.75rem;width:100%;border-collapse:collapse">
@@ -1216,6 +1249,76 @@ function sbStudent(row) {
   };
 }
 
+let enrollmentByStudentId = new Map();
+let enrollmentIndexReady = false;
+
+function normalizedEnrollmentFlag(student) {
+  const value = student?.enrollmentFlag ?? student?.flag ?? student?.active ?? '';
+  if (value === true) return '1';
+  if (value === false) return '0';
+  const flag = String(value).trim();
+  if (flag === '1') return '1';
+  if (flag === '0' || flag === '退塾' || flag === 'inactive' || flag === 'false') return '0';
+  return '';
+}
+
+function enrollmentSelection(activeId, withdrawnId) {
+  return {
+    showActive: !!document.getElementById(activeId)?.checked,
+    showWithdrawn: !!document.getElementById(withdrawnId)?.checked
+  };
+}
+
+function matchesEnrollmentFilter(student, showActive, showWithdrawn) {
+  const flag = normalizedEnrollmentFlag(student);
+  if (flag === '1') return showActive;
+  if (flag === '0') return showWithdrawn;
+  return false;
+}
+
+function matchesEnrollmentRecord(studentId, activeId, withdrawnId) {
+  const { showActive, showWithdrawn } = enrollmentSelection(activeId, withdrawnId);
+  const flag = enrollmentByStudentId.get(String(studentId));
+  return matchesEnrollmentFilter({ flag }, showActive, showWithdrawn);
+}
+
+function withdrawnBadgeForStudentId(studentId) {
+  return enrollmentByStudentId.get(String(studentId)) === '0'
+    ? '<span class="withdrawnBadge">退塾</span>'
+    : '';
+}
+
+function enrollmentFilterIsEmpty(activeId, withdrawnId) {
+  const { showActive, showWithdrawn } = enrollmentSelection(activeId, withdrawnId);
+  return !showActive && !showWithdrawn;
+}
+
+async function ensureEnrollmentIndex(force) {
+  if (enrollmentIndexReady && !force) return;
+  let rows = [];
+  if (DATA_SOURCE === 'supabase' && hasSupabaseConfig() && getSupabaseSession()) {
+    const sourceRows = await supabaseGet('students', {
+      select: 'student_code,active',
+      order: 'student_code.asc',
+      limit: 1000
+    });
+    rows = sourceRows.map(row => ({
+      id: sbValue(row.student_code),
+      flag: row.active === false ? '0' : '1'
+    }));
+  } else {
+    const result = await legacyApi({ action: 'getStudents' });
+    rows = result.students || [];
+  }
+  enrollmentByStudentId = new Map();
+  rows.forEach(student => {
+    const id = String(student.id ?? student.studentId ?? student.student_code ?? '').trim();
+    const flag = normalizedEnrollmentFlag(student);
+    if (id && flag) enrollmentByStudentId.set(id, flag);
+  });
+  enrollmentIndexReady = true;
+}
+
 function sbScore(row) {
   return {
     id: row.id,
@@ -1343,6 +1446,7 @@ async function supabaseApi(data) {
         offset
       };
       if (data.activeOnly === true) params.active = 'eq.true';
+      else if (data.withdrawnOnly === true) params.active = 'eq.false';
       if (data.campus) params.campus = 'eq.' + data.campus;
       if (Array.isArray(data.grades) && data.grades.length) params.grade = supabaseGradesParam(data.grades);
       else if (data.grade) params.grade = supabaseGradeParam(data.grade);
@@ -2546,10 +2650,13 @@ _renderStuGradeButtons();
 
 function studentFilterParams() {
   const grades = selectedStuGrades();
+  const { showActive, showWithdrawn } = enrollmentSelection('stuShowActive', 'stuShowWithdrawn');
   return {
     campus: document.getElementById('stuCampus')?.value || '',
     grades: grades.length > 0 && grades.length < STU_ALL_GRADES.length ? grades : [],
-    q: (document.getElementById('stuSearch')?.value || '').trim()
+    q: (document.getElementById('stuSearch')?.value || '').trim(),
+    activeOnly: showActive && !showWithdrawn,
+    withdrawnOnly: !showActive && showWithdrawn
   };
 }
 
@@ -2581,6 +2688,11 @@ async function loadStudentsFromSupabase(append) {
     studentPageOffset = 0;
     students = [];
     if (box) box.innerHTML = '<div class="noData">読込中...</div>';
+  }
+  if (enrollmentFilterIsEmpty('stuShowActive', 'stuShowWithdrawn')) {
+    if (box) box.innerHTML = '<div class="noData">表示する生徒区分を選択してください。</div>';
+    if (pager) pager.style.display = 'none';
+    return;
   }
   if (!hasSupabaseConfig()) {
     setStudentSourceStatus('Supabase設定がないため、従来GASで開きます。', false);
@@ -2632,6 +2744,11 @@ function onStudentFilterChange() {
     return;
   }
   filterStudents();
+}
+
+function onStudentEnrollmentChange() {
+  if (DATA_SOURCE === 'supabase') loadStudents();
+  else filterStudents();
 }
 
 function openStudentsWithLegacy() {
@@ -2806,7 +2923,8 @@ function _getFilteredSortedStudents() {
   const q      = (document.getElementById('stuSearch').value || '').toLowerCase();
   const grades = selectedStuGrades();
   const campus = document.getElementById('stuCampus').value;
-  let list = [...students];
+  const { showActive, showWithdrawn } = enrollmentSelection('stuShowActive', 'stuShowWithdrawn');
+  let list = students.filter(s => matchesEnrollmentFilter(s, showActive, showWithdrawn));
   if (q)      list = list.filter(s => s.name.toLowerCase().includes(q) || String(s.id).includes(q));
   if (grades.length > 0 && grades.length < STU_ALL_GRADES.length) list = list.filter(s => grades.includes(normalizeGrade(s.grade)));
   if (campus) list = list.filter(s => s.campus === campus);
@@ -2829,14 +2947,18 @@ function _getFilteredSortedStudents() {
 }
 
 function filterStudents() {
+  if (enrollmentFilterIsEmpty('stuShowActive', 'stuShowWithdrawn')) {
+    document.getElementById('stuList').innerHTML = '<div class="noData">表示する生徒区分を選択してください。</div>';
+    return;
+  }
   const list = _getFilteredSortedStudents();
   const box = document.getElementById('stuList');
   if (!list.length) { box.innerHTML = '<div class="noData">該当なし</div>'; return; }
   box.innerHTML = list.map(s => `
     <div class="listRow" onclick="goToCompare('${s.id}')" style="cursor:pointer">
       <div style="flex:1">
-        <strong>${s.name}</strong>（${s.id}）
-        <div class="listRowSub">${s.campus} ／ ${s.grade} ／ ${s.school||'-'} ／ ${['0','退塾'].includes(String(s.flag).trim())?'<strong style="color:#dc2626">退塾</strong>':'在籍'}</div>
+        <strong>${s.name}</strong>（${s.id}）${normalizedEnrollmentFlag(s)==='0'?'<span class="withdrawnBadge">退塾</span>':''}
+        <div class="listRowSub">${s.campus} ／ ${s.grade} ／ ${s.school||'-'}</div>
       </div>
       <div style="color:#94a3b8;font-size:.8rem">📊→</div>
     </div>`).join('');
@@ -2910,10 +3032,15 @@ async function saveWishResult(studentId, key, value) {
 let _allWishes = [];
 
 async function filterWishStudents() {
+  if (enrollmentFilterIsEmpty('wishShowActive', 'wishShowWithdrawn')) {
+    renderWishTable([], '表示する生徒区分を選択してください。');
+    return;
+  }
   const campus = document.getElementById('wishCampus').value;
   const grade  = document.getElementById('wishGrade').value;
   const q = (document.getElementById('wishSearch')?.value || '').trim().toLowerCase();
   const filtered = _allWishes.filter(w =>
+    matchesEnrollmentRecord(w.studentId, 'wishShowActive', 'wishShowWithdrawn') &&
     (!campus || w.campus === campus) &&
     (!grade || gradeMatchesGroup(w.grade, grade)) &&
     (!q || String(w.name || '').toLowerCase().includes(q) || String(w.studentId || '').toLowerCase().includes(q))
@@ -2922,6 +3049,7 @@ async function filterWishStudents() {
 }
 
 async function loadAllWishes() {
+  await ensureEnrollmentIndex();
   const campus = document.getElementById('wishCampus').value;
   const grade  = document.getElementById('wishGrade').value;
   const q = (document.getElementById('wishSearch')?.value || '').trim().toLowerCase();
@@ -2932,6 +3060,7 @@ async function loadAllWishes() {
     return;
   }
   let wishes = _allWishes.filter(w =>
+    matchesEnrollmentRecord(w.studentId, 'wishShowActive', 'wishShowWithdrawn') &&
     (!campus || w.campus === campus) &&
     (!grade  || gradeMatchesGroup(w.grade, grade)) &&
     (!q || String(w.name || '').toLowerCase().includes(q) || String(w.studentId || '').toLowerCase().includes(q))
@@ -2939,13 +3068,13 @@ async function loadAllWishes() {
   renderWishTable(wishes);
 }
 
-function renderWishTable(wishes) {
+function renderWishTable(wishes, emptyMessage) {
   const tbody = document.getElementById('wishBody');
   // 最新更新順に並び替え
   wishes = [...wishes].sort((a,b) => String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')));
   renderedWishes = wishes;
   if (!wishes.length) {
-    tbody.innerHTML = '<tr><td colspan="28" class="noData">データなし</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="28" class="noData">${emptyMessage || 'データなし'}</td></tr>`;
     return;
   }
   const res = w => w.results || {};
@@ -2968,7 +3097,7 @@ function renderWishTable(wishes) {
   tbody.innerHTML = wishes.map((w, idx) => {
     const r2 = res(w);
     return `<tr>
-    <td style="padding:4px 8px;font-weight:600;color:#1a56a0;cursor:pointer;text-decoration:underline" onclick="goToCompare('${htmlEsc(w.studentId)}')" title="成績×通知表へ">${htmlEsc(w.name)}</td>
+    <td style="padding:4px 8px;font-weight:600;color:#1a56a0;cursor:pointer;text-decoration:underline" onclick="goToCompare('${htmlEsc(w.studentId)}')" title="成績×通知表へ">${htmlEsc(w.name)}${withdrawnBadgeForStudentId(w.studentId)}</td>
     <td style="padding:4px 4px;text-align:center">${w.grade||'-'}</td>
     ${tdName(w.pub1name?w.pub1name+(w.pub1dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub1dept+'</span>':''):null,'#dde8ff','border-left:3px solid #4f46e5')}${tdType(r2,'pub1','#dde8ff')}${tdResult(r2,'pub1','#dde8ff')}${tdEnroll(r2,'pub1','#dde8ff')}
     ${tdName(w.pub2name?w.pub2name+(w.pub2dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub2dept+'</span>':''):null,'#dde8ff','border-left:3px solid #4f46e5')}${tdType(r2,'pub2','#dde8ff')}${tdResult(r2,'pub2','#dde8ff')}${tdEnroll(r2,'pub2','#dde8ff')}
@@ -3314,6 +3443,7 @@ async function initAdminScoresTab() {
   await loadAdminScores();
 }
 async function loadAdminScores() {
+  await ensureEnrollmentIndex();
   const year = document.getElementById('scAYear').value;
   const term = document.getElementById('scATerm').value;
   const campus = document.getElementById('scACampus').value;
@@ -3322,26 +3452,31 @@ async function loadAdminScores() {
   filterAdminScores();
 }
 function filterAdminScores() {
+  if (enrollmentFilterIsEmpty('scAShowActive', 'scAShowWithdrawn')) {
+    renderAdminScores([], '表示する生徒区分を選択してください。');
+    return;
+  }
   const q = (document.getElementById('scASearch')?.value || '').trim().toLowerCase();
   const grade = document.getElementById('scAGrade').value;
   const scores = adminScores.filter(d =>
+    matchesEnrollmentRecord(d.studentId, 'scAShowActive', 'scAShowWithdrawn') &&
     (!grade || gradeMatchesGroup(d.grade, grade)) &&
     (!q || String(d.name || '').toLowerCase().includes(q) || String(d.studentId || '').toLowerCase().includes(q))
   ).sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   renderAdminScores(scores);
 }
-function renderAdminScores(scores) {
+function renderAdminScores(scores, emptyMessage) {
   const tbody = document.getElementById('scABody');
   renderedAdminScores = scores;
   if (!tbody) return;
   if (!scores.length) {
-    tbody.innerHTML = '<tr><td colspan="19" class="noData">データなし</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="19" class="noData">${emptyMessage || 'データなし'}</td></tr>`;
     return;
   }
   const n = v => (v === '' || v == null) ? '<span style="color:var(--sub)">-</span>' : htmlEsc(v);
   tbody.innerHTML = scores.map((d, idx) => `
     <tr>
-      <td style="text-align:left;font-weight:600;color:#1a56a0;cursor:pointer;text-decoration:underline" onclick="goToCompare('${htmlEsc(d.studentId)}')" title="成績×通知表へ">${htmlEsc(d.name)}</td>
+      <td style="text-align:left;font-weight:600;color:#1a56a0;cursor:pointer;text-decoration:underline" onclick="goToCompare('${htmlEsc(d.studentId)}')" title="成績×通知表へ">${htmlEsc(d.name)}${withdrawnBadgeForStudentId(d.studentId)}</td>
       <td>${n(d.grade)}</td><td>${n(d.school)}</td><td>${n(d.year)}</td><td>第${n(d.term)}回</td>
       <td>${n(d.jpn)}</td><td>${n(d.soc)}</td><td>${n(d.math)}</td><td>${n(d.sci)}</td><td>${n(d.eng)}</td>
       <td style="font-weight:700;color:#1a56a0">${n(d.total5)}</td><td>${n(d.rank5)}</td>
@@ -3374,6 +3509,7 @@ async function initAdminReportTab() {
   await loadAdminReport();
 }
 async function loadAdminReport() {
+  await ensureEnrollmentIndex();
   const year = document.getElementById('rpAYear').value;
   const semester = document.getElementById('rpASemester').value;
   const campus = document.getElementById('rpACampus').value;
@@ -3382,19 +3518,24 @@ async function loadAdminReport() {
   filterAdminReport();
 }
 function filterAdminReport() {
+  if (enrollmentFilterIsEmpty('rpAShowActive', 'rpAShowWithdrawn')) {
+    renderAdminReport([], '表示する生徒区分を選択してください。');
+    return;
+  }
   const q = (document.getElementById('rpASearch')?.value || '').trim().toLowerCase();
   const grade = document.getElementById('rpAGrade').value;
   const reports = allReports.filter(d =>
+    matchesEnrollmentRecord(d.studentId, 'rpAShowActive', 'rpAShowWithdrawn') &&
     (!grade || gradeMatchesGroup(d.grade, grade)) &&
     (!q || String(d.name || '').toLowerCase().includes(q) || String(d.studentId || '').toLowerCase().includes(q))
   ).sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   renderAdminReport(reports);
 }
-function renderAdminReport(reports) {
+function renderAdminReport(reports, emptyMessage) {
   const tbody = document.getElementById('rpABody');
   renderedAdminReports = reports;
   if (!reports.length) {
-  tbody.innerHTML = '<tr><td colspan="16" class="noData">データなし</td></tr>';
+  tbody.innerHTML = `<tr><td colspan="16" class="noData">${emptyMessage || 'データなし'}</td></tr>`;
     document.getElementById('rpAStudent').innerHTML = '<option value="">生徒を選択</option>';
     if (reportChartInst) {
       reportChartInst.destroy();
@@ -3408,7 +3549,7 @@ function renderAdminReport(reports) {
     const rp5 = rp5keys.every(k=>d[k]!==''&&d[k]!=null) ? rp5keys.reduce((s,k)=>s+Number(d[k]),0) : '';
     const rp9 = rp9keys.every(k=>d[k]!==''&&d[k]!=null) ? rp9keys.reduce((s,k)=>s+Number(d[k]),0) : '';
     return `<tr>
-      <td style="text-align:left;font-weight:600;color:#1a56a0;cursor:pointer;text-decoration:underline" onclick="goToCompare('${htmlEsc(d.studentId)}')" title="成績×通知表へ">${htmlEsc(d.name)}</td>
+      <td style="text-align:left;font-weight:600;color:#1a56a0;cursor:pointer;text-decoration:underline" onclick="goToCompare('${htmlEsc(d.studentId)}')" title="成績×通知表へ">${htmlEsc(d.name)}${withdrawnBadgeForStudentId(d.studentId)}</td>
       <td>${d.grade}</td><td>${d.school}</td><td>${d.semester}</td>
       <td>${rpRating(d.rp_jpn)}</td><td>${rpRating(d.rp_soc)}</td><td>${rpRating(d.rp_math)}</td>
       <td>${rpRating(d.rp_sci)}</td><td>${rpRating(d.rp_eng)}</td>
@@ -4768,6 +4909,12 @@ async function restoreAdminMemo(i){
 }
 
 async function loadMeetingMemos() {
+  await ensureEnrollmentIndex();
+  if (enrollmentFilterIsEmpty('meetShowActive', 'meetShowWithdrawn')) {
+    meetingMemos = [];
+    renderMeetingTable([], '表示する生徒区分を選択してください。');
+    return;
+  }
   const r = await api({
     action: 'getMeetingMemos',
     q: document.getElementById('meetSearch')?.value || '',
@@ -4775,23 +4922,26 @@ async function loadMeetingMemos() {
     counterpart: document.getElementById('meetFilterCounterpart')?.value || ''
   });
   meetingMemos = r.memos || [];
+  meetingMemos = meetingMemos.filter(m =>
+    matchesEnrollmentRecord(m.studentId, 'meetShowActive', 'meetShowWithdrawn')
+  );
   if (selectedMeetingListCampus) {
     meetingMemos = meetingMemos.filter(m => String(m.campus || '') === selectedMeetingListCampus);
   }
   renderMeetingTable(meetingMemos);
 }
 
-function renderMeetingTable(list) {
+function renderMeetingTable(list, emptyMessage) {
   const body = document.getElementById('meetBody');
   if (!body) return;
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="6" class="noData">データなし</td></tr>';
+    body.innerHTML = `<tr><td colspan="6" class="noData">${emptyMessage || 'データなし'}</td></tr>`;
     return;
   }
   body.innerHTML = list.map(m => `
     <tr>
       <td style="white-space:nowrap">${htmlEsc(formatEntryValue(m.date))}</td>
-      <td><button onclick="goToCompare('${htmlEsc(m.studentId)}')" style="border:0;background:transparent;color:#1a56a0;font-weight:700;text-decoration:underline;cursor:pointer;padding:0">${htmlEsc(m.name)}</button><div style="color:#94a3b8;font-size:.72rem">No.${htmlEsc(m.studentId)} / ${htmlEsc(m.grade || '')}</div></td>
+      <td><button onclick="goToCompare('${htmlEsc(m.studentId)}')" style="border:0;background:transparent;color:#1a56a0;font-weight:700;text-decoration:underline;cursor:pointer;padding:0">${htmlEsc(m.name)}</button>${withdrawnBadgeForStudentId(m.studentId)}<div style="color:#94a3b8;font-size:.72rem">No.${htmlEsc(m.studentId)} / ${htmlEsc(m.grade || '')}</div></td>
       <td>${htmlEsc(m.counterpart || '')}</td>
       <td>${htmlEsc(m.staff || '')}</td>
       <td style="white-space:pre-wrap;min-width:320px">${htmlEsc(m.content || '')}</td>
