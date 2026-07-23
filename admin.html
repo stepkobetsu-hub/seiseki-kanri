@@ -2479,7 +2479,7 @@ const STU_GRADE_GROUPS = {
   high: ['高1','高2','高3']
 };
 const STU_ALL_GRADES = [...STU_GRADE_GROUPS.elementary, ...STU_GRADE_GROUPS.junior, ...STU_GRADE_GROUPS.high];
-const _stuGrades = new Set();
+const _stuGrades = new Set(STU_ALL_GRADES);
 
 function selectedStuGrades() {
   return [..._stuGrades];
@@ -2494,7 +2494,7 @@ function _renderStuGradeButtons() {
   document.querySelectorAll('[data-grade-group]').forEach(btn => {
     const key = btn.dataset.gradeGroup;
     const grades = key === 'all' ? STU_ALL_GRADES : (STU_GRADE_GROUPS[key] || []);
-    btn.classList.toggle('on', _sameStuGrades(grades));
+    btn.classList.toggle('on', grades.length > 0 && grades.every(g => _stuGrades.has(g)));
   });
   const summary = document.getElementById('stuGradeSummary');
   if (summary) {
@@ -2519,11 +2519,20 @@ function toggleStuGrade(grade) {
 }
 
 function selectStuGradeGroup(group) {
-  _stuGrades.clear();
-  if (group === 'all') STU_ALL_GRADES.forEach(g => _stuGrades.add(g));
-  else if (STU_GRADE_GROUPS[group]) STU_GRADE_GROUPS[group].forEach(g => _stuGrades.add(g));
+  if (group === 'clear') {
+    _stuGrades.clear();
+  } else {
+    const grades = group === 'all' ? STU_ALL_GRADES : (STU_GRADE_GROUPS[group] || []);
+    const allSelected = grades.length > 0 && grades.every(g => _stuGrades.has(g));
+    grades.forEach(g => {
+      if (allSelected) _stuGrades.delete(g);
+      else _stuGrades.add(g);
+    });
+  }
   _applyStuGradeChange();
 }
+
+_renderStuGradeButtons();
 
 function studentFilterParams() {
   const grades = selectedStuGrades();
