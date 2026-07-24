@@ -143,6 +143,7 @@ function route(e) {
       case 'updateSchool':       result = updateSchool(data); break;
       // 管理者
       case 'getStudents':        result = getStudents(); break;
+      case 'getStudentList':     result = getStudentList(); break;
       case 'getAllScores':        result = getAllScores(data); break;
       case 'getStudentDetail':   result = getStudentDetail(data); break;
       case 'staffLogin':         result = staffLogin(data); break;
@@ -393,6 +394,44 @@ function getStudents() {
         grade: rows[i][3], school: rows[i][4], flag: rows[i][6], syncedAt: rows[i][7]
       });
     }
+  }
+  return { success: true, students };
+}
+
+// 生徒一覧専用。元の「☆マスタ」B列を加工せず、1 / 0 / 空欄のまま返す。
+function getStudentList() {
+  const masterSS = SpreadsheetApp.openById(MASTER_SPREADSHEET_ID);
+  const sh = masterSS.getSheetByName(MASTER_SHEET_NAME);
+  if (!sh) return { success: false, error: `シート「${MASTER_SHEET_NAME}」が見つかりません` };
+  const rows = sh.getDataRange().getValues();
+  if (!rows.length) return { success: true, students: [] };
+
+  const headers = rows[0].map(h => String(h).trim());
+  const col = keywords => {
+    for (const keyword of keywords) {
+      const index = headers.findIndex(header => header.includes(keyword));
+      if (index >= 0) return index;
+    }
+    return -1;
+  };
+  const colId = col(['ID','id','コード','番号','生徒番号','生徒ID']);
+  const colName = col(['氏名','名前','生徒名','name']);
+  const colCampus = col(['校舎','キャンパス','campus']);
+  const colGrade = col(['学年','grade']);
+  const colSchool = col(['中学','在学','学校','school']);
+  const students = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const id = colId >= 0 ? row[colId] : row[0];
+    if (id === null || id === undefined || String(id).trim() === '') continue;
+    students.push({
+      id,
+      name: colName >= 0 ? row[colName] : row[4],
+      campus: colCampus >= 0 ? row[colCampus] : row[7],
+      grade: colGrade >= 0 ? row[colGrade] : row[9],
+      school: colSchool >= 0 ? row[colSchool] : row[15],
+      flag: row[1]
+    });
   }
   return { success: true, students };
 }
