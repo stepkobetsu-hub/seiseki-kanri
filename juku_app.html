@@ -806,11 +806,65 @@ function getNendo(date) {
   return d.getMonth() < 3 ? d.getFullYear() - 1 : d.getFullYear();
 }
 const NOW_YEAR = getNendo();
+const COMMON_TOKEN_KEY = 'stepCommonStudentSessionToken';
+const COMMON_EXPIRES_KEY = 'stepCommonStudentSessionExpiresAt';
+const STUDENT_GRADE_ACTIONS = new Set(['getStudentScores','saveScore','deleteScore','getWish','saveWish','getReport','saveReport','deleteReport','getReports','getSchools']);
+let studentCommonMode = false;
+let commonApiUrlPromise;
+
+function resolveCommonApiUrl() {
+  if (!commonApiUrlPromise) {
+    commonApiUrlPromise = fetch('../foresta-step-progress/', { cache: 'no-store' })
+      .then(response => { if (!response.ok) throw new Error('共通ログインの接続先を確認できません'); return response.text(); })
+      .then(source => {
+        const match = source.match(/const\s+API_URL\s*=\s*['"]([^'"]+)['"]/);
+        if (!match) throw new Error('共通ログインの接続先を確認できません');
+        return match[1];
+      });
+  }
+  return commonApiUrlPromise;
+}
+
+async function commonApi(params) {
+  const response = await fetch(await resolveCommonApiUrl(), {
+    method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(params), cache: 'no-store', redirect: 'follow'
+  });
+  if (!response.ok) throw new Error('共通ログインサーバーへ接続できません');
+  return response.json();
+}
+
+function readCommonSession() {
+  try {
+    const token = localStorage.getItem(COMMON_TOKEN_KEY) || '';
+    const expiresAt = localStorage.getItem(COMMON_EXPIRES_KEY) || '';
+    return token && expiresAt && new Date(expiresAt).getTime() > Date.now() ? { token, expiresAt } : null;
+  } catch (error) { return null; }
+}
+
+function saveCommonSession(token, expiresAt) {
+  localStorage.setItem(COMMON_TOKEN_KEY, String(token));
+  localStorage.setItem(COMMON_EXPIRES_KEY, String(expiresAt));
+}
+
+function clearCommonSession() {
+  localStorage.removeItem(COMMON_TOKEN_KEY);
+  localStorage.removeItem(COMMON_EXPIRES_KEY);
+}
+
+function profileToStudent(profile) {
+  return { id: profile.studentId, name: profile.name || '', campus: profile.campus || '', grade: profile.grade || '', school: profile.school || '' };
+}
 
 // ===================================================
 // API
 // ===================================================
 async function api(params) {
+  if (studentCommonMode && STUDENT_GRADE_ACTIONS.has(String(params.action || ''))) {
+    const session = readCommonSession();
+    if (!session) return { success: false, code: 'UNAUTHENTICATED', error: 'ログインが必要です' };
+    return commonApi({ action: 'commonGradeRequest', token: session.token, gradeAction: params.action, payload: params });
+  }
   if (!GAS) { toast('⚠️ GAS URLを入力してください'); throw new Error('No GAS URL'); }
   const res = await fetch(GAS, {
     method: 'POST',
@@ -840,11 +894,13 @@ async function doLogin() {
   if (!id || !pw) { errEl.textContent = 'IDとパスワードを入力してください'; return; }
   try {
     errEl.textContent = '確認中...';
-    const r = await api({ action: 'login', studentId: id, password: pw });
-    if (r.success) {
-      me = r.student;
-      localStorage.setItem('studentId', id); // ID記憶
-      sessionStorage.setItem('studentMe', JSON.stringify(me)); // セッション保持
+    const r = await commonApi({ action: 'studentLogin', studentId: id, password: pw });
+    if (r.success && r.role === 'STUDENT' && r.profile && r.token && r.expiresAt) {
+      saveCommonSession(r.token, r.expiresAt);
+      studentCommonMode = true;
+      me = profileToStudent(r.profile);
+      document.getElementById('loginId').value = '';
+      document.getElementById('loginPw').value = '';
       showPage('studentPage');
       setHeader(me.name + '（' + me.grade + '）');
       startAutoLogout();
@@ -857,22 +913,22 @@ async function doLogin() {
   }
 }
 
-// ページ読み込み時：ID復元＋セッション継続
-(function() {
-  const savedId = localStorage.getItem('studentId');
-  if (savedId) {
-    const el = document.getElementById('loginId');
-    if (el) el.value = savedId;
-  }
-  const savedMe = sessionStorage.getItem('studentMe');
-  if (savedMe) {
+// ページ読み込み時：共通セッションをサーバーで検証して継続
+(async function() {
+  localStorage.removeItem('studentId');
+  sessionStorage.removeItem('studentMe');
+  const session = readCommonSession();
+  if (session) {
     try {
-      me = JSON.parse(savedMe);
+      const verified = await commonApi({ action: 'getCommonStudentSession', token: session.token });
+      if (!verified.success || verified.role !== 'STUDENT' || !verified.profile) throw new Error('SESSION_EXPIRED');
+      studentCommonMode = true;
+      me = profileToStudent(verified.profile);
       showPage('studentPage');
       setHeader(me.name + '（' + me.grade + '）');
       startAutoLogout();
       initStudent();
-    } catch(e) { sessionStorage.removeItem('studentMe'); }
+    } catch(e) { clearCommonSession(); studentCommonMode = false; me = null; }
   }
 })();
 
@@ -880,6 +936,7 @@ function openAdmin() {
   const saved = localStorage.getItem('adminPass') || 'admin1234';
   const pw = prompt('管理者パスワードを入力してください');
   if (pw !== saved) { alert('パスワードが違います'); return; }
+  studentCommonMode = false;
   setHeader('管理者');
   showPage('adminPage');
   aTabs('speed', 0);
@@ -906,10 +963,13 @@ function clearAutoLogout() {
 
 function logout() {
   clearAutoLogout();
-  sessionStorage.removeItem('studentMe');
+  const session = readCommonSession();
+  clearCommonSession();
+  studentCommonMode = false;
   me = null; myScores = [];
   document.getElementById('appHdr').style.display = 'none';
   showPage('loginPage');
+  if (session) commonApi({ action: 'logout', token: session.token }).catch(() => {});
 }
 
 function setHeader(name) {
