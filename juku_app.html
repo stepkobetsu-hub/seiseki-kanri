@@ -34,8 +34,10 @@ body{font-family:'Hiragino Kaku Gothic ProN','Meiryo',sans-serif;background:var(
 header{background:var(--primary);color:#fff;height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:200;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 header h1{font-size:.95rem;font-weight:700;letter-spacing:.04em}
 #hdrRight{display:flex;align-items:center;gap:10px;font-size:.8rem}
-.hdrBtn{background:rgba(255,255,255,.2);border:none;color:#fff;padding:4px 12px;border-radius:20px;cursor:pointer;font-size:.78rem}
+#hdrName{font-size:1.05rem;font-weight:800;line-height:1.15}
+.hdrBtn{background:rgba(255,255,255,.2);border:none;color:#fff;padding:4px 12px;border-radius:20px;cursor:pointer;font-size:.72rem}
 .hdrBtn:hover{background:rgba(255,255,255,.35)}
+@media(max-width:640px){header{height:58px;padding:0 10px;gap:8px}header h1{font-size:.68rem;line-height:1.2;max-width:78px}#hdrRight{min-width:0;flex:1;justify-content:flex-end;gap:7px}#hdrName{font-size:1.18rem;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hdrBtn{padding:4px 8px;font-size:.64rem;white-space:nowrap}}
 
 /* PAGE */
 .page{display:none;padding:20px;max-width:960px;margin:0 auto}
