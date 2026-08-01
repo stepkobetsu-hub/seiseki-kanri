@@ -510,7 +510,15 @@ function showStaffHome(name, permissionLevel){
   }
 }
 
-function staffLogout(){
+async function staffLogout(){
+  const saved = getSavedStaffAuth();
+  if (saved?.systemPortalSessionToken) {
+    try {
+      await postGas({ action:'logoutSystemPortal', systemPortalSessionToken:saved.systemPortalSessionToken });
+    } catch (e) {
+      console.warn('共通セッションの失効通知に失敗しました', e);
+    }
+  }
   localStorage.removeItem(STAFF_AUTH_KEY);
   localStorage.removeItem(STAFF_CODE_KEY);
   document.getElementById('staffCode').value = '';
