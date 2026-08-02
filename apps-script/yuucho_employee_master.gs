@@ -48,7 +48,8 @@ function getEmployees(token) {
       bankCode:bank.code, bankKana:bank.kana, bankName:bank.name,
       branchCode:isYuucho ? yuuchoBranch_(branchRaw) : pad_(digits_(branchRaw), 3),
       branchKana:'', branchName:'', depositType:'1',
-      accountNumber:isYuucho && accountRaw.length === 8 ? accountRaw.slice(0, 7) : pad_(accountRaw, 7),
+      // ゆうちょの「番号」は末尾1桁がチェック番号。元データが7桁でも必ず除く。
+      accountNumber:isYuucho && accountRaw.length > 1 ? accountRaw.slice(0, -1) : pad_(accountRaw, 7),
       inputMethod:isYuucho ? '1' : '0', sourceBank:bankRaw, sourceBranch:branchRaw,
       warnings:employeeWarnings_(bankRaw, branchRaw, accountRaw, r[2])
     };
