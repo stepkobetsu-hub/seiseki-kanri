@@ -217,6 +217,19 @@ input,textarea{
   padding:12px;
   font:inherit;
 }
+ .rememberLogin{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:0;
+  font-size:.88rem;
+  font-weight:700;
+  color:#52667c;
+}
+.rememberLogin input{
+  width:auto;
+  margin:0;
+}
 textarea{
   min-height:120px;
   resize:vertical;
@@ -289,6 +302,7 @@ textarea{
         <label for="staffPassword">パスワード</label>
         <input id="staffPassword" type="password" autocomplete="current-password" placeholder="未設定の場合は空欄">
       </div>
+      <label class="rememberLogin"><input id="rememberLogin" type="checkbox" checked>この端末にID・パスワードを記憶する</label>
       <button class="btn" type="submit">ログイン</button>
       <div id="loginMsg" class="loginMsg hidden"></div>
     </form>
@@ -446,6 +460,7 @@ textarea{
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 const STAFF_AUTH_KEY = 'stepStaffAppAuth';
 const STAFF_CODE_KEY = 'stepStaffAppCode';
+const STAFF_PASSWORD_KEY = 'stepStaffAppPassword';
 let qrStream = null;
 let qrScanTimer = null;
 let loginInProgress = false;
@@ -469,9 +484,10 @@ function initStaffAppLogin(){
 
   const saved = getSavedStaffAuth();
   const savedCode = saved?.code || localStorage.getItem(STAFF_CODE_KEY) || '';
-  if (savedCode) {
-    codeEl.value = savedCode;
-  }
+  const savedPassword = localStorage.getItem(STAFF_PASSWORD_KEY) || '';
+  if (savedCode) codeEl.value = savedCode;
+  if (savedPassword) passwordEl.value = savedPassword;
+  document.getElementById('rememberLogin').checked = !!(savedCode || savedPassword);
   if (saved?.systemPortalSessionToken && ['2','3','4'].includes(String(saved.permissionLevel || ''))) {
     showStaffHome(saved.name || '', saved.permissionLevel || '');
     return;
@@ -526,7 +542,13 @@ async function staffLogin(isAuto){
     setLoginMsg('確認しています...');
     const result = await postGas({ action:'staffLogin', code, password });
     if (!result.success) throw new Error(result.error || 'ログインできませんでした');
-    localStorage.setItem(STAFF_CODE_KEY, code);
+    if (document.getElementById('rememberLogin').checked) {
+      localStorage.setItem(STAFF_CODE_KEY, code);
+      localStorage.setItem(STAFF_PASSWORD_KEY, password);
+    } else {
+      localStorage.removeItem(STAFF_CODE_KEY);
+      localStorage.removeItem(STAFF_PASSWORD_KEY);
+    }
     localStorage.setItem(STAFF_AUTH_KEY, JSON.stringify({
       code,
       name: result.name || '',
@@ -574,8 +596,10 @@ async function staffLogout(){
   }
   localStorage.removeItem(STAFF_AUTH_KEY);
   localStorage.removeItem(STAFF_CODE_KEY);
+  localStorage.removeItem(STAFF_PASSWORD_KEY);
   document.getElementById('staffCode').value = '';
   document.getElementById('staffPassword').value = '';
+  document.getElementById('rememberLogin').checked = true;
   document.getElementById('homePage').classList.add('hidden');
   document.getElementById('adminQrPage').classList.add('hidden');
   document.getElementById('loginPage').classList.remove('hidden');
