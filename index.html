@@ -487,7 +487,7 @@ function initStaffAppLogin(){
   const savedPassword = localStorage.getItem(STAFF_PASSWORD_KEY) || '';
   if (savedCode) codeEl.value = savedCode;
   if (savedPassword) passwordEl.value = savedPassword;
-  document.getElementById('rememberLogin').checked = !!(savedCode || savedPassword);
+  document.getElementById('rememberLogin').checked = true;
   if (saved?.systemPortalSessionToken && ['2','3','4'].includes(String(saved.permissionLevel || ''))) {
     showStaffHome(saved.name || '', saved.permissionLevel || '');
     return;
