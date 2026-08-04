@@ -497,6 +497,10 @@ async function staffLogin(isAuto){
       savedAt: new Date().toISOString()
     }));
     showStaffHome(result.name || '', result.permissionLevel || '');
+    if (new URLSearchParams(location.search).get('next') === 'points') {
+      location.replace('https://stepkobetsu-hub.github.io/student-QR/points_manager.html');
+      return;
+    }
   }catch(err){
     localStorage.removeItem(STAFF_AUTH_KEY);
     setLoginMsg(err.message || 'ログインできませんでした');
