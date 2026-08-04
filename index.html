@@ -280,7 +280,7 @@ textarea{
   <div class="loginCard">
     <h1>スタッフ用アプリ</h1>
     <p class="loginNote">講師番号とパスワードでログインしてください。許可されているスタッフだけ入れます。</p>
-    <div class="loginForm">
+    <form id="staffLoginForm" class="loginForm">
       <div>
         <label for="staffCode">講師番号</label>
         <input id="staffCode" type="text" inputmode="numeric" autocomplete="username" placeholder="例：7085">
@@ -289,9 +289,9 @@ textarea{
         <label for="staffPassword">パスワード</label>
         <input id="staffPassword" type="password" autocomplete="current-password" placeholder="未設定の場合は空欄">
       </div>
-      <button class="btn" type="button" onclick="staffLogin()">ログイン</button>
+      <button class="btn" type="submit">ログイン</button>
       <div id="loginMsg" class="loginMsg hidden"></div>
-    </div>
+    </form>
   </div>
 </section>
 <main id="homePage" class="page hidden">
@@ -448,18 +448,55 @@ const STAFF_AUTH_KEY = 'stepStaffAppAuth';
 const STAFF_CODE_KEY = 'stepStaffAppCode';
 let qrStream = null;
 let qrScanTimer = null;
+let loginInProgress = false;
+let autoLoginTimer = null;
+let autoLoginAttemptedSignature = '';
 
 document.addEventListener('DOMContentLoaded', initStaffAppLogin);
 
 function initStaffAppLogin(){
+  const form = document.getElementById('staffLoginForm');
+  const codeEl = document.getElementById('staffCode');
+  const passwordEl = document.getElementById('staffPassword');
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    staffLogin(false);
+  });
+  [codeEl, passwordEl].forEach(el => {
+    el.addEventListener('input', scheduleAutoLogin);
+    el.addEventListener('change', scheduleAutoLogin);
+  });
+
   const saved = getSavedStaffAuth();
   const savedCode = saved?.code || localStorage.getItem(STAFF_CODE_KEY) || '';
   if (savedCode) {
-    document.getElementById('staffCode').value = savedCode;
+    codeEl.value = savedCode;
   }
   if (saved?.systemPortalSessionToken && ['2','3','4'].includes(String(saved.permissionLevel || ''))) {
     showStaffHome(saved.name || '', saved.permissionLevel || '');
+    return;
   }
+
+  // Password managers may fill fields without firing input/change events.
+  let checks = 0;
+  const autofillCheck = setInterval(() => {
+    scheduleAutoLogin();
+    checks += 1;
+    if (autoLoginAttemptedSignature || checks >= 40) clearInterval(autofillCheck);
+  }, 250);
+}
+
+function scheduleAutoLogin(){
+  const code = document.getElementById('staffCode').value.trim();
+  const password = document.getElementById('staffPassword').value;
+  if (!code || !password || loginInProgress) return;
+  const signature = code + '\\u0000' + password;
+  if (signature === autoLoginAttemptedSignature) return;
+  clearTimeout(autoLoginTimer);
+  autoLoginTimer = setTimeout(() => {
+    autoLoginAttemptedSignature = signature;
+    staffLogin(true);
+  }, 450);
 }
 
 function getSavedStaffAuth(){
@@ -477,14 +514,16 @@ function setLoginMsg(text){
 }
 
 async function staffLogin(isAuto){
+  if (loginInProgress) return;
   const code = document.getElementById('staffCode').value.trim();
   const password = document.getElementById('staffPassword').value;
   if (!code) {
     if (!isAuto) setLoginMsg('講師番号を入力してください。');
     return;
   }
+  loginInProgress = true;
   try{
-    if (!isAuto) setLoginMsg('確認しています...');
+    setLoginMsg('確認しています...');
     const result = await postGas({ action:'staffLogin', code, password });
     if (!result.success) throw new Error(result.error || 'ログインできませんでした');
     localStorage.setItem(STAFF_CODE_KEY, code);
@@ -504,6 +543,8 @@ async function staffLogin(isAuto){
   }catch(err){
     localStorage.removeItem(STAFF_AUTH_KEY);
     setLoginMsg(err.message || 'ログインできませんでした');
+  }finally{
+    loginInProgress = false;
   }
 }
 
