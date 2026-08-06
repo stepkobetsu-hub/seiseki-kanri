@@ -15,7 +15,9 @@ const STUDENT_QR_SESSION_PREFIX = 'studentQrSession:';
 const STUDENT_QR_SESSION_SECONDS = 6 * 60 * 60;
 const SYSTEM_PORTAL_PERMISSION_LEVELS = ['2', '3', '4'];
 const SYSTEM_PORTAL_SESSION_PREFIX = 'systemPortalSession:';
+const SYSTEM_PORTAL_SESSION_PROPERTY_PREFIX = 'systemPortalPersistent:';
 const SYSTEM_PORTAL_SESSION_SECONDS = 6 * 60 * 60;
+const SYSTEM_PORTAL_PERSISTENT_EXPIRES_AT = '2099-12-31T23:59:59.999Z';
 const SYSTEM_REGISTRY_SHEET_NAME = 'システム台帳';
 const TARGET_MASTER_FLAGS = ['1', '0']; // ☆マスタB列: 1=在籍, 0=保留中
 const SCHOOL_MASTER_COLS = ['学校名','年間テスト回数','学期制','登録日時','定期テスト日程JSON','予定表URL','日程メモ'];
@@ -1651,38 +1653,84 @@ function staffLogin(data) {
   };
 }
 
+function systemPortalSessionPropertyKey_(token) {
+  const digest = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    String(token || ''),
+    Utilities.Charset.UTF_8
+  );
+  return SYSTEM_PORTAL_SESSION_PROPERTY_PREFIX + digest.map(function(byte) {
+    return ('0' + (byte & 255).toString(16)).slice(-2);
+  }).join('');
+}
+
 function createSystemPortalSession_(auth) {
   if (!auth || !SYSTEM_PORTAL_PERMISSION_LEVELS.includes(auth.permissionLevel)) {
     throw new Error('STEP総合管理ポータルを利用する権限がありません。');
   }
   const sessionToken = Utilities.getUuid() + '-' + Utilities.getUuid();
-  const expiresAt = new Date(Date.now() + SYSTEM_PORTAL_SESSION_SECONDS * 1000).toISOString();
+  const session = {
+    loginId: auth.code,
+    name: auth.name,
+    permissionLevel: auth.permissionLevel,
+    createdAt: new Date().toISOString(),
+    expiresAt: SYSTEM_PORTAL_PERSISTENT_EXPIRES_AT,
+    persistent: true
+  };
+  const serialized = JSON.stringify(session);
+  PropertiesService.getScriptProperties().setProperty(
+    systemPortalSessionPropertyKey_(sessionToken),
+    serialized
+  );
   CacheService.getScriptCache().put(
     SYSTEM_PORTAL_SESSION_PREFIX + sessionToken,
-    JSON.stringify({ loginId: auth.code, name: auth.name, permissionLevel: auth.permissionLevel, expiresAt: expiresAt }),
+    serialized,
     SYSTEM_PORTAL_SESSION_SECONDS
   );
-  return { sessionToken: sessionToken, expiresAt: expiresAt };
+  return { sessionToken: sessionToken, expiresAt: session.expiresAt };
 }
 
 function requireSystemPortalAdmin_(data) {
   const token = String(data.systemPortalSessionToken || data.sessionToken || '').trim();
-  if (!token) throw new Error('セッションが切れました。再ログインしてください。');
+  if (!token) throw new Error('ログイン情報がありません。ログインしてください。');
   const cache = CacheService.getScriptCache();
-  const cached = cache.get(SYSTEM_PORTAL_SESSION_PREFIX + token);
-  if (!cached) throw new Error('セッションが切れました。再ログインしてください。');
+  const properties = PropertiesService.getScriptProperties();
+  const propertyKey = systemPortalSessionPropertyKey_(token);
+  let serialized = cache.get(SYSTEM_PORTAL_SESSION_PREFIX + token);
+  let isLegacyCacheSession = false;
+  if (!serialized) serialized = properties.getProperty(propertyKey);
+  else isLegacyCacheSession = !properties.getProperty(propertyKey);
+  if (!serialized) throw new Error('ログイン情報が無効です。もう一度ログインしてください。');
   let session;
-  try { session = JSON.parse(cached); } catch (e) { session = null; }
-  if (!session || !session.loginId || !session.expiresAt || new Date(session.expiresAt).getTime() <= Date.now()) {
+  try { session = JSON.parse(serialized); } catch (e) { session = null; }
+  if (!session || !session.loginId) {
     cache.remove(SYSTEM_PORTAL_SESSION_PREFIX + token);
-    throw new Error('セッションが切れました。再ログインしてください。');
+    properties.deleteProperty(propertyKey);
+    throw new Error('ログイン情報が無効です。もう一度ログインしてください。');
+  }
+  if (isLegacyCacheSession) {
+    session.expiresAt = SYSTEM_PORTAL_PERSISTENT_EXPIRES_AT;
+    session.persistent = true;
+    session.migratedAt = new Date().toISOString();
+    serialized = JSON.stringify(session);
+    properties.setProperty(propertyKey, serialized);
   }
   const auth = getTeacherAuthByCode_(session.loginId);
   if (!auth || !SYSTEM_PORTAL_PERMISSION_LEVELS.includes(auth.permissionLevel)) {
     cache.remove(SYSTEM_PORTAL_SESSION_PREFIX + token);
+    properties.deleteProperty(propertyKey);
     throw new Error('STEP総合管理ポータルを利用する権限がありません。');
   }
-  return { auth: auth, token: token, expiresAt: session.expiresAt };
+  cache.put(
+    SYSTEM_PORTAL_SESSION_PREFIX + token,
+    serialized,
+    SYSTEM_PORTAL_SESSION_SECONDS
+  );
+  return {
+    auth: auth,
+    token: token,
+    expiresAt: session.expiresAt || SYSTEM_PORTAL_PERSISTENT_EXPIRES_AT
+  };
 }
 
 function verifySystemPortal(data) {
@@ -1698,7 +1746,10 @@ function verifySystemPortal(data) {
 
 function logoutSystemPortal(data) {
   const token = String(data.systemPortalSessionToken || data.sessionToken || '').trim();
-  if (token) CacheService.getScriptCache().remove(SYSTEM_PORTAL_SESSION_PREFIX + token);
+  if (token) {
+    CacheService.getScriptCache().remove(SYSTEM_PORTAL_SESSION_PREFIX + token);
+    PropertiesService.getScriptProperties().deleteProperty(systemPortalSessionPropertyKey_(token));
+  }
   return { success: true };
 }
 
