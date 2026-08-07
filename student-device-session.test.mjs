@@ -9,6 +9,8 @@ test('student login has a large device choice and nearby warning', () => {
   assert.match(page, /id="studentDeviceSchool"[\s\S]*塾のタブレット/);
   assert.match(page, /id="studentDeviceWarning" class="deviceWarning hidden" role="alert"/);
   assert.match(page, /\.deviceWarning\{[^}]*font-size:1rem;[^}]*font-weight:800/);
+  assert.match(page, /id="loginId"[^>]*placeholder="例: 0001"/);
+  assert.doesNotMatch(page, /例: S001/);
 });
 
 test('personal student device remembers credentials and has no idle timer', () => {
