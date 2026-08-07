@@ -20,6 +20,14 @@ test('personal student device remembers credentials and has no idle timer', () =
   assert.match(page, /if \(await resumeStudentSession\(\)\) return;/);
 });
 
+test('remembered personal login stays hidden until automatic authentication finishes', () => {
+  assert.match(page, /document\.documentElement\.classList\.add\('student-auth-pending'\)/);
+  assert.match(page, /html\.student-auth-pending #loginPage\{visibility:hidden\}/);
+  assert.match(page, /function finishStudentAuthPending\(\)/);
+  assert.match(page, /showPage\('studentPage'\);\s*finishStudentAuthPending\(\)/);
+  assert.match(page, /if \(!me\) finishStudentAuthPending\(\)/);
+});
+
 test('school student device uses session storage and logs out at 30 minutes', () => {
   assert.match(page, /const STUDENT_IDLE_LIMIT_MS = 30 \* 60 \* 1000/);
   assert.match(page, /const store = studentDeviceMode === 'school' \? sessionStorage : localStorage/);
