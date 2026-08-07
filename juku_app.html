@@ -45,7 +45,7 @@ header h1{font-size:.95rem;font-weight:700;letter-spacing:.04em}
 #loginPage{display:flex;align-items:center;justify-content:center;min-height:100vh}
 
 /* LOGIN */
-.loginBox{background:var(--card);border-radius:var(--radius);padding:40px 36px;width:100%;max-width:380px;box-shadow:var(--shadow);text-align:center}
+.loginBox{background:var(--card);border-radius:var(--radius);padding:40px 36px;width:100%;max-width:520px;box-shadow:var(--shadow);text-align:center}
 .loginLogo{font-size:2.2rem;margin-bottom:6px}
 .loginSub{font-size:1rem;color:var(--sub);margin-bottom:28px}
 .fld{display:flex;flex-direction:column;gap:4px;margin-bottom:14px;text-align:left}
@@ -53,6 +53,16 @@ header h1{font-size:.95rem;font-weight:700;letter-spacing:.04em}
 .fld input,.fld select{padding:10px 13px;border:1.5px solid var(--border);border-radius:8px;font-size:.95rem;outline:none;transition:border .2s}
 .fld input:focus,.fld select:focus{border-color:var(--primary)}
 .errMsg{color:var(--danger);font-size:.8rem;margin-bottom:10px}
+.devicePrompt{margin:0 0 10px;text-align:left;font-size:1rem;font-weight:800;color:var(--text)}
+.deviceChoices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.deviceChoice{min-height:92px;padding:14px 12px;border:2px solid #cbd5e1;border-radius:12px;background:#f8fafc;color:var(--text);text-align:left;cursor:pointer;transition:.15s}
+.deviceChoice strong{display:block;font-size:1rem;margin-bottom:6px}
+.deviceChoice span{display:block;font-size:.76rem;line-height:1.45;color:var(--sub);font-weight:600}
+.deviceChoice:hover{border-color:#60a5fa;background:#eff6ff}
+.deviceChoice.selected{border-color:var(--primary);background:var(--primary-lt);box-shadow:0 0 0 2px rgba(26,86,160,.12)}
+.deviceWarning{margin:0 0 16px;padding:13px 14px;border:2px solid #dc2626;border-radius:10px;background:#fef2f2;color:#b91c1c;text-align:left;font-size:1rem;font-weight:800;line-height:1.5}
+.deviceWarning.hidden{display:none}
+@media(max-width:540px){.loginBox{padding:30px 20px}.deviceChoices{grid-template-columns:1fr}.deviceChoice{min-height:78px}}
 
 /* BUTTONS */
 .btn{display:inline-flex;align-items:center;gap:5px;padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .2s}
@@ -201,8 +211,20 @@ tr:hover td{background:var(--primary-lt)}
       <label>GAS WebアプリURL</label>
       <input id="gasUrl" type="text" placeholder="https://script.google.com/macros/s/...">
     </div>
-    <div class="fld"><label>生徒ID</label><input id="loginId" type="text" placeholder="例: S001"></div>
-    <div class="fld"><label>パスワード</label><input id="loginPw" type="password" placeholder="パスワード"></div>
+    <p class="devicePrompt">この端末を選んでください</p>
+    <div class="deviceChoices" role="group" aria-label="使用する端末">
+      <button type="button" id="studentDevicePersonal" class="deviceChoice" onclick="selectStudentDevice('personal')">
+        <strong>自分・家族の端末</strong>
+        <span>ID・パスワードを保存し、ログアウトするまで次回から自動ログイン</span>
+      </button>
+      <button type="button" id="studentDeviceSchool" class="deviceChoice" onclick="selectStudentDevice('school')">
+        <strong>塾のタブレット</strong>
+        <span>ID・パスワードは保存せず、30分操作がないと自動ログアウト</span>
+      </button>
+    </div>
+    <p id="studentDeviceWarning" class="deviceWarning hidden" role="alert">⚠️「自分・家族の端末」か「塾のタブレット」を選んでください。</p>
+    <div class="fld"><label>生徒ID</label><input id="loginId" type="text" autocomplete="username" placeholder="例: S001"></div>
+    <div class="fld"><label>パスワード</label><input id="loginPw" type="password" autocomplete="current-password" placeholder="パスワード"></div>
     <div class="errMsg" id="loginErr"></div>
     <button class="btn btn-primary btn-full" onclick="doLogin()">ログイン</button>
   </div>
@@ -810,9 +832,17 @@ function getNendo(date) {
 const NOW_YEAR = getNendo();
 const COMMON_TOKEN_KEY = 'stepCommonStudentSessionToken';
 const COMMON_EXPIRES_KEY = 'stepCommonStudentSessionExpiresAt';
+const STUDENT_DEVICE_KEY = 'gradeStudentDeviceMode';
+const STUDENT_ID_KEY = 'gradeStudentSavedId';
+const STUDENT_PASSWORD_KEY = 'gradeStudentSavedPassword';
+const STUDENT_IDLE_AT_KEY = 'gradeStudentLastActivityAt';
+const STUDENT_IDLE_LIMIT_MS = 30 * 60 * 1000;
+const STUDENT_ACTIVITY_EVENTS = ['pointerdown','keydown','touchstart','scroll'];
 const STUDENT_GRADE_ACTIONS = new Set(['getStudentScores','saveScore','deleteScore','getWish','saveWish','getReport','saveReport','deleteReport','getReports','getSchools']);
 let studentCommonMode = false;
 let commonApiUrlPromise;
+let studentDeviceMode = '';
+let studentLoginInProgress = false;
 
 function resolveCommonApiUrl() {
   if (!commonApiUrlPromise) {
@@ -838,20 +868,29 @@ async function commonApi(params) {
 
 function readCommonSession() {
   try {
-    const token = localStorage.getItem(COMMON_TOKEN_KEY) || '';
-    const expiresAt = localStorage.getItem(COMMON_EXPIRES_KEY) || '';
+    const mode = studentDeviceMode || getSavedStudentDevice();
+    if (!mode) return null;
+    const store = mode === 'school' ? sessionStorage : localStorage;
+    const token = store.getItem(COMMON_TOKEN_KEY) || '';
+    const expiresAt = store.getItem(COMMON_EXPIRES_KEY) || '';
     return token && expiresAt && new Date(expiresAt).getTime() > Date.now() ? { token, expiresAt } : null;
   } catch (error) { return null; }
 }
 
 function saveCommonSession(token, expiresAt) {
-  localStorage.setItem(COMMON_TOKEN_KEY, String(token));
-  localStorage.setItem(COMMON_EXPIRES_KEY, String(expiresAt));
+  const store = studentDeviceMode === 'school' ? sessionStorage : localStorage;
+  const otherStore = studentDeviceMode === 'school' ? localStorage : sessionStorage;
+  store.setItem(COMMON_TOKEN_KEY, String(token));
+  store.setItem(COMMON_EXPIRES_KEY, String(expiresAt));
+  otherStore.removeItem(COMMON_TOKEN_KEY);
+  otherStore.removeItem(COMMON_EXPIRES_KEY);
 }
 
 function clearCommonSession() {
   localStorage.removeItem(COMMON_TOKEN_KEY);
   localStorage.removeItem(COMMON_EXPIRES_KEY);
+  sessionStorage.removeItem(COMMON_TOKEN_KEY);
+  sessionStorage.removeItem(COMMON_EXPIRES_KEY);
 }
 
 function profileToStudent(profile) {
@@ -888,30 +927,105 @@ document.getElementById('gasUrl').addEventListener('input', e => {
   localStorage.setItem('gasUrl', GAS);
 });
 
+function getSavedStudentDevice() {
+  return localStorage.getItem(STUDENT_DEVICE_KEY) === 'personal'
+    ? 'personal'
+    : (sessionStorage.getItem(STUDENT_DEVICE_KEY) === 'school' ? 'school' : '');
+}
+
+function paintStudentDeviceChoice(mode) {
+  document.getElementById('studentDevicePersonal')?.classList.toggle('selected', mode === 'personal');
+  document.getElementById('studentDeviceSchool')?.classList.toggle('selected', mode === 'school');
+  document.getElementById('studentDeviceWarning')?.classList.add('hidden');
+}
+
+async function selectStudentDevice(mode) {
+  if (!['personal','school'].includes(mode)) return;
+  const previousPersistentToken = mode === 'school' ? localStorage.getItem(COMMON_TOKEN_KEY) : '';
+  studentDeviceMode = mode;
+  paintStudentDeviceChoice(mode);
+  if (mode === 'personal') {
+    sessionStorage.removeItem(STUDENT_DEVICE_KEY);
+    sessionStorage.removeItem(STUDENT_IDLE_AT_KEY);
+    sessionStorage.removeItem(COMMON_TOKEN_KEY);
+    sessionStorage.removeItem(COMMON_EXPIRES_KEY);
+    localStorage.setItem(STUDENT_DEVICE_KEY, 'personal');
+    document.getElementById('loginId').value = localStorage.getItem(STUDENT_ID_KEY) || '';
+    document.getElementById('loginPw').value = localStorage.getItem(STUDENT_PASSWORD_KEY) || '';
+    if (!me && await resumeStudentSession()) return;
+    if (!me && document.getElementById('loginId').value && document.getElementById('loginPw').value) doLogin();
+  } else {
+    localStorage.removeItem(STUDENT_DEVICE_KEY);
+    localStorage.removeItem(STUDENT_ID_KEY);
+    localStorage.removeItem(STUDENT_PASSWORD_KEY);
+    localStorage.removeItem(COMMON_TOKEN_KEY);
+    localStorage.removeItem(COMMON_EXPIRES_KEY);
+    sessionStorage.setItem(STUDENT_DEVICE_KEY, 'school');
+    document.getElementById('loginId').value = '';
+    document.getElementById('loginPw').value = '';
+    if (previousPersistentToken) commonApi({ action:'logout', token:previousPersistentToken }).catch(() => {});
+  }
+}
+
+function finishStudentLogin(profile) {
+  studentCommonMode = true;
+  me = profileToStudent(profile);
+  document.getElementById('loginId').value = '';
+  document.getElementById('loginPw').value = '';
+  showPage('studentPage');
+  setHeader(me.name + '（' + me.grade + '）');
+  startAutoLogout();
+  return initStudent();
+}
+
+async function resumeStudentSession() {
+  const session = readCommonSession();
+  if (!session) return false;
+  try {
+    const verified = await commonApi({ action: 'getCommonStudentSession', token: session.token });
+    if (!verified.success || verified.role !== 'STUDENT' || !verified.profile) throw new Error('SESSION_EXPIRED');
+    await finishStudentLogin(verified.profile);
+    return true;
+  } catch(e) {
+    clearCommonSession();
+    studentCommonMode = false;
+    me = null;
+    return false;
+  }
+}
+
 async function doLogin() {
+  if (studentLoginInProgress) return;
   const id = document.getElementById('loginId').value.trim();
   const pw = document.getElementById('loginPw').value;
   const errEl = document.getElementById('loginErr');
   errEl.textContent = '';
+  studentDeviceMode = studentDeviceMode || getSavedStudentDevice();
+  if (!studentDeviceMode) {
+    document.getElementById('studentDeviceWarning').classList.remove('hidden');
+    return;
+  }
   if (!id || !pw) { errEl.textContent = 'IDとパスワードを入力してください'; return; }
   try {
+    studentLoginInProgress = true;
     errEl.textContent = '確認中...';
     const r = await commonApi({ action: 'studentLogin', studentId: id, password: pw });
     if (r.success && r.role === 'STUDENT' && r.profile && r.token && r.expiresAt) {
       saveCommonSession(r.token, r.expiresAt);
-      studentCommonMode = true;
-      me = profileToStudent(r.profile);
-      document.getElementById('loginId').value = '';
-      document.getElementById('loginPw').value = '';
-      showPage('studentPage');
-      setHeader(me.name + '（' + me.grade + '）');
-      startAutoLogout();
-      await initStudent();
+      if (studentDeviceMode === 'personal') {
+        localStorage.setItem(STUDENT_ID_KEY, id);
+        localStorage.setItem(STUDENT_PASSWORD_KEY, pw);
+      } else {
+        sessionStorage.setItem(STUDENT_IDLE_AT_KEY, String(Date.now()));
+      }
+      await finishStudentLogin(r.profile);
     } else {
       errEl.textContent = r.error || 'ログインできません';
     }
   } catch(e) {
     errEl.textContent = 'サーバーに接続できません: ' + e.message;
+  } finally {
+    studentLoginInProgress = false;
   }
 }
 
@@ -919,18 +1033,21 @@ async function doLogin() {
 (async function() {
   localStorage.removeItem('studentId');
   sessionStorage.removeItem('studentMe');
-  const session = readCommonSession();
-  if (session) {
-    try {
-      const verified = await commonApi({ action: 'getCommonStudentSession', token: session.token });
-      if (!verified.success || verified.role !== 'STUDENT' || !verified.profile) throw new Error('SESSION_EXPIRED');
-      studentCommonMode = true;
-      me = profileToStudent(verified.profile);
-      showPage('studentPage');
-      setHeader(me.name + '（' + me.grade + '）');
-      startAutoLogout();
-      initStudent();
-    } catch(e) { clearCommonSession(); studentCommonMode = false; me = null; }
+  studentDeviceMode = getSavedStudentDevice();
+  if (!studentDeviceMode) return;
+  paintStudentDeviceChoice(studentDeviceMode);
+  if (studentDeviceMode === 'personal') {
+    document.getElementById('loginId').value = localStorage.getItem(STUDENT_ID_KEY) || '';
+    document.getElementById('loginPw').value = localStorage.getItem(STUDENT_PASSWORD_KEY) || '';
+    if (await resumeStudentSession()) return;
+    if (document.getElementById('loginId').value && document.getElementById('loginPw').value) doLogin();
+  } else {
+    const lastActivity = Number(sessionStorage.getItem(STUDENT_IDLE_AT_KEY)) || 0;
+    if (lastActivity && Date.now() - lastActivity >= STUDENT_IDLE_LIMIT_MS) {
+      await logout({ automatic:true });
+      return;
+    }
+    await resumeStudentSession();
   }
 })();
 
@@ -946,32 +1063,45 @@ function openAdmin() {
 }
 
 let autoLogoutTimer = null;
-const AUTO_LOGOUT_MIN = 40;
 
 function startAutoLogout() {
   clearAutoLogout();
-  autoLogoutTimer = setTimeout(() => {
-    alert('⏰ 操作がなかったため、自動的にログアウトしました。');
-    logout();
-  }, AUTO_LOGOUT_MIN * 60 * 1000);
+  if (studentDeviceMode !== 'school' || !me) return;
+  STUDENT_ACTIVITY_EVENTS.forEach(ev => document.addEventListener(ev, recordStudentActivity, { passive:true }));
+  const lastActivity = Number(sessionStorage.getItem(STUDENT_IDLE_AT_KEY)) || Date.now();
+  const remaining = Math.max(0, STUDENT_IDLE_LIMIT_MS - (Date.now() - lastActivity));
+  autoLogoutTimer = setTimeout(() => logout({ automatic:true }), remaining);
 }
 function clearAutoLogout() {
   if (autoLogoutTimer) { clearTimeout(autoLogoutTimer); autoLogoutTimer = null; }
+  STUDENT_ACTIVITY_EVENTS.forEach(ev => document.removeEventListener(ev, recordStudentActivity));
 }
-// 操作があるたびにタイマーリセット
-['click','touchstart','keydown'].forEach(ev =>
-  document.addEventListener(ev, () => { if (me) startAutoLogout(); }, { passive: true })
-);
+function recordStudentActivity() {
+  if (studentDeviceMode !== 'school' || !me) return;
+  sessionStorage.setItem(STUDENT_IDLE_AT_KEY, String(Date.now()));
+  if (autoLogoutTimer) clearTimeout(autoLogoutTimer);
+  autoLogoutTimer = setTimeout(() => logout({ automatic:true }), STUDENT_IDLE_LIMIT_MS);
+}
 
-function logout() {
+async function logout(options = {}) {
   clearAutoLogout();
   const session = readCommonSession();
   clearCommonSession();
+  localStorage.removeItem(STUDENT_DEVICE_KEY);
+  localStorage.removeItem(STUDENT_ID_KEY);
+  localStorage.removeItem(STUDENT_PASSWORD_KEY);
+  sessionStorage.removeItem(STUDENT_DEVICE_KEY);
+  sessionStorage.removeItem(STUDENT_IDLE_AT_KEY);
+  studentDeviceMode = '';
   studentCommonMode = false;
   me = null; myScores = [];
   document.getElementById('appHdr').style.display = 'none';
   showPage('loginPage');
-  if (session) commonApi({ action: 'logout', token: session.token }).catch(() => {});
+  paintStudentDeviceChoice('');
+  document.getElementById('loginId').value = '';
+  document.getElementById('loginPw').value = '';
+  if (options.automatic) document.getElementById('loginErr').textContent = '30分間操作がなかったため、自動でログアウトしました。';
+  if (session) await commonApi({ action: 'logout', token: session.token }).catch(() => {});
 }
 
 function setHeader(name) {
