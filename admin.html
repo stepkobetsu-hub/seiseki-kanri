@@ -64,7 +64,7 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 
 /* LOGIN */
 .loginWrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f0f7f4}
-.loginBox{background:#fff;border:1px solid #b7e0cc;border-radius:var(--radius);padding:44px 40px;width:100%;max-width:400px;box-shadow:0 4px 24px rgba(16,120,70,.12)}
+.loginBox{background:#fff;border:1px solid #b7e0cc;border-radius:var(--radius);padding:44px 40px;width:100%;max-width:520px;box-shadow:0 4px 24px rgba(16,120,70,.12)}
 .loginHead{text-align:center;margin-bottom:28px}
 .loginHead .imgWrap{background:linear-gradient(135deg,#e8f5ee 0%,#c8ecd8 100%);border-radius:16px;padding:12px;margin-bottom:12px;display:inline-block;border:2px solid #a3d9b8}
 .loginHead h2{font-size:1.2rem;font-weight:700;color:var(--text);margin-bottom:4px}
@@ -74,6 +74,20 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 .fld input{background:#f8fafc;border:1px solid var(--border2);border-radius:8px;padding:10px 12px;color:var(--text);font-size:.9rem;outline:none;transition:.15s}
 .fld input:focus{border-color:var(--primary)}
 .errMsg{font-size:.78rem;color:var(--danger);min-height:16px;margin-bottom:6px}
+.devicePrompt{margin:0 0 10px;font-size:1rem;font-weight:800;color:#1e293b}
+.deviceChoices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.deviceChoice{min-height:92px;padding:14px 12px;border:2px solid #cbd5e1;border-radius:12px;background:#f8fafc;color:#1e293b;text-align:left;cursor:pointer;transition:.15s}
+.deviceChoice strong{display:block;font-size:1rem;margin-bottom:6px}
+.deviceChoice span{display:block;font-size:.76rem;line-height:1.45;color:#64748b;font-weight:600}
+.deviceChoice:hover{border-color:#60a5fa;background:#eff6ff}
+.deviceChoice.selected{border-color:var(--primary);background:#e8f0fb;box-shadow:0 0 0 2px rgba(26,86,160,.12)}
+.deviceWarning{margin:0 0 16px;padding:13px 14px;border:2px solid #dc2626;border-radius:10px;background:#fef2f2;color:#b91c1c;font-size:1rem;font-weight:800;line-height:1.5}
+.deviceWarning.hidden{display:none}
+@media(max-width:540px){
+  .loginBox{padding:30px 20px}
+  .deviceChoices{grid-template-columns:1fr}
+  .deviceChoice{min-height:78px}
+}
 
 /* LAYOUT */
 .layout{display:flex;min-height:calc(100vh - 56px);background:#f0f4f8}
@@ -237,6 +251,18 @@ tr:hover td{background:#f8fafc}
       <h2>管理者ログイン</h2>
       <p>成績管理システム 管理画面</p>
     </div>
+    <p class="devicePrompt">この端末を選んでください</p>
+    <div class="deviceChoices" role="group" aria-label="使用する端末">
+      <button type="button" id="devicePersonal" class="deviceChoice" onclick="selectAdminDevice('personal')">
+        <strong>自分・家族の端末</strong>
+        <span>ID・パスワードを保存し、ログアウトするまで次回から自動ログイン</span>
+      </button>
+      <button type="button" id="deviceSchool" class="deviceChoice" onclick="selectAdminDevice('school')">
+        <strong>塾のタブレット</strong>
+        <span>ID・パスワードは保存せず、30分操作がないと自動ログアウト</span>
+      </button>
+    </div>
+    <p id="deviceWarning" class="deviceWarning hidden" role="alert">⚠️「自分・家族の端末」か「塾のタブレット」を選んでください。</p>
     <div class="fld"><label>講師コード</label><input type="text" id="adminCodeIn" placeholder="講師マスターA列のコード" onkeydown="if(event.key==='Enter')doAdminLogin()"></div>
     <input type="hidden" id="adminEmailIn" value="stepkobetsu@gmail.com">
     <div class="fld"><label>パスワード</label><input type="password" id="adminPwIn" placeholder="講師マスターAJ列のパスワード" onkeydown="if(event.key==='Enter')doAdminLogin()"></div>
@@ -1708,6 +1734,68 @@ async function api(data) {
 }
 
 // ===== LOGIN =====
+const ADMIN_DEVICE_KEY = 'adminDeviceMode';
+const ADMIN_IDLE_AT_KEY = 'adminLastActivityAt';
+const ADMIN_IDLE_LIMIT_MS = 30 * 60 * 1000;
+const ADMIN_ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
+let adminDeviceMode = '';
+let adminIdleTimer = null;
+let adminLoginInProgress = false;
+
+function getSavedAdminDevice() {
+  return localStorage.getItem(ADMIN_DEVICE_KEY) === 'personal'
+    ? 'personal'
+    : (sessionStorage.getItem(ADMIN_DEVICE_KEY) === 'school' ? 'school' : '');
+}
+function selectAdminDevice(mode) {
+  if (!['personal', 'school'].includes(mode)) return;
+  adminDeviceMode = mode;
+  document.getElementById('devicePersonal')?.classList.toggle('selected', mode === 'personal');
+  document.getElementById('deviceSchool')?.classList.toggle('selected', mode === 'school');
+  document.getElementById('deviceWarning')?.classList.add('hidden');
+  if (mode === 'school') {
+    localStorage.removeItem(ADMIN_DEVICE_KEY);
+    localStorage.removeItem('adminCodeInput');
+    localStorage.removeItem('adminPwInput');
+    localStorage.removeItem('adminEmailInput');
+    localStorage.removeItem('adminLoggedIn');
+    localStorage.removeItem('adminStaffCode');
+    localStorage.removeItem('adminStaffName');
+    sessionStorage.setItem(ADMIN_DEVICE_KEY, 'school');
+    document.getElementById('adminCodeIn').value = '';
+    document.getElementById('adminPwIn').value = '';
+  } else {
+    sessionStorage.removeItem(ADMIN_DEVICE_KEY);
+    localStorage.setItem(ADMIN_DEVICE_KEY, 'personal');
+  }
+}
+function getAdminState(key) {
+  return adminDeviceMode === 'personal' ? localStorage.getItem(key) : sessionStorage.getItem(key);
+}
+function setAdminState(key, value) {
+  const store = adminDeviceMode === 'personal' ? localStorage : sessionStorage;
+  store.setItem(key, value);
+}
+function clearAdminIdleTimer() {
+  if (adminIdleTimer) clearTimeout(adminIdleTimer);
+  adminIdleTimer = null;
+  ADMIN_ACTIVITY_EVENTS.forEach(eventName => document.removeEventListener(eventName, recordAdminActivity));
+}
+function scheduleAdminIdleLogout() {
+  if (adminDeviceMode !== 'school' || getAdminState('adminLoggedIn') !== '1') return;
+  clearAdminIdleTimer();
+  ADMIN_ACTIVITY_EVENTS.forEach(eventName => document.addEventListener(eventName, recordAdminActivity, { passive:true }));
+  const lastActivity = Number(sessionStorage.getItem(ADMIN_IDLE_AT_KEY)) || Date.now();
+  const remaining = Math.max(0, ADMIN_IDLE_LIMIT_MS - (Date.now() - lastActivity));
+  adminIdleTimer = setTimeout(() => logout({ automatic:true }), remaining);
+}
+function recordAdminActivity() {
+  if (adminDeviceMode !== 'school' || getAdminState('adminLoggedIn') !== '1') return;
+  sessionStorage.setItem(ADMIN_IDLE_AT_KEY, String(Date.now()));
+  if (adminIdleTimer) clearTimeout(adminIdleTimer);
+  adminIdleTimer = setTimeout(() => logout({ automatic:true }), ADMIN_IDLE_LIMIT_MS);
+}
+
 function toggleSidebar(){
   const sb = document.getElementById('sidebar');
   const ov = document.getElementById('sideOverlay');
@@ -1727,22 +1815,31 @@ function closeSidebar(){
 }
 
 async function doAdminLogin() {
+  if (adminLoginInProgress) return;
   const code = document.getElementById('adminCodeIn').value.trim();
   const pw = document.getElementById('adminPwIn').value;
   const errEl = document.getElementById('loginErr');
+  adminDeviceMode = adminDeviceMode || getSavedAdminDevice();
+  if (!adminDeviceMode) {
+    document.getElementById('deviceWarning').classList.remove('hidden');
+    return;
+  }
   if (!code || !pw) {
     errEl.textContent = '講師コードとパスワードを入力してください';
     return;
   }
+  adminLoginInProgress = true;
   const staff = await api({ action: 'staffLogin', code, password: pw });
   if (!staff.success) {
     errEl.textContent = staff.error || 'ログインできませんでした';
+    adminLoginInProgress = false;
     return;
   }
   if (DATA_SOURCE === 'supabase' && hasSupabaseConfig()) {
     const email = (document.getElementById('adminEmailIn')?.value || DEFAULT_SUPABASE_AUTH_EMAIL).trim();
     if (!email || !pw) {
       errEl.textContent = '講師コードとパスワードを入力してください';
+      adminLoginInProgress = false;
       return;
     }
     try {
@@ -1753,12 +1850,16 @@ async function doAdminLogin() {
       toast('Supabase Authに入れなかったため、従来GASで開きます');
     }
   }
-  sessionStorage.setItem('adminLoggedIn', '1');
-  sessionStorage.setItem('adminStaffCode', staff.code || code);
-  sessionStorage.setItem('adminStaffName', staff.name || '');
-  rememberAdminLogin(code, pw, DATA_SOURCE === 'supabase' ? DEFAULT_SUPABASE_AUTH_EMAIL : '');
-  localStorage.removeItem('adminLoggedIn');
+  setAdminState('adminLoggedIn', '1');
+  setAdminState('adminStaffCode', staff.code || code);
+  setAdminState('adminStaffName', staff.name || '');
+  if (adminDeviceMode === 'personal') {
+    rememberAdminLogin(code, pw, DATA_SOURCE === 'supabase' ? DEFAULT_SUPABASE_AUTH_EMAIL : '');
+  } else {
+    sessionStorage.setItem(ADMIN_IDLE_AT_KEY, String(Date.now()));
+  }
   errEl.textContent = '';
+  adminLoginInProgress = false;
   showMain();
 }
 function rememberAdminLogin(code, password, email) {
@@ -1770,15 +1871,15 @@ function restoreAdminLoginInputs() {
   const codeEl = document.getElementById('adminCodeIn');
   const pwEl = document.getElementById('adminPwIn');
   const emailEl = document.getElementById('adminEmailIn');
-  if (codeEl) codeEl.value = localStorage.getItem('adminCodeInput') || '';
-  if (pwEl) pwEl.value = localStorage.getItem('adminPwInput') || '';
+  if (codeEl) codeEl.value = adminDeviceMode === 'personal' ? (localStorage.getItem('adminCodeInput') || '') : '';
+  if (pwEl) pwEl.value = adminDeviceMode === 'personal' ? (localStorage.getItem('adminPwInput') || '') : '';
   if (emailEl) emailEl.value = localStorage.getItem('adminEmailInput') || DEFAULT_SUPABASE_AUTH_EMAIL;
 }
 function updateAdminLabel() {
   const label = document.getElementById('adminLabel');
   if (!label) return;
-  const name = sessionStorage.getItem('adminStaffName') || '';
-  const code = sessionStorage.getItem('adminStaffCode') || '';
+  const name = getAdminState('adminStaffName') || '';
+  const code = getAdminState('adminStaffCode') || '';
   label.textContent = name ? `${name}（${code}）` : '管理者';
   label.style.fontSize = '.78rem';
 }
@@ -1802,26 +1903,54 @@ function showMain() {
   } else {
     loadSpeed();
   }
+  scheduleAdminIdleLogout();
 }
-async function logout() {
+async function logout(options = {}) {
+  clearAdminIdleTimer();
   await supabaseSignOut();
   clearSensitiveCache();
   sessionStorage.removeItem('adminLoggedIn');
   sessionStorage.removeItem('adminStaffCode');
   sessionStorage.removeItem('adminStaffName');
+  sessionStorage.removeItem(ADMIN_DEVICE_KEY);
+  sessionStorage.removeItem(ADMIN_IDLE_AT_KEY);
   localStorage.removeItem('adminLoggedIn');
+  localStorage.removeItem('adminStaffCode');
+  localStorage.removeItem('adminStaffName');
+  localStorage.removeItem(ADMIN_DEVICE_KEY);
+  localStorage.removeItem('adminCodeInput');
+  localStorage.removeItem('adminPwInput');
+  localStorage.removeItem('adminEmailInput');
+  adminDeviceMode = '';
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('mainHeader').style.display = 'none';
   document.getElementById('mainLayout').style.display = 'none';
   document.getElementById('adminLabel').textContent = '管理者';
+  document.getElementById('devicePersonal')?.classList.remove('selected');
+  document.getElementById('deviceSchool')?.classList.remove('selected');
   restoreAdminLoginInputs();
+  if (options.automatic) {
+    document.getElementById('loginErr').textContent = '30分間操作がなかったため、自動でログアウトしました。';
+  }
 }
 // ページ読み込み時：ログイン済みなら自動ログイン
-(function() {
+(async function() {
+  adminDeviceMode = getSavedAdminDevice();
+  if (adminDeviceMode) selectAdminDevice(adminDeviceMode);
   restoreAdminLoginInputs();
-  // セッションが生きていれば自動ログイン
-  if (sessionStorage.getItem('adminLoggedIn') === '1' && (DATA_SOURCE !== 'supabase' || getSupabaseSession())) {
+  if (adminDeviceMode === 'school' && sessionStorage.getItem('adminLoggedIn') === '1') {
+    const lastActivity = Number(sessionStorage.getItem(ADMIN_IDLE_AT_KEY)) || 0;
+    if (lastActivity && Date.now() - lastActivity >= ADMIN_IDLE_LIMIT_MS) {
+      await logout({ automatic:true });
+      return;
+    }
     showMain();
+    return;
+  }
+  if (adminDeviceMode === 'personal' && localStorage.getItem('adminLoggedIn') === '1') {
+    const code = localStorage.getItem('adminCodeInput') || '';
+    const password = localStorage.getItem('adminPwInput') || '';
+    if (code && password) await doAdminLogin();
   }
 })();
 
