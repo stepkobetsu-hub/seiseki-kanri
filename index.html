@@ -410,13 +410,13 @@ textarea{
         <div class="go">開く</div>
       </a>
 
-      <a class="app primary" id="timetableInputCard" href="https://docs.google.com/spreadsheets/d/1CIJkTlYUcUkbb8jBdFc6L8D5ubTGsxwNxFv01ten-Zk/edit?gid=829117795#gid=829117795" target="_blank" rel="noopener noreferrer">
+      <button class="app primary" id="timetableInputCard" type="button" onclick="openTimetableInput()">
         <div>
           <div class="appTitle"><span class="ico">🗓️</span><span>時間割入力</span></div>
-          <p class="desc">生徒の時間割・兄弟コード・標準コース・標準オプションを入力します。</p>
+          <p class="desc">ID・パスワードと権限を再確認し、権限2以上のスタッフだけが開けます。</p>
         </div>
-        <div class="go">開く</div>
-      </a>
+        <div class="go" id="timetableAccessStatus">確認して開く</div>
+      </button>
 
       <a class="app primary" href="https://script.google.com/macros/s/AKfycbwYzQ1tM1mWRLG6jOxBirAuSUCMb41bkDsn5vviGUjDPmFKjJNCl5jdz7NFa4L45J8yvQ/exec" target="_blank" rel="noopener noreferrer">
         <div>
@@ -466,6 +466,7 @@ textarea{
 </section>
 <script>
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
+const TIMETABLE_APP_URL = 'https://script.google.com/macros/s/AKfycbyB2DdfN6Xdz0mq0vDs37sqNxtbTz5Mh085zdDB5HvVFIfOK1JjfbVCC6oQZ9j0NCeA/exec';
 const STAFF_AUTH_KEY = 'stepStaffAppAuth';
 const STAFF_CODE_KEY = 'stepStaffAppCode';
 const STAFF_PASSWORD_KEY = 'stepStaffAppPassword';
@@ -689,6 +690,47 @@ function stopQrScan(){
   const video = document.getElementById('qrVideo');
   if (video) video.srcObject = null;
 }
+
+async function openTimetableInput(){
+  if (timetableOpening) return;
+  const card = document.getElementById('timetableInputCard');
+  const status = document.getElementById('timetableAccessStatus');
+  const saved = getSavedStaffAuth();
+  const code = (document.getElementById('staffCode').value || saved?.code || localStorage.getItem(STAFF_CODE_KEY) || '').trim();
+  const password = document.getElementById('staffPassword').value || localStorage.getItem(STAFF_PASSWORD_KEY) || '';
+
+  if (!code) {
+    status.textContent = 'IDを確認できません';
+    alert('講師番号を確認できません。いったんログアウトし、ID・パスワードでログインし直してください。');
+    return;
+  }
+
+  timetableOpening = true;
+  card.disabled = true;
+  status.textContent = 'ID・パスワードと権限を確認中...';
+  try {
+    const result = await postGas({ action:'staffLogin', code, password });
+    if (!result.success) throw new Error(result.error || 'IDまたはパスワードを確認できませんでした。');
+
+    const permissionLevel = String(result.permissionLevel || '').trim();
+    if (!['2','3','4'].includes(permissionLevel)) {
+      status.textContent = '権限2以上が必要です';
+      alert('時間割入力は権限2以上のスタッフだけ利用できます。');
+      return;
+    }
+
+    status.textContent = '時間割入力を開いています...';
+    location.href = TIMETABLE_APP_URL;
+  } catch (err) {
+    status.textContent = '認証できませんでした';
+    alert(err.message || 'ID・パスワードを確認できませんでした。');
+  } finally {
+    timetableOpening = false;
+    card.disabled = false;
+  }
+}
+
+let timetableOpening = false;
 
 async function postGas(data){
   const res = await fetch(GAS, {
