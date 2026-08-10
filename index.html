@@ -410,6 +410,14 @@ textarea{
         <div class="go">開く</div>
       </a>
 
+      <a class="app primary hidden" id="specialAdjustmentCard" href="https://script.google.com/macros/s/AKfycbxzkE1tQRyB_Ca4bfPKYWIkpTukIVPMWKf2ETE7yN7qROJk0VyOlvxaJ9GGI5p-6pGb/exec?page=adjustments" target="_blank" rel="noopener noreferrer">
+        <div>
+          <div class="appTitle"><span class="ico">💴</span><span>料金特別調整</span></div>
+          <p class="desc">イレギュラーな割引・加算を、気づいた時点で入力します。権限2以上のスタッフ用です。</p>
+        </div>
+        <div class="go">開く</div>
+      </a>
+
       <a class="app primary hidden" id="timetableInputCard" href="https://script.google.com/macros/s/AKfycbyB2DdfN6Xdz0mq0vDs37sqNxtbTz5Mh085zdDB5HvVFIfOK1JjfbVCC6oQZ9j0NCeA/exec" target="_blank" rel="noopener noreferrer">
         <div>
           <div class="appTitle"><span class="ico">🗓️</span><span>時間割マスタ入力</span></div>
@@ -591,6 +599,10 @@ function showStaffHome(name, permissionLevel){
   if (systemPortalCard) {
     systemPortalCard.classList.toggle('hidden', !['2','3','4'].includes(String(permissionLevel || '').trim()));
   }
+  const specialAdjustmentCard = document.getElementById('specialAdjustmentCard');
+  if (specialAdjustmentCard) {
+    specialAdjustmentCard.classList.toggle('hidden', !['2','3','4'].includes(String(permissionLevel || '').trim()));
+  }
   const timetableInputCard = document.getElementById('timetableInputCard');
   if (timetableInputCard) {
     timetableInputCard.classList.toggle('hidden', !['2','3','4'].includes(String(permissionLevel || '').trim()));
@@ -619,6 +631,8 @@ async function staffLogout(){
   if (studentQrCard) studentQrCard.classList.remove('hidden');
   const systemPortalCard = document.getElementById('systemPortalCard');
   if (systemPortalCard) systemPortalCard.classList.add('hidden');
+  const specialAdjustmentCard = document.getElementById('specialAdjustmentCard');
+  if (specialAdjustmentCard) specialAdjustmentCard.classList.add('hidden');
   const timetableInputCard = document.getElementById('timetableInputCard');
   if (timetableInputCard) timetableInputCard.classList.add('hidden');
   setLoginMsg('');
