@@ -14,7 +14,7 @@ test('student mode authenticates through the common session API', () => {
 test('student grade operations are sent through the bound gateway', () => {
   assert.match(page, /action: 'commonGradeRequest', token: session\.token, gradeAction: params\.action, payload: params/);
   assert.match(page, /studentCommonMode && STUDENT_GRADE_ACTIONS\.has/);
-  assert.match(page, /studentCommonMode = false;\n\s*setHeader\('管理者'\)/);
+  assert.match(page, /studentCommonMode = false;\r?\n\s*setHeader\('管理者'\)/);
 });
 
 test('logout revokes the server session and clears local state', () => {

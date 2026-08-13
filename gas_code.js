@@ -150,6 +150,8 @@ function route(e) {
       case 'getStudentDetail':   result = getStudentDetail(data); break;
       case 'staffLogin':         result = staffLogin(data); break;
       case 'getSystemRegistry':  result = getSystemRegistry(data); break;
+      case 'getWorkspaceConfig': result = getWorkspaceConfig(data); break;
+      case 'saveWorkspaceConfig': result = saveWorkspaceConfig(data); break;
       case 'verifySystemPortal': result = verifySystemPortal(data); break;
       case 'logoutSystemPortal': result = logoutSystemPortal(data); break;
       case 'studentQrLogin':     result = studentQrLogin(data); break;
