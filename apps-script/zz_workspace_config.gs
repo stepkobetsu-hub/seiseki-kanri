@@ -60,6 +60,19 @@ function saveWorkspaceConfig(data) {
   try {
     const sheet = getOrCreateSheet(WORKSPACE_CONFIG_SHEET_NAME, ['キー','設定JSON','更新日時','更新者コード','更新者名','版']);
     const current = readWorkspaceConfig_(sheet);
+    const expectedVersion = Number(data.expectedVersion);
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 0 || expectedVersion !== current.version) {
+      return {
+        success: false,
+        code: 'WORKSPACE_VERSION_CONFLICT',
+        error: '別の端末で新しい配置が保存されています。最新版を読み込みましたので、変更をもう一度行ってください。',
+        sharedState: current.sharedState,
+        version: current.version,
+        updatedAt: current.updatedAt,
+        updatedBy: current.updatedBy,
+        expiresAt: verified.expiresAt
+      };
+    }
     const row = getWorkspaceConfigRow_(sheet) || Math.max(2, sheet.getLastRow() + 1);
     const version = current.version + 1;
     const updatedAt = new Date().toISOString();

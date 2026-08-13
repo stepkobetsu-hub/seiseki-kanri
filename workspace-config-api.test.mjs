@@ -21,3 +21,11 @@ test('共有対象は配置設定とお気に入りだけに限定する',()=>{
   assert.doesNotMatch(code,/sharedState[^\n]*(password|systemPortalSessionToken)/i);
   assert.match(code,/WORKSPACE_CONFIG_MAX_LENGTH = 45000/);
 });
+
+test('古い端末からの共有設定上書きを版番号で拒否する',()=>{
+  assert.match(code,/const expectedVersion = Number\(data\.expectedVersion\)/);
+  assert.match(code,/expectedVersion !== current\.version/);
+  assert.match(code,/code: 'WORKSPACE_VERSION_CONFLICT'/);
+  assert.match(code,/sharedState: current\.sharedState/);
+  assert.match(code,/最新版を読み込みました/);
+});
