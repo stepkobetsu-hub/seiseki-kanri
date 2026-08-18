@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#147a48">
+<title>お友達紹介カード 読み取り</title>
+<style>
+:root{--g:#147a48;--p:#eaf6ef;--m:#647269;--l:#d7e1da;--bg:#f4f7f5}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#17231c;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif}button,input,textarea{font:inherit}button{cursor:pointer}header{background:linear-gradient(135deg,#11663e,#19985b);color:#fff;padding:22px 17px;border-radius:0 0 23px 23px}header div,main{max-width:920px;margin:auto}h1{font-size:23px;margin:0 0 6px}header p{font-size:13px;margin:0;line-height:1.6}main{padding:15px 13px 70px}.tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:14px}.tab,.btn{border:0;border-radius:11px;padding:13px;font-weight:800}.tab{background:#fff;color:var(--g);border:1px solid var(--l)}.tab.on,.primary{background:var(--g);color:#fff}.card{background:#fff;border:1px solid var(--l);border-radius:16px;padding:15px;margin-bottom:13px;box-shadow:0 7px 22px #17362312}.card h2{font-size:18px;margin:0 0 10px}.hint{font-size:12px;color:var(--m);line-height:1.6}.drop{display:block;position:relative;text-align:center;border:2px dashed #88b69d;background:var(--p);padding:21px 11px;border-radius:14px}.drop input{position:absolute;inset:0;opacity:0;width:100%;height:100%}.drop b{display:block;color:var(--g);font-size:18px}.preview{display:none;width:100%;max-height:390px;object-fit:contain;margin-top:10px;border-radius:11px;background:#eef2ef}.preview.on{display:block}.actions{display:grid;gap:8px;margin-top:10px}.secondary{background:#fff;color:var(--g);border:1px solid var(--g)}.btn:disabled{opacity:.45}.msg{display:none;padding:11px;margin-top:10px;border-radius:10px;white-space:pre-wrap;font-size:13px}.msg.on{display:block}.ok{background:#e8f7ee;color:#12643c}.err{background:#fff0ee;color:#9f2017}.info{background:#eef5ff;color:#24558c}.hidden{display:none!important}.grid{display:grid;gap:10px}.person{border:1px solid var(--l);padding:12px;border-radius:12px}.person h3{margin:0 0 8px;color:var(--g);font-size:16px}.field{display:block;margin:8px 0}.field span{display:block;color:var(--m);font-size:12px;font-weight:700;margin-bottom:4px}.field input,.field textarea,.search{width:100%;border:1px solid #bbc8c0;border-radius:9px;padding:10px}.field textarea{min-height:68px}.benefits{display:grid;gap:7px}.benefit{display:grid;grid-template-columns:1fr auto;gap:7px;align-items:center;border:1px solid var(--l);border-radius:10px;padding:9px}.benefit strong{font-size:13px}.benefit small{display:block;color:var(--m)}.toggle{border:1px solid #bdc8c1;background:#f4f6f4;color:#526158;border-radius:999px;padding:7px 10px;font-weight:800}.toggle.done{background:#dff4e8;border-color:#64aa81;color:#0c6838}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:10px}.stat{text-align:center;background:#f4faf6;border-radius:9px;padding:7px}.stat b{display:block;font-size:21px;color:var(--g)}.stat small{color:var(--m)}.filters{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:7px 0 10px}.filter{border:1px solid var(--l);background:#fff;color:var(--m);border-radius:8px;padding:8px;font-weight:800}.filter.on{background:var(--p);color:var(--g)}.record{border:1px solid var(--l);border-radius:13px;padding:12px;margin:9px 0}.rh{display:flex;justify-content:space-between;gap:7px}.rh h3{font-size:15px;margin:0}.date{font-size:11px;color:var(--m)}.people{display:grid;gap:6px;margin:9px 0}.who{background:#f6f8f6;padding:8px;border-radius:8px;font-size:13px}.badges{display:flex;gap:4px;flex-wrap:wrap}.badge{font-size:10px;border-radius:999px;padding:5px 7px;background:#fff0e5;color:#a04a0b;font-weight:800}.badge.done{background:#e5f5eb;color:#11693d}.rbuttons{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:8px}.mini{border:1px solid var(--l);background:#fff;border-radius:8px;padding:7px 2px;font-size:11px;color:var(--m)}.mini.done{background:#e5f5eb;color:#11693d}.link{color:var(--g);font-size:13px;font-weight:700}.empty{text-align:center;color:var(--m);padding:23px}@media(min-width:680px){.grid,.people{grid-template-columns:1fr 1fr}.actions{grid-template-columns:1fr 1fr}}
+</style></head>
+<body>
+<header><div><h1>お友達紹介カード 読み取り</h1><p>カードを撮影 → AI読み取り → 確認して保存。特典の処理状況もあとから更新できます。</p></div></header>
+<main>
+<div class="tabs"><button id="tc" class="tab on" onclick="showTab('c')">新しく取り込む</button><button id="tl" class="tab" onclick="showTab('l')">保存済み一覧</button></div>
+<section id="capture">
+<div class="card"><h2>1. カード画像を選ぶ</h2><label class="drop"><input id="file" type="file" accept="image/*" capture="environment"><b>カメラで撮影・画像を選択</b><span class="hint">カード全体が入るように撮影。横向きでも読み取れます。</span></label><img id="preview" class="preview"><div class="actions"><button id="read" class="btn primary" disabled onclick="readCard()">AIで読み取る</button><button class="btn secondary" onclick="resetForm()">画像を取り消す</button></div><div id="readMsg" class="msg"></div></div>
+<div id="edit" class="card hidden"><h2>2. 読み取り内容を確認</h2><p class="hint">保存前に氏名・電話番号と3つの特典チェックをご確認ください。</p>
+<div class="grid"><div class="person"><h3>紹介された方（入塾する方）</h3><label class="field"><span>学年</span><input id="rg"></label><label class="field"><span>氏名</span><input id="rn"></label><label class="field"><span>TEL</span><input id="rt" inputmode="tel"></label></div><div class="person"><h3>紹介した方（塾生）</h3><label class="field"><span>学年</span><input id="fg"></label><label class="field"><span>氏名</span><input id="fn"></label><label class="field"><span>TEL</span><input id="ft" inputmode="tel"></label></div></div>
+<h2 style="margin-top:16px">特典の処理状況</h2><div class="benefits">
+<div class="benefit"><div><strong>紹介した方：図書カード 1,000円</strong><small>塾生へ配布</small></div><button id="bf" class="toggle" onclick="toggleDraft('referrerGiftDone')">未処理</button></div>
+<div class="benefit"><div><strong>紹介された方：図書カード 1,000円</strong><small>入塾した方へ配布</small></div><button id="br" class="toggle" onclick="toggleDraft('referredGiftDone')">未処理</button></div>
+<div class="benefit"><div><strong>紹介された方：初回学費 2,000円割引</strong><small>初回請求で割引</small></div><button id="bt" class="toggle" onclick="toggleDraft('tuitionDiscountDone')">未処理</button></div></div>
+<label class="field"><span>読み取りメモ・確認事項</span><textarea id="notes"></textarea></label><button id="save" class="btn primary" style="width:100%" onclick="saveCard()">画像と内容を保存</button><div id="saveMsg" class="msg"></div></div>
+</section>
+<section id="list" class="hidden"><div class="card"><h2>保存済み紹介カード</h2><div class="stats"><div class="stat"><b id="sa">0</b><small>全件</small></div><div class="stat"><b id="sp">0</b><small>未完了</small></div><div class="stat"><b id="sd">0</b><small>完了</small></div></div><input id="search" class="search" placeholder="氏名・TELで検索" oninput="render()"><div class="filters"><button class="filter on" onclick="setFilter('all',this)">すべて</button><button class="filter" onclick="setFilter('pending',this)">未完了</button><button class="filter" onclick="setFilter('done',this)">完了</button></div><div id="listMsg" class="msg"></div><div id="records"></div></div></section>
+</main>
+<script>
+var GAS='https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
+var AI='https://juku-card-system.onrender.com/api/read-card';
+var MARK='REFERRAL_CARD_V1',file=null,url='',mode='all',records=[];
+var draft={benefits:{referrerGiftDone:false,referredGiftDone:false,tuitionDiscountDone:false},ocrRaw:{},capturedAt:''};
+function $(id){return document.getElementById(id)}
+function message(id,text,type){var e=$(id);e.textContent=text;e.className='msg on '+(type||'info')}
+function clearMessage(id){$(id).className='msg';$(id).textContent=''}
+async function api(data){var r=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(data)});if(!r.ok)throw Error('保存サーバーに接続できません');return await r.json()}
+$('file').onchange=function(e){file=e.target.files&&e.target.files[0];if(!file)return;if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(file);$('preview').src=url;$('preview').classList.add('on');$('read').disabled=false;draft.capturedAt=new Date().toISOString();clearMessage('readMsg')};
+function showTab(v){var c=v==='c';$('capture').classList.toggle('hidden',!c);$('list').classList.toggle('hidden',c);$('tc').classList.toggle('on',c);$('tl').classList.toggle('on',!c);if(!c)loadRecords()}
+function resetForm(){file=null;$('file').value='';$('preview').classList.remove('on');$('read').disabled=true;$('edit').classList.add('hidden');draft={benefits:{referrerGiftDone:false,referredGiftDone:false,tuitionDiscountDone:false},ocrRaw:{},capturedAt:''};['rg','rn','rt','fg','fn','ft','notes'].forEach(function(x){$(x).value=''});setButtons();clearMessage('readMsg');clearMessage('saveMsg')}
+function b64(f){return new Promise(function(ok,no){var r=new FileReader;r.onload=function(){ok(r.result.split(',')[1])};r.onerror=no;r.readAsDataURL(f)})}
+function loadImg(src){return new Promise(function(ok,no){var i=new Image;i.onload=function(){ok(i)};i.onerror=no;i.src=src})}
+async function resized(f){var src='data:'+f.type+';base64,'+await b64(f),im=await loadImg(src),s=Math.min(1,1800/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.86)}
+function bool(v){return v===true||['true','済','済み','すみ','完','完了','処理済','配布済'].indexOf(String(v||'').trim())>=0}
+function phone(v){var s=String(v||'').replace(/[０-９]/g,function(c){return String.fromCharCode(c.charCodeAt(0)-65248)}).replace(/[^0-9]/g,'');if(s.length===11)return s.slice(0,3)+'-'+s.slice(3,7)+'-'+s.slice(7);if(s.length===10)return s.slice(0,3)+'-'+s.slice(3,6)+'-'+s.slice(6);return String(v||'').trim()}
+async function readCard(){
+ var btn=$('read');btn.disabled=true;btn.textContent='読み取り中…';message('readMsg','AIが向きと手書きを確認しています。20〜40秒ほどかかる場合があります。','info');
+ try{
+  var prompt=[
+'これは個別指導Stepの「お友達紹介特典 ご紹介カード」です。画像が横向き・上下逆でも、正しい向きに見立てて読み取る。',
+'次のJSONだけを返す。説明やマークダウンは禁止。',
+'{"referred":{"grade":"","name":"","tel":""},"referrer":{"grade":"","name":"","tel":""},"benefits":{"referrerGiftDone":false,"referredGiftDone":false,"tuitionDiscountDone":false},"confidence":{},"notes":""}',
+'紹介された方欄と紹介した方欄から、学年・氏名・TELを読む。読めない文字を勝手に補わない。',
+'referrerGiftDoneは紹介した方の図書カード1000円。referredGiftDoneは紹介された方の図書カード1000円。tuitionDiscountDoneは紹介された方の初回学費2000円割引。',
+'各金額枠を別々に確認。枠内に「済」「済み」「すみ」「完」「配布済」など、済と同じ意味または済によく似た手書きがあればtrue。字が崩れていても明らかな処理済みの個別記入ならtrue。',
+'大きな丸・長い線・黒い囲みが隣の特典から通過または重複しただけならtrueにしない。',
+'図書カード2欄が済でも、初回学費2000円欄に個別の済印がなければtuitionDiscountDoneはfalse。',
+'不明な特典はfalseにし、notesへ要確認と書く。電話番号は数字とハイフン。'
+  ].join('\\n');
+  var data64=await b64(file);
+  var resp=await fetch(AI,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({api_key:'server',model:'claude-opus-4-5',messages:[{role:'user',content:[{type:'text',text:prompt},{type:'image',source:{type:'base64',media_type:file.type||'image/jpeg',data:data64}}]}]})});
+  var data=await resp.json();if(data.error)throw Error(data.error.message||JSON.stringify(data.error));
+  var tick=String.fromCharCode(96)+String.fromCharCode(96)+String.fromCharCode(96);
+  var raw=(data.content||[]).map(function(x){return x.text||''}).join('').split(tick+'json').join('').split(tick).join('').trim();
+  var o=JSON.parse(raw),r=o.referred||{},f=o.referrer||{},b=o.benefits||{};
+  $('rg').value=r.grade||'';$('rn').value=r.name||'';$('rt').value=phone(r.tel);$('fg').value=f.grade||'';$('fn').value=f.name||'';$('ft').value=phone(f.tel);
+  draft.benefits={referrerGiftDone:bool(b.referrerGiftDone),referredGiftDone:bool(b.referredGiftDone),tuitionDiscountDone:bool(b.tuitionDiscountDone)};draft.ocrRaw=o;$('notes').value=o.notes||'';setButtons();$('edit').classList.remove('hidden');message('readMsg','読み取り完了。内容を確認して保存してください。','ok');
+ }catch(e){message('readMsg','読み取りに失敗しました: '+e.message+'\\n画像を選び直すか、少し待って再実行してください。','err')}
+ btn.disabled=false;btn.textContent='AIで読み取る';
+}
+function toggleDraft(k){draft.benefits[k]=!draft.benefits[k];setButtons()}
+function one(id,v){$(id).classList.toggle('done',v);$(id).textContent=v?'処理済':'未処理'}
+function setButtons(){one('bf',draft.benefits.referrerGiftDone);one('br',draft.benefits.referredGiftDone);one('bt',draft.benefits.tuitionDiscountDone)}
+function newId(){return 'REF-'+Date.now()+'-'+Math.random().toString(36).slice(2,7).toUpperCase()}
+function gather(){return{id:newId(),capturedAt:draft.capturedAt||new Date().toISOString(),referred:{grade:$('rg').value.trim(),name:$('rn').value.trim(),tel:phone($('rt').value)},referrer:{grade:$('fg').value.trim(),name:$('fn').value.trim(),tel:phone($('ft').value)},benefits:Object.assign({},draft.benefits),notes:$('notes').value.trim(),ocrRaw:draft.ocrRaw||{}}}
+function wish(r){return{action:'saveWish',studentId:r.id,pub1name:MARK,pub1dept:r.referred.grade,pub2name:r.referred.name,pub2dept:r.referred.tel,pub3name:r.referrer.grade,pub3dept:r.referrer.name,pri1name:r.referrer.tel,pri1dept:r.imageUrl||'',pri2name:JSON.stringify(r.benefits),pri2dept:r.capturedAt,pri3name:r.notes||'',pri3dept:JSON.stringify({fileName:r.fileName||'',ocrRaw:r.ocrRaw||{}})}}
+function unwish(w){var b={},m={};try{b=JSON.parse(w.pri2name||'{}')}catch(e){}try{m=JSON.parse(w.pri3dept||'{}')}catch(e){}return{id:w.studentId,capturedAt:w.pri2dept||w.createdAt||'',referred:{grade:w.pub1dept||'',name:w.pub2name||'',tel:w.pub2dept||''},referrer:{grade:w.pub3name||'',name:w.pub3dept||'',tel:w.pri1name||''},imageUrl:w.pri1dept||'',benefits:{referrerGiftDone:bool(b.referrerGiftDone),referredGiftDone:bool(b.referredGiftDone),tuitionDiscountDone:bool(b.tuitionDiscountDone)},notes:w.pri3name||'',fileName:m.fileName||'',ocrRaw:m.ocrRaw||{}}}
+async function saveCard(){
+ var r=gather();if(!r.referred.name&&!r.referrer.name){message('saveMsg','どちらかの氏名を入力してください。','err');return}var btn=$('save');btn.disabled=true;btn.textContent='保存中…';
+ try{message('saveMsg','原本画像をGoogleドライブへ保存しています。','info');var up=await api({action:'uploadEntryImage',studentId:r.id,name:r.referred.name||r.referrer.name,label:'friend_referral',imageData:await resized(file)});if(!up.success)throw Error(up.error||'画像保存失敗');r.imageUrl=up.url;r.fileName=up.name||file.name;var s=await api(wish(r));if(!s.success)throw Error(s.error||'内容保存失敗');message('saveMsg','保存しました。一覧で特典状況を更新できます。','ok');setTimeout(function(){resetForm();showTab('l')},800)}catch(e){message('saveMsg','保存に失敗しました: '+e.message,'err')}btn.disabled=false;btn.textContent='画像と内容を保存';
+}
+async function loadRecords(){message('listMsg','保存データを読み込んでいます。','info');try{var x=await api({action:'getAllWishes'});if(!x.success)throw Error(x.error||'読込失敗');records=(x.wishes||[]).filter(function(w){return w.pub1name===MARK}).map(unwish);clearMessage('listMsg');render()}catch(e){message('listMsg','一覧を読み込めません: '+e.message,'err');records=[];render()}}
+function done(r){return r.benefits.referrerGiftDone&&r.benefits.referredGiftDone&&r.benefits.tuitionDiscountDone}
+function setFilter(v,e){mode=v;document.querySelectorAll('.filter').forEach(function(x){x.classList.remove('on')});e.classList.add('on');render()}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function date(s){var d=new Date(s);return isNaN(d)?esc(s):d.toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}
+function render(){
+ var q=$('search').value.trim().toLowerCase(),all=records.slice().sort(function(a,b){return String(b.capturedAt).localeCompare(String(a.capturedAt))});$('sa').textContent=all.length;$('sp').textContent=all.filter(function(r){return !done(r)}).length;$('sd').textContent=all.filter(done).length;
+ var shown=all.filter(function(r){return(mode==='all'||(mode==='done')===done(r))&&(!q||[r.referred.name,r.referred.tel,r.referrer.name,r.referrer.tel].join(' ').toLowerCase().indexOf(q)>=0)});
+ var box=$('records');box.innerHTML='';if(!shown.length){box.innerHTML='<div class="empty">該当するカードはありません。</div>';return}
+ shown.forEach(function(r){var a=document.createElement('article');a.className='record';
+ a.innerHTML='<div class="rh"><h3>'+esc(r.referred.name||'氏名未確認')+' <span class="hint">← '+esc(r.referrer.name||'紹介者未確認')+'</span></h3><span class="date">'+date(r.capturedAt)+'</span></div><div class="people"><div class="who"><b>紹介された方</b><br>'+esc(r.referred.grade)+'　'+esc(r.referred.name)+'<br>'+esc(r.referred.tel)+'</div><div class="who"><b>紹介した方</b><br>'+esc(r.referrer.grade)+'　'+esc(r.referrer.name)+'<br>'+esc(r.referrer.tel)+'</div></div><div class="badges"><span class="badge '+(r.benefits.referrerGiftDone?'done':'')+'">紹介者1,000円 '+(r.benefits.referrerGiftDone?'済':'未')+'</span><span class="badge '+(r.benefits.referredGiftDone?'done':'')+'">入塾者1,000円 '+(r.benefits.referredGiftDone?'済':'未')+'</span><span class="badge '+(r.benefits.tuitionDiscountDone?'done':'')+'">学費2,000円 '+(r.benefits.tuitionDiscountDone?'済':'未')+'</span></div><div class="rbuttons"><button class="mini '+(r.benefits.referrerGiftDone?'done':'')+'" data-k="referrerGiftDone">紹介者1,000円</button><button class="mini '+(r.benefits.referredGiftDone?'done':'')+'" data-k="referredGiftDone">入塾者1,000円</button><button class="mini '+(r.benefits.tuitionDiscountDone?'done':'')+'" data-k="tuitionDiscountDone">学費2,000円</button></div>'+(r.imageUrl?'<p><a class="link" href="'+esc(r.imageUrl)+'" target="_blank" rel="noopener">原本画像を開く</a></p>':'')+(r.notes?'<p class="hint">メモ: '+esc(r.notes)+'</p>':'');
+ a.querySelectorAll('[data-k]').forEach(function(b){b.onclick=function(){toggleRecord(r.id,b.dataset.k)}});box.appendChild(a)})
+}
+async function toggleRecord(id,k){var r=records.find(function(x){return x.id===id});if(!r)return;var old=r.benefits[k];r.benefits[k]=!old;render();try{var x=await api(wish(r));if(!x.success)throw Error(x.error||'更新失敗')}catch(e){r.benefits[k]=old;render();message('listMsg','更新できませんでした: '+e.message,'err')}}
+</script></body></html>
