@@ -264,6 +264,10 @@ select.invalid,input.invalid{
         </select>
       </div>
       <div class="field">
+        <label for="studentSearch">生徒検索</label>
+        <input id="studentSearch" placeholder="生徒コード・氏名・フリガナ・ローマ字で検索" autocomplete="off">
+      </div>
+      <div class="field">
         <label for="student">生徒名</label>
         <select id="student"></select>
       </div>
@@ -512,6 +516,7 @@ function fetchSearchStudents_(){
 async function init(){
   $('date').value = today();
   selectCampus('');
+  $('studentSearch').addEventListener('input', debounce(renderStudents, 150));
   $('searchName').addEventListener('input', debounce(renderMemos, 250));
   $('filterStaff').addEventListener('change', renderMemos);
   $('searchContent').addEventListener('input', debounce(renderMemos, 250));
@@ -584,12 +589,21 @@ function updateNameDatalist(){
 
 function renderStudents(){
   const prev = $('student').value;
+  const q = normalizeStudentSearch_($('studentSearch')?.value || '');
   let list = currentCampus ? students.filter(s => s.campus === currentCampus) : students;
   if (currentGradeGroup) list = list.filter(s => gradeMatchesGroup(s.grade, currentGradeGroup));
-  $('student').innerHTML = '<option value="">生徒を選択</option>' + list.map(s =>
+  if (q) {
+    list = list.filter(s => {
+      const kana = s.kana || s.furigana || '';
+      const values = [s.id, s.name, kana, kanaToRomaji_(kana)].map(normalizeStudentSearch_);
+      return values.some(value => value.includes(q));
+    });
+  }
+  const emptyLabel = q && !list.length ? '該当する生徒がいません' : '生徒を選択';
+  $('student').innerHTML = `<option value="">${emptyLabel}</option>` + list.map(s =>
     `<option value="${esc(s.id)}">${esc(s.name)}（${esc(s.grade || '')} / No.${esc(s.id)}）</option>`
   ).join('');
-  if (prev) $('student').value = prev;
+  if (prev && list.some(s => String(s.id) === String(prev))) $('student').value = prev;
 }
 
 function renderStaff(){
@@ -764,6 +778,7 @@ function editMemo(id){
   $('saveBtn').textContent = '変更を保存';
   currentGradeGroup = '';
   if ($('gradeGroup')) $('gradeGroup').value = '';
+  if ($('studentSearch')) $('studentSearch').value = '';
   selectCampus(m.campus || '');
   $('student').value = m.studentId || '';
   $('date').value = formatDate(m.date).replace(/\//g,'-');
