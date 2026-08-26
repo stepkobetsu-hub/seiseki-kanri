@@ -164,6 +164,8 @@ textarea{
   font-weight:700;
 }
 .studentChoice:last-child{border-bottom:0}
+.studentChoice.searchResult{background:#edf6ff}
+.studentChoice.searchResult:hover{background:#dfedfb}
 .studentChoice:hover{background:#eef6ff}
 .studentChoice.selected{
   background:#dceeff;
@@ -689,7 +691,7 @@ function renderStudents(){
   const activeId = String($('student').value || '');
   $('studentList').innerHTML = list.length ? list.map(s => {
     const selected = String(s.id) === activeId;
-    return `<button type="button" class="studentChoice${selected ? ' selected' : ''}" data-student-id="${esc(s.id)}" role="option" aria-selected="${selected}" onclick="selectStudent('${esc(s.id)}')">
+    return `<button type="button" class="studentChoice${q ? ' searchResult' : ''}${selected ? ' selected' : ''}" data-student-id="${esc(s.id)}" role="option" aria-selected="${selected}" onclick="selectStudent('${esc(s.id)}')">
       <span class="studentCheck">${selected ? '✓' : ''}</span>
       <span>${esc(s.name)} <span class="studentChoiceMeta">No.${esc(s.id)}</span></span>
       <span class="studentChoiceMeta">${esc(s.grade || '')}</span>
