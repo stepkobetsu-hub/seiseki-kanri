@@ -135,6 +135,65 @@ textarea{
   padding:9px 12px;
   min-height:40px;
 }
+.studentPicker{
+  margin-top:8px;
+  border:1px solid #cbd8e6;
+  border-radius:10px;
+  background:#fff;
+  overflow:hidden;
+}
+.studentPicker.invalid{
+  border:2px solid #ef4444;
+  background:#fff5f5;
+  box-shadow:0 0 0 3px rgba(239,68,68,.15);
+}
+.studentChoice{
+  width:100%;
+  display:grid;
+  grid-template-columns:28px minmax(0,1fr) 64px 90px;
+  gap:8px;
+  align-items:center;
+  min-height:42px;
+  padding:8px 10px;
+  border:0;
+  border-bottom:1px solid #e8eef5;
+  border-radius:0;
+  background:#fff;
+  color:#102033;
+  text-align:left;
+  font-weight:700;
+}
+.studentChoice:last-child{border-bottom:0}
+.studentChoice:hover{background:#eef6ff}
+.studentChoice.selected{
+  background:#dceeff;
+  color:#0f4f90;
+  box-shadow:inset 4px 0 #155aa5;
+}
+.studentCheck{
+  display:grid;
+  place-items:center;
+  width:22px;
+  height:22px;
+  border:1px solid #aebfd1;
+  border-radius:6px;
+  color:#fff;
+  font-weight:900;
+}
+.studentChoice.selected .studentCheck{
+  background:#155aa5;
+  border-color:#155aa5;
+}
+.studentChoiceMeta{
+  color:#64748b;
+  font-size:.8rem;
+  font-weight:700;
+}
+.studentPickerEmpty{
+  padding:14px;
+  color:#64748b;
+  text-align:center;
+}
 .memoList{
   display:grid;
   gap:10px;
@@ -224,6 +283,7 @@ select.invalid,input.invalid{
   .campusFilter button{flex:1}
   .campusGrid button{padding:11px 6px}
   .actions button{flex:1;min-width:0}
+  .studentChoice{grid-template-columns:28px minmax(0,1fr) 54px 72px;padding:8px 7px;font-size:.88rem}
   .memoTop{display:block}
   .memoBtns{margin-top:10px}
   .memoBtns button{flex:0 0 auto}
@@ -263,13 +323,11 @@ select.invalid,input.invalid{
           <option value="h13">高1〜高3</option>
         </select>
       </div>
-      <div class="field">
+      <div class="field full">
         <label for="studentSearch">生徒検索</label>
         <input id="studentSearch" placeholder="生徒コード・氏名・フリガナ・ローマ字で検索" autocomplete="off">
-      </div>
-      <div class="field">
-        <label for="student">生徒名</label>
-        <select id="student"></select>
+        <input id="student" type="hidden">
+        <div id="studentList" class="studentPicker" role="listbox" aria-label="生徒を選択"></div>
       </div>
       <div class="field">
         <label for="date">日付</label>
@@ -588,7 +646,7 @@ function updateNameDatalist(){
 }
 
 function renderStudents(){
-  const prev = $('student').value;
+  const selectedId = String($('student').value || '');
   const q = normalizeStudentSearch_($('studentSearch')?.value || '');
   let list = currentCampus ? students.filter(s => s.campus === currentCampus) : students;
   if (currentGradeGroup) list = list.filter(s => gradeMatchesGroup(s.grade, currentGradeGroup));
@@ -599,11 +657,29 @@ function renderStudents(){
       return values.some(value => value.includes(q));
     });
   }
-  const emptyLabel = q && !list.length ? '該当する生徒がいません' : '生徒を選択';
-  $('student').innerHTML = `<option value="">${emptyLabel}</option>` + list.map(s =>
-    `<option value="${esc(s.id)}">${esc(s.name)}（${esc(s.grade || '')} / No.${esc(s.id)}）</option>`
-  ).join('');
-  if (prev && list.some(s => String(s.id) === String(prev))) $('student').value = prev;
+  if (selectedId && !list.some(s => String(s.id) === selectedId)) $('student').value = '';
+  const activeId = String($('student').value || '');
+  $('studentList').innerHTML = list.length ? list.map(s => {
+    const selected = String(s.id) === activeId;
+    return `<button type="button" class="studentChoice${selected ? ' selected' : ''}" data-student-id="${esc(s.id)}" role="option" aria-selected="${selected}" onclick="selectStudent('${esc(s.id)}')">
+      <span class="studentCheck">${selected ? '✓' : ''}</span>
+      <span>${esc(s.name)} <span class="studentChoiceMeta">No.${esc(s.id)}</span></span>
+      <span class="studentChoiceMeta">${esc(s.grade || '')}</span>
+      <span class="studentChoiceMeta">${esc(s.campus || '')}</span>
+    </button>`;
+  }).join('') : '<div class="studentPickerEmpty">該当する生徒がいません。</div>';
+}
+function selectStudent(id){
+  $('student').value = String(id || '');
+  $('studentList').classList.remove('invalid');
+  $('studentSearch').classList.remove('invalid');
+  document.querySelectorAll('#studentList .studentChoice').forEach(row => {
+    const selected = String(row.dataset.studentId) === String(id);
+    row.classList.toggle('selected', selected);
+    row.setAttribute('aria-selected', selected ? 'true' : 'false');
+    const check = row.querySelector('.studentCheck');
+    if (check) check.textContent = selected ? '✓' : '';
+  });
 }
 
 function renderStaff(){
@@ -650,8 +726,12 @@ async function saveMemo(sendEmail){
   // バリデーション
   const errEl = $('formError');
   const errs = [];
-  [$('student'),$('date'),$('staff'),$('content')].forEach(el=>el?.classList.remove('invalid'));
-  if (!payload.studentId){ $('student').classList.add('invalid'); errs.push('・生徒名を選択してください'); }
+  [$('studentList'),$('studentSearch'),$('date'),$('staff'),$('content')].forEach(el=>el?.classList.remove('invalid'));
+  if (!payload.studentId){
+    $('studentList').classList.add('invalid');
+    $('studentSearch').classList.add('invalid');
+    errs.push('・生徒名を選択してください');
+  }
   if (!payload.date){ $('date').classList.add('invalid'); errs.push('・日付を入力してください'); }
   if (!payload.staff){
     $('staff').classList.add('invalid');
@@ -690,7 +770,11 @@ function clearForm(keepStudent){
   editingId = '';
   $('formTitle').textContent = '面談・電話内容を登録';
   $('saveBtn').textContent = '保存する';
-  if (!keepStudent) $('student').value = '';
+  if (!keepStudent) {
+    $('student').value = '';
+    $('studentSearch').value = '';
+    renderStudents();
+  }
   $('date').value = today();
   $('counterpart').value = '母';
   $('other').value = '';
@@ -701,7 +785,7 @@ function clearForm(keepStudent){
   toggleStaffOther();
   const errEl = $('formError');
   if (errEl) errEl.classList.remove('show');
-  [$('student'),$('date'),$('staff'),$('staffOther'),$('content')].forEach(el=>el?.classList.remove('invalid'));
+  [$('studentList'),$('studentSearch'),$('date'),$('staff'),$('staffOther'),$('content')].forEach(el=>el?.classList.remove('invalid'));
 }
 
 async function loadMemos(){
@@ -780,7 +864,7 @@ function editMemo(id){
   if ($('gradeGroup')) $('gradeGroup').value = '';
   if ($('studentSearch')) $('studentSearch').value = '';
   selectCampus(m.campus || '');
-  $('student').value = m.studentId || '';
+  selectStudent(m.studentId || '');
   $('date').value = formatDate(m.date).replace(/\//g,'-');
   const cp = String(m.counterpart || '');
   if (['母','父','本人'].includes(cp)) {
