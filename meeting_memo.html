@@ -538,6 +538,30 @@ async function api(data){
 }
 
 
+async function fetchLocalSearchStudents_(){
+  const res = await fetch('student_search_index.json?v=20260826-1', { cache:'no-store' });
+  if (!res.ok) throw new Error('生徒フリガナ一覧を読み込めませんでした');
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data.students || []);
+}
+function mergeSearchKana_(baseStudents, searchStudents){
+  const byId = new Map();
+  const byName = new Map();
+  (searchStudents || []).forEach(s => {
+    const id = String(s.id || s.studentId || '').trim();
+    const nameKey = normalizeStudentSearch_(s.name || '');
+    if (id) byId.set(id, s);
+    if (nameKey) byName.set(nameKey, s);
+  });
+  return (baseStudents || []).map(s => {
+    const searchStudent = byId.get(String(s.id)) || byName.get(normalizeStudentSearch_(s.name || '')) || {};
+    return {
+      ...s,
+      kana: searchStudent.kana || searchStudent.furigana || s.kana || s.furigana || ''
+    };
+  });
+}
+
 function fetchSearchStudents_(){
   return new Promise((resolve, reject) => {
     const callbackName = 'meetingSearch_' + Date.now() + '_' + Math.random().toString(36).slice(2);
@@ -580,22 +604,26 @@ async function init(){
   $('searchContent').addEventListener('input', debounce(renderMemos, 250));
   $('filterCounterpart').addEventListener('change', renderMemos);
   try {
-    const [sr, fr, searchStudents] = await Promise.all([
+    const [sr, fr, localSearchStudents] = await Promise.all([
       api({ action:'getStudents' }),
       api({ action:'getStaffMembers' }),
-      fetchSearchStudents_().catch(() => [])
+      fetchLocalSearchStudents_().catch(() => [])
     ]);
-    const searchById = new Map(searchStudents.map(s => [String(s.id), s]));
-    students = (sr.students || []).map(s => {
-      const searchStudent = searchById.get(String(s.id)) || {};
-      return { ...s, kana: searchStudent.kana || searchStudent.furigana || s.kana || s.furigana || '' };
-    });
+    students = mergeSearchKana_(sr.students || [], localSearchStudents);
     staffMembers = fr.staff || [];
-    // 名前datalistを生成
     updateNameDatalist();
     renderStudents();
     renderStaff();
     await loadMemos();
+
+    // メール送信システムの最新フリガナも後から取り込み、初期表示は待たせない
+    fetchSearchStudents_().then(searchStudents => {
+      if (!searchStudents.length) return;
+      students = mergeSearchKana_(students, searchStudents);
+      updateNameDatalist();
+      renderStudents();
+      renderMemos();
+    }).catch(() => {});
   } catch (e) {
     $('formError').textContent = '読み込みに失敗しました。通信状態を確認してください。';
     $('formError').classList.add('show');
