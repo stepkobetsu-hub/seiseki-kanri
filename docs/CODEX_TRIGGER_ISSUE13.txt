@@ -1,0 +1,1 @@
+@codex Issue #13 を実装してください。まず docs/CODEX_SEISEKI_AUTOSAVE_TASK_2026-08-31.md と supabase/SEISEKI_AUTOSAVE_CUTOVER_2026-08-31.md を読み、juku_app.html の生徒側を Supabase 先行保存＋自動保存へ切替してください。main へ直接入れず branch + PR、ダミー生徒で再読込保持まで検証してください。
