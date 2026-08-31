@@ -33,6 +33,11 @@ test('runtime validates the common student session contract', () => {
   assert.match(auth, /return result\.profile/);
 });
 
+test('runtime resolves the common API root to /api', () => {
+  assert.match(auth, /url\.pathname = '\/api'/);
+  assert.match(auth, /fetchImpl\(commonSessionEndpoint\(commonApiUrl\)/);
+});
+
 test('runtime normalizes common-session failures to HTTP 401', () => {
   assert.match(auth, /code: 'AUTH_REQUIRED'/);
   assert.match(auth, /status: 401/);
