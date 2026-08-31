@@ -115,6 +115,7 @@ html.student-auth-pending #loginPage{visibility:hidden}
 .saveMsg{font-size:.8rem}
 .saveMsg.ok{color:var(--success)}
 .saveMsg.pending{color:var(--sub)}
+.saveMsg.err{color:var(--danger)}
 
 /* HISTORY */
 .yrTabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
@@ -309,7 +310,7 @@ tr:hover td{background:var(--primary-lt)}
         </div>
       </div>
       <div class="saveRow">
-        <button class="btn btn-primary" onclick="saveScore()">💾 保存する</button>
+        <button class="btn btn-primary" onclick="saveScore()">💾 今すぐ保存／再試行</button>
       </div>
     </div>
   </div>
@@ -532,7 +533,7 @@ tr:hover td{background:var(--primary-lt)}
         </div>
       </div>
             <div id="wishUpdatedAt" style="font-size:.72rem;color:#94a3b8;margin-top:8px;text-align:right"></div>
-      <button class="btn btn-primary btn-full" onclick="saveWish()" style="margin-top:16px">💾 保存する</button>
+      <button class="btn btn-primary btn-full" onclick="saveWish()" style="margin-top:16px">💾 今すぐ保存／再試行</button>
       <div id="wishMsg" style="margin-top:8px;text-align:center;font-size:.82rem"></div>
     </div>
   </div>
@@ -614,7 +615,7 @@ tr:hover td{background:var(--primary-lt)}
         </div>
       </div>
       <div class="saveRow">
-        <button class="btn btn-primary" onclick="saveReport()">💾 保存する</button>
+        <button class="btn btn-primary" onclick="saveReport()">💾 今すぐ保存／再試行</button>
       </div>
     </div>
     <div class="card">
@@ -849,6 +850,10 @@ const STUDENT_IDLE_AT_KEY = 'gradeStudentLastActivityAt';
 const STUDENT_IDLE_LIMIT_MS = 30 * 60 * 1000;
 const STUDENT_ACTIVITY_EVENTS = ['pointerdown','keydown','touchstart','scroll'];
 const STUDENT_GRADE_ACTIONS = new Set(['getStudentScores','saveScore','deleteScore','getWish','saveWish','getReport','saveReport','deleteReport','getReports','getSchools']);
+const SEISEKI_SUPABASE_AUTOSAVE = true; // 緊急時は false にすると従来の共通 API・手動保存へ戻る
+const SEISEKI_RUNTIME_URL = 'https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-runtime-v1';
+const SEISEKI_RUNTIME_ACTIONS = new Set(['getStudentScores','saveScore','deleteScore','getReports','getReport','saveReport','deleteReport','getWish','saveWish']);
+const SEISEKI_WRITE_ACTIONS = new Set(['saveScore','deleteScore','saveReport','deleteReport','saveWish']);
 let studentCommonMode = false;
 let commonApiUrlPromise;
 let studentDeviceMode = '';
@@ -877,6 +882,34 @@ async function commonApi(params) {
     body: JSON.stringify(params), cache: 'no-store', redirect: 'follow'
   });
   if (!response.ok) throw new Error('共通ログインサーバーへ接続できません');
+  return response.json();
+}
+
+function newMutationId() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function legacyStudentGradeRequest(params, session) {
+  return commonApi({ action: 'commonGradeRequest', token: session.token, gradeAction: params.action, payload: params });
+}
+
+async function supabaseStudentGradeRequest(params, session) {
+  const payload = { ...params, token: session.token };
+  if (SEISEKI_WRITE_ACTIONS.has(params.action)) payload.mutationId = params.mutationId || newMutationId();
+  let response;
+  try {
+    response = await fetch(SEISEKI_RUNTIME_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload), cache: 'no-store'
+    });
+  } catch (error) {
+    return legacyStudentGradeRequest(params, session);
+  }
+  if (response.status === 401 || response.status === 403) {
+    return { success: false, code: 'UNAUTHENTICATED', error: '認証の有効期限が切れました。もう一度ログインしてください。' };
+  }
+  if (response.status >= 500) return legacyStudentGradeRequest(params, session);
+  if (!response.ok) return { success: false, error: `保存先でエラーが発生しました (${response.status})` };
   return response.json();
 }
 
@@ -918,7 +951,10 @@ async function api(params) {
   if (studentCommonMode && STUDENT_GRADE_ACTIONS.has(String(params.action || ''))) {
     const session = readCommonSession();
     if (!session) return { success: false, code: 'UNAUTHENTICATED', error: 'ログインが必要です' };
-    return commonApi({ action: 'commonGradeRequest', token: session.token, gradeAction: params.action, payload: params });
+    if (SEISEKI_SUPABASE_AUTOSAVE && SEISEKI_RUNTIME_ACTIONS.has(params.action)) {
+      return supabaseStudentGradeRequest(params, session);
+    }
+    return legacyStudentGradeRequest(params, session);
   }
   if (!GAS) { toast('⚠️ GAS URLを入力してください'); throw new Error('No GAS URL'); }
   const res = await fetch(GAS, {
@@ -1230,11 +1266,61 @@ async function initStudent() {
   }
   sTabs('input', 0);
   loadScore(); // 自動的に読み込む
+  setupStudentAutosave();
 }
 
 // ===================================================
 // SCORE INPUT
 // ===================================================
+let scoreAutosaveTimer = null;
+let reportAutosaveTimer = null;
+let wishAutosaveTimer = null;
+let scoreSaveSequence = 0;
+let reportSaveSequence = 0;
+let wishSaveSequence = 0;
+let studentAutosaveReady = false;
+
+function setSaveStatus(id, text, kind) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'saveMsg ' + kind;
+}
+
+function scheduleAutosave(type) {
+  if (!SEISEKI_SUPABASE_AUTOSAVE || !studentCommonMode || !studentAutosaveReady) return;
+  const config = {
+    score: { delay: 500, status: 'inputStatus', timer: 'scoreAutosaveTimer', sequence: 'scoreSaveSequence', save: saveScore },
+    report: { delay: 500, status: 'rpStatus', timer: 'reportAutosaveTimer', sequence: 'reportSaveSequence', save: saveReport },
+    wish: { delay: 800, status: 'wishMsg', timer: 'wishAutosaveTimer', sequence: 'wishSaveSequence', save: saveWish }
+  }[type];
+  const next = ({ score: scoreSaveSequence, report: reportSaveSequence, wish: wishSaveSequence }[type]) + 1;
+  if (type === 'score') scoreSaveSequence = next;
+  if (type === 'report') reportSaveSequence = next;
+  if (type === 'wish') wishSaveSequence = next;
+  clearTimeout({ score: scoreAutosaveTimer, report: reportAutosaveTimer, wish: wishAutosaveTimer }[type]);
+  setSaveStatus(config.status, '入力中', 'pending');
+  const timer = setTimeout(() => config.save({ sequence: next, automatic: true }), config.delay);
+  if (type === 'score') scoreAutosaveTimer = timer;
+  if (type === 'report') reportAutosaveTimer = timer;
+  if (type === 'wish') wishAutosaveTimer = timer;
+}
+
+function setupStudentAutosave() {
+  if (studentAutosaveReady) return;
+  studentAutosaveReady = true;
+  const scoreIds = ['f_jpn','f_soc','f_math','f_sci','f_eng','f_rank5','f_avg_jpn','f_avg_soc','f_avg_math','f_avg_sci','f_avg_eng','f_avg_total5','f_mus','f_art','f_pe','f_tech','f_rank9'];
+  scoreIds.forEach(id => ['input','change'].forEach(eventName =>
+    document.getElementById(id)?.addEventListener(eventName, () => scheduleAutosave('score'))));
+  ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech']
+    .forEach(id => ['input','change'].forEach(eventName =>
+      document.getElementById(id)?.addEventListener(eventName, () => scheduleAutosave('report'))));
+  const wishTab = document.getElementById('sTab_wish');
+  wishTab?.addEventListener('input', event => { if (event.target.matches('input,select')) scheduleAutosave('wish'); });
+  wishTab?.addEventListener('change', event => { if (event.target.matches('input,select')) scheduleAutosave('wish'); });
+  wishTab?.addEventListener('click', event => { if (event.target.matches('button[id]')) scheduleAutosave('wish'); });
+}
+
 function calcTotal() {
   const g = id => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
   const v5 = ['f_jpn','f_soc','f_math','f_sci','f_eng'].map(g).filter(x => x !== null);
@@ -1256,7 +1342,9 @@ function loadScore() {
   st.className = 'saveMsg ' + (sc ? 'ok' : 'pending');
 }
 
-async function saveScore() {
+async function saveScore(options = {}) {
+  const sequence = options.sequence || ++scoreSaveSequence;
+  clearTimeout(scoreAutosaveTimer);
   const yr = document.getElementById('selYear').value;
   const tm = document.getElementById('selTerm').value;
   const g = id => { const el = document.getElementById(id); if(!el) return ''; const v = el.value; return v === '' ? '' : Number(v); };
@@ -1299,7 +1387,7 @@ async function saveScore() {
     return;
   }
 
-  const r = await api({
+  const payload = {
     action: 'saveScore', studentId: me.id, name: me.name, campus: me.campus,
     grade: me.grade, school: me.school, year: yr, term: tm,
     jpn: g('f_jpn'), soc: g('f_soc'), math: g('f_math'), sci: g('f_sci'), eng: g('f_eng'),
@@ -1308,14 +1396,23 @@ async function saveScore() {
     total9: g('f_total9'), rank9: g('f_rank9'),
     avg_jpn: g('f_avg_jpn'), avg_soc: g('f_avg_soc'), avg_math: g('f_avg_math'),
     avg_sci: g('f_avg_sci'), avg_eng: g('f_avg_eng'), avg_total5: g('f_avg_total5')
-  });
+  };
+  setSaveStatus('inputStatus', '保存中…', 'pending');
+  let r;
+  try { r = await api(payload); }
+  catch (error) { r = { success: false, error: '通信エラー' }; }
   if (r.success) {
-    toast('✅ ' + r.message);
-    const sr = await api({ action: 'getStudentScores', studentId: me.id });
-    myScores = sr.scores || [];
-    document.getElementById('inputStatus').textContent = '✅ 保存しました';
-    document.getElementById('inputStatus').className = 'saveMsg ok';
-  } else toast('❌ ' + r.error);
+    if (sequence === scoreSaveSequence) {
+      const index = myScores.findIndex(s => String(s.year) === String(yr) && String(s.term) === String(tm));
+      if (index >= 0) myScores[index] = { ...myScores[index], ...payload };
+      else myScores.push({ ...payload });
+      setSaveStatus('inputStatus', options.automatic ? '自動保存済み' : '保存しました', 'ok');
+      if (!options.automatic) toast('✅ 保存しました');
+    }
+  } else if (sequence === scoreSaveSequence) {
+    setSaveStatus('inputStatus', '保存失敗・再試行', 'err');
+    toast('❌ ' + (r.error || '保存に失敗しました'));
+  }
 }
 
 // ===================================================
@@ -1951,7 +2048,9 @@ async function loadWish() {
   } catch(e) {}
 }
 
-async function saveWish() {
+async function saveWish(options = {}) {
+  const sequence = options.sequence || ++wishSaveSequence;
+  clearTimeout(wishAutosaveTimer);
   syncAllWishDeptHidden();
   const data = { action: 'saveWish', studentId: me.id };
   ['pub1name','pub1dept','pub2name','pub2dept','pub3name','pub3dept',
@@ -1971,23 +2070,26 @@ async function saveWish() {
   });
   data.results = JSON.stringify(results);
   const msg = document.getElementById('wishMsg');
+  setSaveStatus('wishMsg', '保存中…', 'pending');
   try {
     const r = await api(data);
-    if (r.success) {
-      msg.textContent = '✅ 保存しました';
+    if (r.success && sequence === wishSaveSequence) {
+      setSaveStatus('wishMsg', options.automatic ? '自動保存済み' : '保存しました', 'ok');
       msg.style.color = '#10b981';
       const now = new Date().toLocaleString('ja-JP');
       const upEl = document.getElementById('wishUpdatedAt');
       if (upEl) upEl.textContent = '最終更新: ' + now;
-    } else {
-      msg.textContent = '❌ ' + (r.error||'エラー');
+      renderWishSummary({ ...data, results, updatedAt: new Date().toISOString() });
+    } else if (!r.success && sequence === wishSaveSequence) {
+      msg.textContent = '保存失敗・再試行: ' + (r.error||'エラー');
       msg.style.color = '#ef4444';
     }
   } catch(e) {
-    msg.textContent = '❌ 通信エラー';
-    msg.style.color = '#ef4444';
+    if (sequence === wishSaveSequence) {
+      msg.textContent = '保存失敗・再試行: 通信エラー';
+      msg.style.color = '#ef4444';
+    }
   }
-  setTimeout(() => { if(msg) msg.textContent = ''; }, 3000);
 }
 
 function initReportTab() {
@@ -2019,7 +2121,9 @@ async function loadReport() {
   renderReportHistory();
 }
 
-async function saveReport() {
+async function saveReport(options = {}) {
+  const sequence = options.sequence || ++reportSaveSequence;
+  clearTimeout(reportAutosaveTimer);
   const year = document.getElementById('rpYear').value;
   const semester = document.getElementById('rpSemester').value;
   document.querySelectorAll('.inputError').forEach(el => el.classList.remove('inputError'));
@@ -2054,20 +2158,30 @@ async function saveReport() {
   ['jpn','soc','math','sci','eng','mus','art','pe','tech'].forEach(k => {
     payload['rp_' + k] = document.getElementById('rp_' + k).value || '';
   });
-  const r = await api(payload);
+  setSaveStatus('rpStatus', '保存中…', 'pending');
+  let r;
+  try { r = await api(payload); }
+  catch (error) { r = { success: false, error: '通信エラー' }; }
   if (r.success) {
-    toast('✅ 保存しました');
-    document.getElementById('rpStatus').textContent = '（保存済み）';
-    const exists = myReports.findIndex(x => x.year == year && x.semester === semester);
-    if (exists >= 0) myReports[exists] = { ...myReports[exists], ...payload };
-    else myReports.push({ year, semester, ...payload });
-    renderReportHistory();
-  } else toast('❌ ' + r.error);
+    if (sequence === reportSaveSequence) {
+      setSaveStatus('rpStatus', options.automatic ? '自動保存済み' : '保存しました', 'ok');
+      const exists = myReports.findIndex(x => x.year == year && x.semester === semester);
+      if (exists >= 0) myReports[exists] = { ...myReports[exists], ...payload };
+      else myReports.push({ year, semester, ...payload });
+      renderReportHistory(true);
+      if (!options.automatic) toast('✅ 保存しました');
+    }
+  } else if (sequence === reportSaveSequence) {
+    setSaveStatus('rpStatus', '保存失敗・再試行', 'err');
+    toast('❌ ' + (r.error || '保存に失敗しました'));
+  }
 }
 
-async function renderReportHistory() {
-  const r = await api({ action: 'getReports', studentId: me.id });
-  myReports = r.data || [];
+async function renderReportHistory(useLocal = false) {
+  if (!useLocal) {
+    const r = await api({ action: 'getReports', studentId: me.id });
+    myReports = r.data || [];
+  }
   const noData = '<tr><td colspan="12" class="noData">データなし</td></tr>';
   const rows = myReports.map(d => `
     <tr>
