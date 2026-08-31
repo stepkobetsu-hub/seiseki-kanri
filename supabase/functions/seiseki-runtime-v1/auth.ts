@@ -12,6 +12,17 @@ export class AuthRequiredError extends Error {
 }
 
 /**
+ * Resolves the browser app host to the actual common-session API endpoint.
+ * The root URL serves the app shell; session actions are handled at /api.
+ * If a non-root path is already configured, preserve it unchanged.
+ */
+export function commonSessionEndpoint(commonApiUrl: string): string {
+  const url = new URL(commonApiUrl);
+  if (url.pathname === '/' || url.pathname === '') url.pathname = '/api';
+  return url.toString();
+}
+
+/**
  * Revalidates a browser session against the common API used by juku_app.html.
  * The common endpoint only authenticates the request when all three response
  * fields (`success`, `role`, and `profile`) match the student-session contract.
@@ -24,7 +35,7 @@ export async function validateStudent(
   if (!token) throw new AuthRequiredError();
 
   try {
-    const response = await fetchImpl(commonApiUrl, {
+    const response = await fetchImpl(commonSessionEndpoint(commonApiUrl), {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
       body: JSON.stringify({ action: 'getCommonStudentSession', token }),
