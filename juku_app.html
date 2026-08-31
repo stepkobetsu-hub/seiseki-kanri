@@ -894,21 +894,30 @@ async function legacyStudentGradeRequest(params, session) {
 }
 
 async function supabaseStudentGradeRequest(params, session) {
+  const isWrite = SEISEKI_WRITE_ACTIONS.has(params.action);
   const payload = { ...params, token: session.token };
-  if (SEISEKI_WRITE_ACTIONS.has(params.action)) payload.mutationId = params.mutationId || newMutationId();
+  if (isWrite) payload.mutationId = params.mutationId || newMutationId();
   let response;
   try {
     response = await fetch(SEISEKI_RUNTIME_URL, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      // text/plain is a CORS-safelisted content type. The runtime still parses the
+      // JSON body, while browsers no longer need an application/json preflight.
+      method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
       body: JSON.stringify(payload), cache: 'no-store'
     });
   } catch (error) {
+    // A legacy write cannot prove that Supabase was updated. Reporting it as a
+    // success would let a reload restore stale data, so only reads may fall back.
+    if (isWrite) return { success: false, code: 'SUPABASE_UNAVAILABLE', error: '保存先に接続できません。再試行してください。' };
     return legacyStudentGradeRequest(params, session);
   }
   if (response.status === 401 || response.status === 403) {
     return { success: false, code: 'UNAUTHENTICATED', error: '認証の有効期限が切れました。もう一度ログインしてください。' };
   }
-  if (response.status >= 500) return legacyStudentGradeRequest(params, session);
+  if (response.status >= 500) {
+    if (isWrite) return { success: false, code: 'SUPABASE_UNAVAILABLE', error: '保存先で一時的なエラーが発生しました。再試行してください。' };
+    return legacyStudentGradeRequest(params, session);
+  }
   if (!response.ok) return { success: false, error: `保存先でエラーが発生しました (${response.status})` };
   return response.json();
 }
