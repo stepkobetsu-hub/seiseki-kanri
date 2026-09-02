@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createHash } from 'node:crypto';
 /*
   Existing GAS -> Supabase migration.
 
@@ -26,7 +27,7 @@ const headers = {
   apikey: SERVICE_KEY,
   Authorization: `Bearer ${SERVICE_KEY}`,
   'Content-Type': 'application/json',
-  Prefer: 'return=representation'
+  Prefer: 'resolution=merge-duplicates,return=representation'
 };
 
 async function gas(action, data = {}) {
@@ -155,60 +156,107 @@ function memoRow(m, studentId) {
   };
 }
 
+function schoolRow(s) {
+  return {
+    name: clean(s.name),
+    term_count: num(s.termCount),
+    semester_type: clean(s.semType) || '3term',
+    schedule: s.testSchedule && typeof s.testSchedule === 'object' ? s.testSchedule : {},
+    schedule_url: clean(s.scheduleUrl),
+    memo: clean(s.scheduleMemo)
+  };
+}
+
+function digest(rows) {
+  const canonical = rows.map(row => JSON.stringify(row, Object.keys(row).sort())).sort().join('\n');
+  return createHash('sha256').update(canonical).digest('hex');
+}
+
+function latestByNaturalKey(rows, key) {
+  const latest = new Map();
+  for (const row of rows) {
+    const naturalKey = key(row);
+    const current = latest.get(naturalKey);
+    if (!current || String(row.updatedAt || '') >= String(current.updatedAt || '')) latest.set(naturalKey, row);
+  }
+  return [...latest.values()];
+}
+
 function required(row, keys) {
   return keys.every(k => row[k] !== null && row[k] !== undefined && row[k] !== '');
 }
 
 async function main() {
   console.log(`Migration started${DRY_RUN ? ' (dry run)' : ''}`);
-  const [studentsRes, scoresRes, reportsRes, wishesRes, memosRes] = await Promise.all([
-    gas('getStudents'),
+  const [studentsRes, scoresRes, reportsRes, wishesRes, schoolsRes, memosRes] = await Promise.all([
+    gas('getStudentList'),
     gas('getAllScores'),
     gas('getAllReports'),
     gas('getAllWishes'),
+    gas('getSchools'),
     gas('getMeetingMemos')
   ]);
 
-  const studentRows = (studentsRes.students || []).map((s, idx) => ({
+  const masterStudentRows = (studentsRes.students || []).map((s, idx) => ({
     student_code: clean(s.id),
     name: clean(s.name),
     campus: clean(s.campus),
     grade: clean(s.grade),
     school_name: clean(s.school),
-    active: clean(s.flag) !== '退塾',
+    active: clean(s.flag) === '1',
     source_row: idx + 2,
     source_updated_at: s.syncedAt || undefined
   })).filter(r => required(r, ['student_code', 'name']));
+  const masterCodes = new Set(masterStudentRows.map(row => row.student_code));
+  const linkedRecords = [...(scoresRes.scores || []), ...(reportsRes.data || []), ...(wishesRes.wishes || [])];
+  const orphanByCode = new Map();
+  for (const row of linkedRecords) {
+    const code = clean(row.studentId);
+    if (code && !masterCodes.has(code) && !orphanByCode.has(code)) orphanByCode.set(code, row);
+  }
+  const orphanStudentRows = [...orphanByCode].map(([code, row]) => ({
+    student_code: code, name: clean(row.name) || code, campus: clean(row.campus), grade: clean(row.grade),
+    school_name: clean(row.school), active: false, source_updated_at: new Date().toISOString()
+  }));
+  const studentRows = [...masterStudentRows, ...orphanStudentRows];
 
   await sbUpsert('students', studentRows, 'student_code');
   const savedStudents = await sbSelect('students', { select: 'id,student_code' });
   const studentIdByCode = new Map(savedStudents.map(s => [String(s.student_code), s.id]));
 
-  const scoreRows = (scoresRes.scores || [])
+  const scoreRows = latestByNaturalKey(scoresRes.scores || [], row => `${row.studentId}|${row.year}|${row.term}`)
     .map(s => scoreRow(s, studentIdByCode.get(String(s.studentId))))
     .filter(r => required(r, ['student_id', 'school_year', 'test_number']));
-  const reportRows = (reportsRes.data || [])
+  const reportRows = latestByNaturalKey(reportsRes.data || [], row => `${row.studentId}|${row.year}|${row.semester}`)
     .map(r => reportRow(r, studentIdByCode.get(String(r.studentId))))
     .filter(r => required(r, ['student_id', 'school_year', 'term']));
-  const wishRows = (wishesRes.wishes || [])
+  const wishRows = latestByNaturalKey(wishesRes.wishes || [], row => `${row.studentId}|${row.year || 0}`)
     .map(w => wishRow(w, studentIdByCode.get(String(w.studentId))))
     .filter(r => required(r, ['student_id']));
   const memoRows = (memosRes.memos || [])
     .map(m => memoRow(m, studentIdByCode.get(String(m.studentId))))
     .filter(r => r.content || r.memo_date);
+  const schoolRows = (schoolsRes.schools || []).map(schoolRow).filter(r => required(r, ['name']));
 
   await sbUpsert('test_scores', scoreRows, 'student_id,school_year,test_number');
   await sbUpsert('report_cards', reportRows, 'student_id,school_year,term');
   await sbUpsert('school_preferences', wishRows, 'student_id,school_year');
+  await sbUpsert('schools', schoolRows, 'name');
   await sbUpsert('meeting_memos', memoRows, 'id');
 
-  console.log(JSON.stringify({
+  const summary = {
     students: studentRows.length,
     test_scores: scoreRows.length,
     report_cards: reportRows.length,
     school_preferences: wishRows.length,
+    schools: schoolRows.length,
     meeting_memos: memoRows.length
-  }, null, 2));
+  };
+  const hashes = {
+    students: digest(studentRows), test_scores: digest(scoreRows), report_cards: digest(reportRows),
+    school_preferences: digest(wishRows), schools: digest(schoolRows)
+  };
+  console.log(JSON.stringify({ mode: DRY_RUN ? 'dry-run' : 'apply', counts: summary, sha256: hashes }, null, 2));
 }
 
 main().catch(err => {
