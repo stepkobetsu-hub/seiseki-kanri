@@ -1058,10 +1058,22 @@ tr:hover td{background:#f8fafc}
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 const RUNTIME_CONFIG = window.SEISEKI_CONFIG || {};
 const SUPABASE_URL = RUNTIME_CONFIG.supabaseUrl || localStorage.getItem('seisekiSupabaseUrl') || '';
-const SUPABASE_ANON_KEY = RUNTIME_CONFIG.supabaseAnonKey || localStorage.getItem('seisekiSupabaseAnonKey') || '';
-const DEFAULT_SUPABASE_AUTH_EMAIL = RUNTIME_CONFIG.supabaseAdminEmail || localStorage.getItem('seisekiSupabaseAdminEmail') || 'stepkobetsu@gmail.com';
-let DATA_SOURCE = localStorage.getItem('seisekiDataSource') || (SUPABASE_URL && SUPABASE_ANON_KEY ? 'supabase' : 'legacy-gas');
-const SUPABASE_ENABLED_ACTIONS = new Set(['getStudents', 'syncStudents', 'applySyncResult', 'getSyncLog']);
+const ADMIN_RUNTIME_URL = RUNTIME_CONFIG.adminRuntimeUrl || `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/seiseki-admin-runtime-v1`;
+const SEISEKI_ADMIN_SUPABASE = true; // 緊急時は false にすると成績関連だけ旧GASへ戻る
+const SEISEKI_ADMIN_CUTOVER_VERSION = '2026-09-02-v1';
+if (SEISEKI_ADMIN_SUPABASE && localStorage.getItem('seisekiAdminCutoverVersion') !== SEISEKI_ADMIN_CUTOVER_VERSION) {
+  localStorage.setItem('seisekiDataSource', 'supabase');
+  localStorage.setItem('seisekiAdminCutoverVersion', SEISEKI_ADMIN_CUTOVER_VERSION);
+}
+let DATA_SOURCE = localStorage.getItem('seisekiDataSource') || (ADMIN_RUNTIME_URL ? 'supabase' : 'legacy-gas');
+const SUPABASE_ENABLED_ACTIONS = new Set([
+  'getStudents', 'getStudentList', 'getAllScores', 'getStudentScores', 'saveScore', 'deleteScore',
+  'getAllReports', 'getReports', 'saveReport', 'deleteReport', 'getAllWishes', 'getWish', 'saveWish',
+  'saveWishResult', 'getSchools', 'addSchool', 'updateSchool', 'deleteSchool'
+]);
+const SUPABASE_WRITE_ACTIONS = new Set(['saveScore','deleteScore','saveReport','deleteReport','saveWish','saveWishResult','addSchool','updateSchool','deleteSchool']);
+const ADMIN_SESSION_TOKEN_KEY = 'seisekiAdminCommonSessionToken';
+const ADMIN_SESSION_EXPIRES_KEY = 'seisekiAdminCommonSessionExpiresAt';
 let schools = [];
 let students = [];
 let allScores = [];
@@ -1167,20 +1179,14 @@ function initGradeSelects() {
 
 // ===== API =====
 function hasSupabaseConfig() {
-  return /^https:\/\/.+\.supabase\.co$/.test(SUPABASE_URL) && !!SUPABASE_ANON_KEY;
+  return /^https:\/\/.+\.supabase\.co\/functions\/v1\/seiseki-admin-runtime-v1$/.test(ADMIN_RUNTIME_URL);
 }
 
-function getSupabaseSession() {
-  try {
-    const raw = sessionStorage.getItem('seisekiSupabaseSession');
-    if (!raw) return null;
-    const session = JSON.parse(raw);
-    if (!session.access_token || !session.expires_at) return null;
-    if (Date.now() > Number(session.expires_at) * 1000 - 60000) return null;
-    return session;
-  } catch(e) {
-    return null;
-  }
+function readAdminCommonSession() {
+  const store = adminDeviceMode === 'personal' ? localStorage : sessionStorage;
+  const token = store.getItem(ADMIN_SESSION_TOKEN_KEY) || '';
+  const expiresAt = store.getItem(ADMIN_SESSION_EXPIRES_KEY) || '';
+  return token && (!expiresAt || new Date(expiresAt).getTime() > Date.now()) ? { token, expiresAt } : null;
 }
 
 function clearSensitiveCache() {
@@ -1210,52 +1216,11 @@ function setDataSource(source) {
   if (source !== 'supabase') clearSensitiveCache();
 }
 
-function supabaseHeaders(extra) {
-  const session = getSupabaseSession();
-  return Object.assign({
-    apikey: SUPABASE_ANON_KEY,
-    Authorization: 'Bearer ' + (session?.access_token || SUPABASE_ANON_KEY),
-    'Content-Type': 'application/json',
-    Prefer: 'return=representation'
-  }, extra || {});
-}
-
-async function supabaseSignIn(email, password) {
-  const url = SUPABASE_URL.replace(/\/$/, '') + '/auth/v1/token?grant_type=password';
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ email, password })
-  });
-  const json = await r.json().catch(() => ({}));
-  if (!r.ok || !json.access_token) throw new Error('Supabase認証に失敗しました');
-  sessionStorage.setItem('seisekiSupabaseSession', JSON.stringify({
-    access_token: json.access_token,
-    refresh_token: json.refresh_token || '',
-    expires_at: Math.floor(Date.now() / 1000) + Number(json.expires_in || 3600),
-    user_id: json.user?.id || '',
-    email: json.user?.email || email
-  }));
-  return json;
-}
-
 async function supabaseSignOut() {
-  const session = getSupabaseSession();
-  if (session?.access_token && hasSupabaseConfig()) {
-    try {
-      await fetch(SUPABASE_URL.replace(/\/$/, '') + '/auth/v1/logout', {
-        method: 'POST',
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: 'Bearer ' + session.access_token
-        }
-      });
-    } catch(e) { /* logout must still clear local state */ }
-  }
-  sessionStorage.removeItem('seisekiSupabaseSession');
+  localStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+  localStorage.removeItem(ADMIN_SESSION_EXPIRES_KEY);
+  sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+  sessionStorage.removeItem(ADMIN_SESSION_EXPIRES_KEY);
 }
 
 function sbValue(v) {
@@ -1357,16 +1322,9 @@ function studentListPrintName(student) {
 async function ensureEnrollmentIndex(force) {
   if (enrollmentIndexReady && !force) return;
   let rows = [];
-  if (DATA_SOURCE === 'supabase' && hasSupabaseConfig() && getSupabaseSession()) {
-    const sourceRows = await supabaseGet('students', {
-      select: 'student_code,active',
-      order: 'student_code.asc',
-      limit: 1000
-    });
-    rows = sourceRows.map(row => ({
-      id: sbValue(row.student_code),
-      flag: row.active === false ? '0' : '1'
-    }));
+  if (DATA_SOURCE === 'supabase' && hasSupabaseConfig() && readAdminCommonSession()) {
+    const result = await supabaseApi({ action:'getStudents', limit:1000 });
+    rows = result.students || [];
   } else {
     const result = await legacyApi({ action: 'getStudents' });
     rows = result.students || [];
@@ -1491,43 +1449,26 @@ async function legacyApi(data) {
 async function supabaseApi(data) {
   if (!hasSupabaseConfig()) return { success: false, fallback: true, error: 'Supabase設定がありません' };
   if (!SUPABASE_ENABLED_ACTIONS.has(data.action)) {
-    return { success: false, fallback: true, error: 'Phase 2ではSupabase対象外です: ' + data.action };
+    return { success: false, fallback: true, error: '成績データ以外は従来GASを使用します: ' + data.action };
   }
-  if (!getSupabaseSession()) {
+  if (!SEISEKI_ADMIN_SUPABASE) return { success:false, fallback:true, error:'管理者Supabase機能が無効です' };
+  const session = readAdminCommonSession();
+  if (!session) {
     return { success: false, fallback: false, authRequired: true, error: 'Supabaseログインが必要です' };
   }
-  switch (data.action) {
-    case 'getStudents': {
-      const limit = Math.min(Number(data.limit || 50), 50);
-      const offset = Math.max(Number(data.offset || 0), 0);
-      const params = {
-        select: 'id,student_code,name,name_kana,campus,grade,school_name,active',
-        order: 'active.desc,campus.asc,grade.asc,student_code.asc',
-        limit,
-        offset
-      };
-      if (data.activeOnly === true) params.active = 'eq.true';
-      else if (data.withdrawnOnly === true) params.active = 'eq.false';
-      if (data.campus) params.campus = 'eq.' + data.campus;
-      if (Array.isArray(data.grades) && data.grades.length) params.grade = supabaseGradesParam(data.grades);
-      else if (data.grade) params.grade = supabaseGradeParam(data.grade);
-      if (data.q) {
-        const q = String(data.q).replace(/[()*.,]/g, ' ').trim();
-        if (q) params.or = `(name.ilike.*${q}*,student_code.ilike.*${q}*)`;
-      }
-      const rows = await supabaseGet('students', {
-        ...params
-      });
-      return { success: true, students: rows.map(sbStudent), source: 'supabase', hasMore: rows.length === limit, limit, offset };
-    }
-    case 'syncStudents':
-      return await previewSupabaseStudentSync();
-    case 'applySyncResult':
-      return await applySupabaseStudentSync(data);
-    case 'getSyncLog':
-      return { success: true, logs: getSupabaseSyncLogs() };
-    default:
-      return { success: false, fallback: true, error: 'Supabase未対応アクション: ' + data.action };
+  const payload = Object.assign({}, data, { token:session.token });
+  if (SUPABASE_WRITE_ACTIONS.has(data.action)) payload.mutationId = data.mutationId || (crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`);
+  try {
+    const response = await fetch(ADMIN_RUNTIME_URL, {
+      method:'POST', headers:{ 'Content-Type':'text/plain;charset=UTF-8' },
+      body:JSON.stringify(payload), cache:'no-store'
+    });
+    const result = await response.json().catch(() => ({}));
+    if (response.status === 401 || response.status === 403) return { success:false, fallback:false, authRequired:true, error:'認証または権限を確認してください' };
+    if (!response.ok) return { success:false, fallback:!SUPABASE_WRITE_ACTIONS.has(data.action) && response.status >= 500, error:result.error || `Supabase API error (${response.status})` };
+    return result;
+  } catch (error) {
+    return { success:false, fallback:!SUPABASE_WRITE_ACTIONS.has(data.action), error:'Supabaseへ接続できません: ' + error.message };
   }
 }
 
@@ -1761,11 +1702,15 @@ function selectAdminDevice(mode) {
     localStorage.removeItem('adminLoggedIn');
     localStorage.removeItem('adminStaffCode');
     localStorage.removeItem('adminStaffName');
+    localStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+    localStorage.removeItem(ADMIN_SESSION_EXPIRES_KEY);
     sessionStorage.setItem(ADMIN_DEVICE_KEY, 'school');
     document.getElementById('adminCodeIn').value = '';
     document.getElementById('adminPwIn').value = '';
   } else {
     sessionStorage.removeItem(ADMIN_DEVICE_KEY);
+    sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+    sessionStorage.removeItem(ADMIN_SESSION_EXPIRES_KEY);
     localStorage.setItem(ADMIN_DEVICE_KEY, 'personal');
   }
 }
@@ -1835,26 +1780,21 @@ async function doAdminLogin() {
     adminLoginInProgress = false;
     return;
   }
-  if (DATA_SOURCE === 'supabase' && hasSupabaseConfig()) {
-    const email = (document.getElementById('adminEmailIn')?.value || DEFAULT_SUPABASE_AUTH_EMAIL).trim();
-    if (!email || !pw) {
-      errEl.textContent = '講師コードとパスワードを入力してください';
+  if (DATA_SOURCE === 'supabase') {
+    if (!['2','3','4'].includes(String(staff.permissionLevel || '')) || !staff.systemPortalSessionToken) {
+      errEl.textContent = '成績管理を利用する管理者権限がありません';
       adminLoginInProgress = false;
       return;
     }
-    try {
-      await supabaseSignIn(email, pw);
-    } catch(e) {
-      setDataSource('legacy-gas');
-      clearSensitiveCache();
-      toast('Supabase Authに入れなかったため、従来GASで開きます');
-    }
+    const store = adminDeviceMode === 'personal' ? localStorage : sessionStorage;
+    store.setItem(ADMIN_SESSION_TOKEN_KEY, staff.systemPortalSessionToken);
+    store.setItem(ADMIN_SESSION_EXPIRES_KEY, staff.systemPortalExpiresAt || '');
   }
   setAdminState('adminLoggedIn', '1');
   setAdminState('adminStaffCode', staff.code || code);
   setAdminState('adminStaffName', staff.name || '');
   if (adminDeviceMode === 'personal') {
-    rememberAdminLogin(code, pw, DATA_SOURCE === 'supabase' ? DEFAULT_SUPABASE_AUTH_EMAIL : '');
+    rememberAdminLogin(code, pw, '');
   } else {
     sessionStorage.setItem(ADMIN_IDLE_AT_KEY, String(Date.now()));
   }
@@ -1873,7 +1813,7 @@ function restoreAdminLoginInputs() {
   const emailEl = document.getElementById('adminEmailIn');
   if (codeEl) codeEl.value = adminDeviceMode === 'personal' ? (localStorage.getItem('adminCodeInput') || '') : '';
   if (pwEl) pwEl.value = adminDeviceMode === 'personal' ? (localStorage.getItem('adminPwInput') || '') : '';
-  if (emailEl) emailEl.value = localStorage.getItem('adminEmailInput') || DEFAULT_SUPABASE_AUTH_EMAIL;
+  if (emailEl) emailEl.closest('label,div')?.classList.add('hidden');
 }
 function updateAdminLabel() {
   const label = document.getElementById('adminLabel');
@@ -2856,7 +2796,7 @@ async function loadStudentsFromSupabase(append) {
     await loadStudents();
     return;
   }
-  if (!getSupabaseSession()) {
+  if (!readAdminCommonSession()) {
     setStudentSourceStatus('Supabaseログインが必要です。再ログインしてください。', true);
     if (legacyBtn) legacyBtn.style.display = '';
     if (box) box.innerHTML = '<div class="noData">ログイン後に表示します</div>';
