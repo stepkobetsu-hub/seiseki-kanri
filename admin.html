@@ -1411,6 +1411,8 @@ async function ensureEnrollmentIndex(force) {
     const flag = normalizedEnrollmentFlag(student);
     if (id) enrollmentByStudentId.set(id, flag);
   });
+  // 面談画面の生徒選択にも同じ全件データを再利用し、二重取得と競合を防ぐ
+  if (!students.length) students = rows;
   enrollmentIndexReady = true;
 }
 
@@ -4907,14 +4909,11 @@ async function initMeetings() {
   const dateEl = document.getElementById('meetDate');
   if (dateEl && !dateEl.value) dateEl.value = todayStr();
 
-  // 生徒・担当者・面談一覧を同時に取得し、遅い通信の待ち時間を重ねない
-  const studentTask = students.length
-    ? Promise.resolve()
-    : api({ action: 'getStudents' }).then(sr => { students = sr.students || []; });
+  // 先に在籍情報を1回だけ確定し、その後で担当者と面談一覧を安全に同時取得する
+  await ensureEnrollmentIndex();
   await Promise.all([
-    studentTask,
     loadStaffMembers(),
-    loadMeetingMemos()
+    loadMeetingMemos({ enrollmentReady: true })
   ]);
 
   populateMeetingStudents();
@@ -5250,7 +5249,7 @@ function sortMeetingMemosNewest(list) {
   );
 }
 
-async function loadMeetingMemos() {
+async function loadMeetingMemos(options) {
   const requestId = ++meetingLoadRequestId;
   const body = document.getElementById('meetBody');
   if (body && !meetingMemos.length) {
@@ -5263,16 +5262,14 @@ async function loadMeetingMemos() {
   }
 
   try {
-    // 在籍情報と面談一覧は互いに独立しているため、同時に取得する
-    const [r] = await Promise.all([
-      api({
-        action: 'getMeetingMemos',
-        q: document.getElementById('meetSearch')?.value || '',
-        staff: document.getElementById('meetFilterStaff')?.value || '',
-        counterpart: document.getElementById('meetFilterCounterpart')?.value || ''
-      }),
-      ensureEnrollmentIndex()
-    ]);
+    // 在籍情報の準備完了後に面談一覧を取得し、初期化時の競合を防ぐ
+    if (!options?.enrollmentReady) await ensureEnrollmentIndex();
+    const r = await api({
+      action: 'getMeetingMemos',
+      q: document.getElementById('meetSearch')?.value || '',
+      staff: document.getElementById('meetFilterStaff')?.value || '',
+      counterpart: document.getElementById('meetFilterCounterpart')?.value || ''
+    });
     if (requestId !== meetingLoadRequestId) return;
     if (!r.success) throw new Error(r.error || '面談メモを取得できませんでした');
 
