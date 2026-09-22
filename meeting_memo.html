@@ -923,7 +923,13 @@ async function init(){
     ]);
     if (!sr.success) throw new Error(sr.error || '生徒一覧を読み込めませんでした');
     if (!fr.success) throw new Error(fr.error || '担当者一覧を読み込めませんでした');
-    students = mergeSearchKana_(sr.students || [], localSearchStudents);
+    const selectableStudents = (sr.students || []).filter(student => {
+      const status = String(student.enrollmentStatus || '').trim().toLowerCase();
+      if (status) return status === 'active' || status === 'withdrawal_scheduled';
+      const flag = String(student.enrollmentFlag ?? student.flag ?? '').trim();
+      return student.active === true || flag === '1' || flag === '0';
+    });
+    students = mergeSearchKana_(selectableStudents, localSearchStudents);
     staffMembers = fr.staff || [];
     updateNameDatalist();
     renderStudents();
