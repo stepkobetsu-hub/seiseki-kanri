@@ -1908,6 +1908,21 @@ async function doAdminLogin() {
   } else {
     sessionStorage.setItem(ADMIN_IDLE_AT_KEY, String(Date.now()));
   }
+
+  // 旧GAS固定期間の更新を、端末ごとの初回ログイン時に一度だけ取り込む。
+  const cutoverKey = 'seisekiSupabaseCutoverReconciledV1';
+  if (localStorage.getItem(cutoverKey) !== '1') {
+    errEl.textContent = '初回のみ、最新データをSupabaseへ移行しています...';
+    const reconciled = await adminSupabaseApi({ action: 'reconcileLegacy' });
+    if (reconciled.success) {
+      localStorage.setItem(cutoverKey, '1');
+      enrollmentIndexReady = false;
+      clearSensitiveCache();
+    } else {
+      console.warn('初回データ移行を完了できませんでした', reconciled.error);
+    }
+  }
+
   errEl.textContent = '';
   adminLoginInProgress = false;
   showMain();
@@ -2880,7 +2895,7 @@ function studentFilterParams() {
 }
 
 async function loadStudents(opts) {
-  setStudentSourceStatus('取得元: 生徒マスタ', false);
+  setStudentSourceStatus('取得元: Supabase', false);
   document.getElementById('stuLegacyBtn').style.display = 'none';
   document.getElementById('stuPager').style.display = 'none';
   const r = await api({ action: 'getStudentList' });
