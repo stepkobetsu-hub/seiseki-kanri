@@ -238,7 +238,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="event.stopPropagation();navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v7.0</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v7.1 · Supabase</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -1063,12 +1063,23 @@ const RUNTIME_CONFIG = window.SEISEKI_CONFIG || {};
 const SUPABASE_URL = RUNTIME_CONFIG.supabaseUrl || localStorage.getItem('seisekiSupabaseUrl') || '';
 const SUPABASE_ANON_KEY = RUNTIME_CONFIG.supabaseAnonKey || localStorage.getItem('seisekiSupabaseAnonKey') || '';
 const DEFAULT_SUPABASE_AUTH_EMAIL = RUNTIME_CONFIG.supabaseAdminEmail || localStorage.getItem('seisekiSupabaseAdminEmail') || 'stepkobetsu@gmail.com';
-// 緊急安定運用: 停止中のSupabaseへの接続待ちを避け、GASを直接使用する
-let DATA_SOURCE = 'legacy-gas';
-if (localStorage.getItem('seisekiDataSource') !== 'legacy-gas') {
-  localStorage.setItem('seisekiDataSource', 'legacy-gas');
-}
-const SUPABASE_ENABLED_ACTIONS = new Set(['getStudents', 'syncStudents', 'applySyncResult', 'getSyncLog']);
+// 成績データの正本は本番Supabase。管理権限は共通スタッフセッションで検証する。
+const SEISEKI_ADMIN_RUNTIME_URL = 'https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
+const ADMIN_SESSION_TOKEN_KEY = 'adminSystemPortalSessionToken';
+const ADMIN_SESSION_EXPIRES_KEY = 'adminSystemPortalExpiresAt';
+const SUPABASE_ENABLED_ACTIONS = new Set([
+  'getStudents', 'getStudentList',
+  'getAllScores', 'getStudentScores', 'saveScore', 'deleteScore',
+  'getAllReports', 'getReports', 'saveReport', 'deleteReport',
+  'getAllWishes', 'getWish', 'saveWish', 'saveWishResult',
+  'getSchools', 'addSchool', 'updateSchool', 'deleteSchool'
+]);
+const SUPABASE_WRITE_ACTIONS = new Set([
+  'saveScore', 'deleteScore', 'saveReport', 'deleteReport',
+  'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool'
+]);
+let DATA_SOURCE = 'supabase-admin-edge';
+localStorage.setItem('seisekiDataSource', DATA_SOURCE);
 let schools = [];
 let students = [];
 let allScores = [];
@@ -1363,21 +1374,9 @@ function studentListPrintName(student) {
 
 async function ensureEnrollmentIndex(force) {
   if (enrollmentIndexReady && !force) return;
-  let rows = [];
-  if (DATA_SOURCE === 'supabase' && hasSupabaseConfig() && getSupabaseSession()) {
-    const sourceRows = await supabaseGet('students', {
-      select: 'student_code,active',
-      order: 'student_code.asc',
-      limit: 1000
-    });
-    rows = sourceRows.map(row => ({
-      id: sbValue(row.student_code),
-      flag: row.active === false ? '0' : '1'
-    }));
-  } else {
-    const result = await legacyApi({ action: 'getStudents' });
-    rows = result.students || [];
-  }
+  const result = await api({ action: 'getStudents', limit: 1000 });
+  if (!result.success) throw new Error(result.error || '在籍情報を取得できませんでした');
+  const rows = result.students || [];
   enrollmentByStudentId = new Map();
   rows.forEach(student => {
     const id = String(student.id ?? student.studentId ?? student.student_code ?? '').trim();
@@ -1725,19 +1724,71 @@ function supabaseGradeParam(grade) {
   return 'in.(' + values.join(',') + ')';
 }
 
+function newAdminMutationId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return 'admin-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+}
+
+function getAdminSessionToken() {
+  return getAdminState(ADMIN_SESSION_TOKEN_KEY) || '';
+}
+
+function hasValidAdminSessionToken() {
+  const token = getAdminSessionToken();
+  if (!token) return false;
+  const expiresAt = getAdminState(ADMIN_SESSION_EXPIRES_KEY);
+  return !expiresAt || !Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) > Date.now() + 30000;
+}
+
+async function adminSupabaseApi(data) {
+  const token = getAdminSessionToken();
+  if (!token) {
+    return { success: false, authRequired: true, code: 'AUTH_REQUIRED', error: '管理者セッションがありません。再ログインしてください。' };
+  }
+  const payload = { ...data, token };
+  if (SUPABASE_WRITE_ACTIONS.has(data.action) && !payload.mutationId) {
+    payload.mutationId = newAdminMutationId();
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(SEISEKI_ADMIN_RUNTIME_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+      signal: controller.signal
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.success !== true) {
+      const authRequired = response.status === 401 || response.status === 403 || result.code === 'AUTH_REQUIRED';
+      return {
+        success: false,
+        authRequired,
+        code: result.code || 'SUPABASE_ERROR',
+        error: authRequired ? 'ログインの有効期限が切れました。再ログインしてください。' : (result.error || 'Supabaseから取得できませんでした。')
+      };
+    }
+    return result;
+  } catch (e) {
+    return {
+      success: false,
+      error: e.name === 'AbortError' ? 'Supabaseへの接続がタイムアウトしました。' : e.message
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function api(data) {
   try {
-    if (DATA_SOURCE === 'supabase') {
-      const sr = await supabaseApi(data);
-      if (sr.success || !sr.fallback) return sr;
+    if (SUPABASE_ENABLED_ACTIONS.has(data.action)) {
+      return await adminSupabaseApi(data);
     }
-    const r = await fetch(GAS, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(data)
-    });
-    return await r.json();
-  } catch(e) { return { success: false, error: e.message }; }
+    return await legacyApi(data);
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
 }
 
 // ===== LOGIN =====
@@ -1836,32 +1887,24 @@ async function doAdminLogin() {
     return;
   }
   adminLoginInProgress = true;
-  const staff = await api({ action: 'staffLogin', code, password: pw });
+  const staff = await legacyApi({ action: 'staffLogin', code, password: pw });
   if (!staff.success) {
     errEl.textContent = staff.error || 'ログインできませんでした';
     adminLoginInProgress = false;
     return;
   }
-  if (DATA_SOURCE === 'supabase' && hasSupabaseConfig()) {
-    const email = (document.getElementById('adminEmailIn')?.value || DEFAULT_SUPABASE_AUTH_EMAIL).trim();
-    if (!email || !pw) {
-      errEl.textContent = '講師コードとパスワードを入力してください';
-      adminLoginInProgress = false;
-      return;
-    }
-    try {
-      await supabaseSignIn(email, pw);
-    } catch(e) {
-      setDataSource('legacy-gas');
-      clearSensitiveCache();
-      toast('Supabase Authに入れなかったため、従来GASで開きます');
-    }
+  if (!staff.systemPortalSessionToken) {
+    errEl.textContent = 'この管理画面には管理権限（権限2〜4）が必要です。';
+    adminLoginInProgress = false;
+    return;
   }
   setAdminState('adminLoggedIn', '1');
   setAdminState('adminStaffCode', staff.code || code);
   setAdminState('adminStaffName', staff.name || '');
+  setAdminState(ADMIN_SESSION_TOKEN_KEY, staff.systemPortalSessionToken);
+  setAdminState(ADMIN_SESSION_EXPIRES_KEY, staff.systemPortalExpiresAt || '');
   if (adminDeviceMode === 'personal') {
-    rememberAdminLogin(code, pw, DATA_SOURCE === 'supabase' ? DEFAULT_SUPABASE_AUTH_EMAIL : '');
+    rememberAdminLogin(code, pw, '');
   } else {
     sessionStorage.setItem(ADMIN_IDLE_AT_KEY, String(Date.now()));
   }
@@ -1914,8 +1957,12 @@ function showMain() {
 }
 async function logout(options = {}) {
   clearAdminIdleTimer();
-  await supabaseSignOut();
+  sessionStorage.removeItem('seisekiSupabaseSession');
   clearSensitiveCache();
+  sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+  sessionStorage.removeItem(ADMIN_SESSION_EXPIRES_KEY);
+  localStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+  localStorage.removeItem(ADMIN_SESSION_EXPIRES_KEY);
   sessionStorage.removeItem('adminLoggedIn');
   sessionStorage.removeItem('adminStaffCode');
   sessionStorage.removeItem('adminStaffName');
@@ -1949,6 +1996,11 @@ async function logout(options = {}) {
     const lastActivity = Number(sessionStorage.getItem(ADMIN_IDLE_AT_KEY)) || 0;
     if (lastActivity && Date.now() - lastActivity >= ADMIN_IDLE_LIMIT_MS) {
       await logout({ automatic:true });
+      return;
+    }
+    if (!hasValidAdminSessionToken()) {
+      sessionStorage.removeItem('adminLoggedIn');
+      document.getElementById('loginErr').textContent = 'Supabase移行後の初回のみ、もう一度ログインしてください。';
       return;
     }
     showMain();
@@ -2793,8 +2845,7 @@ function _renderStuGradeButtons() {
 function _applyStuGradeChange() {
   _renderStuGradeButtons();
   _stuSchoolExclude.clear();
-  if (DATA_SOURCE === 'supabase') onStudentFilterChange();
-  else buildSchoolDropdown();
+  onStudentFilterChange();
 }
 
 function toggleStuGrade(grade) {
@@ -2857,16 +2908,10 @@ async function loadStudentsFromSupabase(append) {
     if (pager) pager.style.display = 'none';
     return;
   }
-  if (!hasSupabaseConfig()) {
-    setStudentSourceStatus('Supabase設定がないため、従来GASで開きます。', false);
-    setDataSource('legacy-gas');
-    await loadStudents();
-    return;
-  }
-  if (!getSupabaseSession()) {
-    setStudentSourceStatus('Supabaseログインが必要です。再ログインしてください。', true);
-    if (legacyBtn) legacyBtn.style.display = '';
-    if (box) box.innerHTML = '<div class="noData">ログイン後に表示します</div>';
+  if (!hasValidAdminSessionToken()) {
+    setStudentSourceStatus('管理者セッションの有効期限が切れました。再ログインしてください。', true);
+    if (legacyBtn) legacyBtn.style.display = 'none';
+    if (box) box.innerHTML = '<div class="noData">再ログイン後に表示します</div>';
     return;
   }
   const params = studentFilterParams();
@@ -2879,8 +2924,8 @@ async function loadStudentsFromSupabase(append) {
   });
   const ms = Math.round(performance.now() - started);
   if (!r.success) {
-    setStudentSourceStatus('Supabaseから取得できませんでした。再試行するか従来方式で開いてください。', true);
-    if (legacyBtn) legacyBtn.style.display = '';
+    setStudentSourceStatus(r.error || 'Supabaseから取得できませんでした。', true);
+    if (legacyBtn) legacyBtn.style.display = 'none';
     if (box) box.innerHTML = '<div class="noData"><button class="btn btn-outline btn-sm" onclick="loadStudents()">再試行</button></div>';
     return;
   }
@@ -2909,8 +2954,7 @@ function onStudentEnrollmentChange() {
 }
 
 function openStudentsWithLegacy() {
-  setDataSource('legacy-gas');
-  setStudentSourceStatus('従来GASで開いています。', false);
+  setStudentSourceStatus('成績データはSupabaseへ移行済みです。再読込します。', false);
   loadStudents();
 }
 function printStudentList() {
@@ -4764,7 +4808,7 @@ async function applySync() {
   if (r.success) {
     toast(`✅ 同期完了（${r.applied}件）`);
     pendingSync = null;
-    if (DATA_SOURCE === 'supabase') loadStudents();
+    loadStudents();
   } else toast('❌ ' + r.error);
 }
 async function loadSyncLog() {
