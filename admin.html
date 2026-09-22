@@ -245,7 +245,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="event.stopPropagation();navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v7.2 · Supabase</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v7.3 · Supabase</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -1937,27 +1937,13 @@ async function doAdminLogin() {
     sessionStorage.setItem(ADMIN_IDLE_AT_KEY, String(Date.now()));
   }
 
-  // 旧GAS固定期間の更新を、端末ごとの初回ログイン時に一度だけ取り込む。
-  const cutoverKey = 'seisekiSupabaseCutoverReconciledV2';
-  if (localStorage.getItem(cutoverKey) !== '1') {
-    errEl.textContent = '初回のみ、最新データをSupabaseへ移行しています...';
-    const reconciled = await adminSupabaseApi({ action: 'reconcileLegacy' });
-    if (reconciled.success) {
-      localStorage.setItem(cutoverKey, '1');
-      enrollmentIndexReady = false;
-      clearSensitiveCache();
-    } else {
-      console.warn('初回データ移行を完了できませんでした', reconciled.error);
-    }
-  }
-
   errEl.textContent = '';
   adminLoginInProgress = false;
   showMain();
 }
 function rememberAdminLogin(code, password, email) {
   localStorage.setItem('adminCodeInput', code || '');
-  localStorage.setItem('adminPwInput', password || '');
+  localStorage.removeItem('adminPwInput');
   if (email) localStorage.setItem('adminEmailInput', email);
 }
 function restoreAdminLoginInputs() {
@@ -1976,6 +1962,32 @@ function updateAdminLabel() {
   label.textContent = name ? `${name}（${code}）` : '管理者';
   label.style.fontSize = '.78rem';
 }
+
+let adminReconcileInProgress = false;
+function reconcileAdminDataInBackground() {
+  const cutoverKey = 'seisekiSupabaseCutoverReconciledV2';
+  if (adminReconcileInProgress || localStorage.getItem(cutoverKey) === '1' || !hasValidAdminSessionToken()) return;
+  adminReconcileInProgress = true;
+  setTimeout(async () => {
+    try {
+      const reconciled = await adminSupabaseApi({ action: 'reconcileLegacy' });
+      if (!reconciled.success) {
+        console.warn('在籍区分の再照合を完了できませんでした', reconciled.error);
+        return;
+      }
+      localStorage.setItem(cutoverKey, '1');
+      enrollmentIndexReady = false;
+      clearSensitiveCache();
+      if (getAdminState('adminLoggedIn') === '1') {
+        reloadData();
+        toast('在籍区分を最新状態に更新しました');
+      }
+    } finally {
+      adminReconcileInProgress = false;
+    }
+  }, 0);
+}
+
 function showMain() {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('mainHeader').style.display = 'flex';
@@ -1997,9 +2009,19 @@ function showMain() {
     loadSpeed();
   }
   scheduleAdminIdleLogout();
+  reconcileAdminDataInBackground();
 }
 async function logout(options = {}) {
   clearAdminIdleTimer();
+  const token = getAdminSessionToken();
+  if (token) {
+    try {
+      await Promise.race([
+        adminSupabaseApi({ action: 'logoutAdmin' }),
+        new Promise(resolve => setTimeout(resolve, 3000))
+      ]);
+    } catch(e) { /* local logout must always continue */ }
+  }
   sessionStorage.removeItem('seisekiSupabaseSession');
   clearSensitiveCache();
   sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
@@ -2046,24 +2068,23 @@ async function logout(options = {}) {
       document.getElementById('loginErr').textContent = 'Supabase移行後の初回のみ、もう一度ログインしてください。';
       return;
     }
-    const cutoverKey = 'seisekiSupabaseCutoverReconciledV2';
-    if (localStorage.getItem(cutoverKey) !== '1') {
-      const reconciled = await adminSupabaseApi({ action: 'reconcileLegacy' });
-      if (reconciled.success) {
-        localStorage.setItem(cutoverKey, '1');
-        enrollmentIndexReady = false;
-        clearSensitiveCache();
-      } else {
-        console.warn('在籍区分の再照合を完了できませんでした', reconciled.error);
-      }
-    }
     showMain();
     return;
   }
   if (adminDeviceMode === 'personal' && localStorage.getItem('adminLoggedIn') === '1') {
+    if (hasValidAdminSessionToken()) {
+      localStorage.removeItem('adminPwInput');
+      showMain();
+      return;
+    }
     const code = localStorage.getItem('adminCodeInput') || '';
     const password = localStorage.getItem('adminPwInput') || '';
-    if (code && password) await doAdminLogin();
+    if (code && password) {
+      await doAdminLogin();
+    } else {
+      localStorage.removeItem('adminLoggedIn');
+      document.getElementById('loginErr').textContent = 'この端末では初回のみ、もう一度ログインしてください。';
+    }
   }
 })();
 
