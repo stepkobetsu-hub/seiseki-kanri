@@ -20,6 +20,7 @@ create table if not exists public.students (
   grade text,
   school_name text,
   active boolean not null default true,
+  enrollment_status text not null default 'active' check (enrollment_status in ('active', 'withdrawal_scheduled', 'withdrawn')),
   enrollment_date date,
   withdrawal_date date,
   source_row integer,
