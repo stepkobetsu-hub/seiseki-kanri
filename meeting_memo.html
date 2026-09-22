@@ -290,13 +290,66 @@ select.invalid,input.invalid{
   .memoBtns{margin-top:10px}
   .memoBtns button{flex:0 0 auto}
 }
+
+/* LOGIN */
+body.auth-locked > header,
+body.auth-locked > main,
+body.auth-locked > #trashModal,
+body.auth-locked > #toast{display:none!important}
+.loginGate{
+  position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;
+  padding:20px;background:linear-gradient(145deg,#eaf2fa,#f8fbff);
+}
+.loginCard{
+  width:min(92vw,420px);background:#fff;border:1px solid #d6e2ef;border-radius:18px;
+  padding:28px;box-shadow:0 18px 50px rgba(31,52,78,.16);
+}
+.loginMark{font-size:2rem;text-align:center;margin-bottom:8px}
+.loginTitle{text-align:center;font-size:1.28rem;font-weight:900;margin-bottom:6px}
+.loginHelp{text-align:center;color:#64748b;font-size:.84rem;line-height:1.6;margin-bottom:20px}
+.loginField{margin-bottom:13px}
+.loginField label{font-size:.84rem;color:#44576d}
+.loginButton{width:100%;background:#155aa5;color:#fff;border-color:#155aa5;font-size:1rem;margin-top:5px}
+.loginError{min-height:1.4em;color:#dc2626;font-size:.84rem;line-height:1.5;margin-top:12px;text-align:center}
+.headActions{display:flex;align-items:center;gap:8px}
+.sessionStaff{font-size:.78rem;color:#52667c;font-weight:800}
+.logoutButton{padding:8px 10px;background:#fff;color:#b42318;border:1px solid #f0b8b3;font-size:.8rem}
+@media(max-width:600px){
+  .loginCard{padding:22px 18px}
+  .sessionStaff{display:none}
+  .headActions{gap:5px}
+  .logoutButton,.home{padding:7px 8px;font-size:.75rem}
+}
 </style>
 </head>
-<body>
+<body class="auth-locked">
+
+<div id="loginGate" class="loginGate">
+  <form class="loginCard" onsubmit="meetingLogin(event)">
+    <div class="loginMark">📝</div>
+    <div class="loginTitle">面談メモ ログイン</div>
+    <div class="loginHelp">管理画面と同じ講師コード・パスワードを入力してください。<br>一度ログインすると、ログアウトするまでこの端末でログイン状態を保ちます。</div>
+    <div class="loginField">
+      <label for="meetingLoginCode">講師コード</label>
+      <input id="meetingLoginCode" inputmode="numeric" autocomplete="username" placeholder="講師コード">
+    </div>
+    <div class="loginField">
+      <label for="meetingLoginPassword">パスワード</label>
+      <input id="meetingLoginPassword" type="password" autocomplete="current-password" placeholder="パスワード">
+    </div>
+    <button id="meetingLoginButton" class="loginButton" type="submit">ログイン</button>
+    <div id="meetingLoginError" class="loginError" role="alert"></div>
+  </form>
+</div>
+
 <header>
   <div class="head">
     <h1>面談メモ</h1>
-    <a class="home" href="index.html">トップへ</a>
+    <div class="headActions">
+      <span id="meetingSessionStaff" class="sessionStaff"></span>
+      <button class="logoutButton" type="button" onclick="meetingLogout()">ログアウト</button>
+      <a class="home" href="index.html">トップへ</a>
+    </div>
   </div>
 </header>
 
@@ -427,7 +480,8 @@ const STUDENT_SEARCH_GAS = 'https://script.google.com/macros/s/AKfycbxIH2VtgwRi5
 const SEISEKI_ADMIN_RUNTIME_URL = 'https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
 const SUPABASE_MEETING_ACTIONS = new Set([
   'getStudents', 'getStudentList', 'getMeetingMemos', 'saveMeetingMemo',
-  'deleteMeetingMemo', 'getStaffMembers', 'addStaffMember', 'deleteStaffMember'
+  'deleteMeetingMemo', 'getStaffMembers', 'addStaffMember', 'deleteStaffMember',
+  'persistAdminSession', 'logoutAdmin'
 ]);
 const SUPABASE_MEETING_WRITES = new Set([
   'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember'
@@ -576,12 +630,128 @@ async function meetingSupabaseApi_(data){
     clearTimeout(timeout);
   }
 }
-async function api(data){
-  if (SUPABASE_MEETING_ACTIONS.has(data.action) && meetingAdminToken_()) {
-    return meetingSupabaseApi_(data);
-  }
-  const res = await fetch(GAS, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(data) });
+async function meetingLegacyApi_(data){
+  const res = await fetch(GAS, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=UTF-8'},
+    body:JSON.stringify(data),
+    cache:'no-store'
+  });
   return await res.json();
+}
+async function api(data){
+  if (SUPABASE_MEETING_ACTIONS.has(data.action)) return meetingSupabaseApi_(data);
+  return meetingLegacyApi_(data);
+}
+
+let meetingAppInitialized_ = false;
+function storeMeetingSession_(staff, fallbackCode){
+  const token = String(staff.systemPortalSessionToken || '').trim();
+  localStorage.setItem('adminSystemPortalSessionToken', token);
+  localStorage.setItem('adminSystemPortalExpiresAt', '2100-01-01T00:00:00.000Z');
+  localStorage.setItem('adminLoggedIn', '1');
+  localStorage.setItem('adminDeviceMode', 'personal');
+  localStorage.setItem('adminStaffCode', String(staff.code || fallbackCode || ''));
+  localStorage.setItem('adminStaffName', String(staff.name || ''));
+  localStorage.setItem('adminCodeInput', String(staff.code || fallbackCode || ''));
+  sessionStorage.removeItem('adminSystemPortalSessionToken');
+  sessionStorage.removeItem('adminSystemPortalExpiresAt');
+}
+function clearMeetingSession_(){
+  [
+    'adminSystemPortalSessionToken','adminSystemPortalExpiresAt','adminLoggedIn',
+    'adminStaffCode','adminStaffName','adminDeviceMode','adminCodeInput','adminPwInput'
+  ].forEach(key => localStorage.removeItem(key));
+  ['adminSystemPortalSessionToken','adminSystemPortalExpiresAt','adminLoggedIn','adminStaffCode','adminStaffName','adminDeviceMode']
+    .forEach(key => sessionStorage.removeItem(key));
+}
+async function showMeetingApp_(){
+  document.body.classList.remove('auth-locked');
+  $('loginGate').style.display = 'none';
+  const name = localStorage.getItem('adminStaffName') || sessionStorage.getItem('adminStaffName') || '';
+  const code = localStorage.getItem('adminStaffCode') || sessionStorage.getItem('adminStaffCode') || '';
+  $('meetingSessionStaff').textContent = name ? name + (code ? '（' + code + '）' : '') : (code || '');
+  if (!meetingAppInitialized_) {
+    meetingAppInitialized_ = true;
+    await init();
+  } else {
+    await loadMemos();
+  }
+}
+function showMeetingLogin_(message=''){
+  document.body.classList.add('auth-locked');
+  $('loginGate').style.display = 'flex';
+  $('meetingLoginError').textContent = message;
+  const savedCode = localStorage.getItem('adminCodeInput') || '';
+  if (savedCode) $('meetingLoginCode').value = savedCode;
+}
+async function meetingLogin(event){
+  event?.preventDefault();
+  const code = $('meetingLoginCode').value.trim();
+  const password = $('meetingLoginPassword').value;
+  const button = $('meetingLoginButton');
+  const error = $('meetingLoginError');
+  if (!code || !password) {
+    error.textContent = '講師コードとパスワードを入力してください。';
+    return;
+  }
+  button.disabled = true;
+  button.textContent = 'ログイン中...';
+  error.textContent = '';
+  try {
+    const staff = await meetingLegacyApi_({ action:'staffLogin', code, password });
+    if (!staff.success) throw new Error(staff.error || 'ログインできませんでした。');
+    if (!staff.systemPortalSessionToken) {
+      throw new Error('面談メモを利用できる管理権限がありません。');
+    }
+    storeMeetingSession_(staff, code);
+    await meetingSupabaseApi_({ action:'persistAdminSession' });
+    $('meetingLoginPassword').value = '';
+    await showMeetingApp_();
+  } catch(e) {
+    clearMeetingSession_();
+    error.textContent = e.message || 'ログインできませんでした。';
+  } finally {
+    button.disabled = false;
+    button.textContent = 'ログイン';
+  }
+}
+async function meetingLogout(){
+  const token = meetingAdminToken_();
+  if (token) {
+    try {
+      await Promise.race([
+        meetingSupabaseApi_({ action:'logoutAdmin' }),
+        new Promise(resolve => setTimeout(resolve, 3000))
+      ]);
+    } catch(e) {}
+  }
+  clearMeetingSession_();
+  students = [];
+  staffMembers = [];
+  allMemos = [];
+  memos = [];
+  showMeetingLogin_('ログアウトしました。');
+}
+async function bootMeetingApp_(){
+  const sessionToken = meetingAdminToken_();
+  if (!sessionToken) {
+    showMeetingLogin_();
+    return;
+  }
+  if (!localStorage.getItem('adminSystemPortalSessionToken')) {
+    localStorage.setItem('adminSystemPortalSessionToken', sessionToken);
+    localStorage.setItem('adminSystemPortalExpiresAt', '2100-01-01T00:00:00.000Z');
+    localStorage.setItem('adminLoggedIn', '1');
+    localStorage.setItem('adminDeviceMode', 'personal');
+  }
+  try {
+    await meetingSupabaseApi_({ action:'persistAdminSession' });
+    await showMeetingApp_();
+  } catch(e) {
+    clearMeetingSession_();
+    showMeetingLogin_('ログインしてください。');
+  }
 }
 
 
@@ -1108,7 +1278,7 @@ function closeTrash(){
   $('trashModal').style.display = 'none';
 }
 
-init();
+bootMeetingApp_();
 </script>
 </body>
 </html>
