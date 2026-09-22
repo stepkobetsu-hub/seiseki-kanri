@@ -245,7 +245,7 @@ tr:hover td{background:#f8fafc}
     <button id="navFwdBtn"   onclick="event.stopPropagation();navForward()" title="進む" style="padding:3px 10px;font-size:.9rem;border:1px solid #e2e8f0;border-radius:7px;background:#f1f5f9;cursor:pointer;color:#94a3b8;transition:all .15s;font-weight:400" disabled>▶</button>
   </h1>
   <div class="hdrRight">
-    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v7.1 · Supabase</span>
+    <span style="color:#94a3b8;font-size:.72rem;margin-right:auto">v7.2 · Supabase</span>
     <span id="adminLabel" style="color:var(--sub)">管理者</span>
     <button class="hdrBtn" onclick="logout()">ログアウト</button>
   </div>
@@ -1342,7 +1342,7 @@ function enrollmentSelection(activeId, withdrawnId) {
 function matchesEnrollmentFilter(student, showActive, showWithdrawn) {
   const flag = normalizedEnrollmentFlag(student);
   if (flag === '1') return showActive;
-  if (flag === '0') return showWithdrawn;
+  if (flag === '' || flag === '0') return showWithdrawn;
   return false;
 }
 
@@ -1353,9 +1353,12 @@ function matchesEnrollmentRecord(studentId, activeId, withdrawnId) {
 }
 
 function withdrawnBadgeForStudentId(studentId) {
-  return enrollmentByStudentId.get(String(studentId)) === '0'
-    ? '<span class="withdrawnBadge">退塾</span>'
-    : '';
+  const key = String(studentId);
+  if (!enrollmentByStudentId.has(key)) return '';
+  const flag = enrollmentByStudentId.get(key);
+  if (flag === '0') return '<span class="withdrawalScheduledBadge">退塾予定</span>';
+  if (flag === '') return '<span class="withdrawnBadge">退塾</span>';
+  return '';
 }
 
 function enrollmentFilterIsEmpty(activeId, withdrawnId) {
@@ -1406,7 +1409,7 @@ async function ensureEnrollmentIndex(force) {
   rows.forEach(student => {
     const id = String(student.id ?? student.studentId ?? student.student_code ?? '').trim();
     const flag = normalizedEnrollmentFlag(student);
-    if (id && flag) enrollmentByStudentId.set(id, flag);
+    if (id) enrollmentByStudentId.set(id, flag);
   });
   enrollmentIndexReady = true;
 }
@@ -1935,7 +1938,7 @@ async function doAdminLogin() {
   }
 
   // 旧GAS固定期間の更新を、端末ごとの初回ログイン時に一度だけ取り込む。
-  const cutoverKey = 'seisekiSupabaseCutoverReconciledV1';
+  const cutoverKey = 'seisekiSupabaseCutoverReconciledV2';
   if (localStorage.getItem(cutoverKey) !== '1') {
     errEl.textContent = '初回のみ、最新データをSupabaseへ移行しています...';
     const reconciled = await adminSupabaseApi({ action: 'reconcileLegacy' });
