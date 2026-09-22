@@ -7,10 +7,11 @@ const ADMIN_ACTIONS = new Set([
   'saveScore', 'deleteScore', 'getAllReports', 'getReports', 'saveReport',
   'deleteReport', 'getAllWishes', 'getWish', 'saveWish', 'saveWishResult',
   'getSchools', 'addSchool', 'updateSchool', 'deleteSchool',
-  'reconcileLegacy',
+  'reconcileLegacy', 'logoutAdmin',
 ]);
 const WRITE_ACTIONS = new Set(['saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool']);
 const ADMIN_PERMISSION_LEVELS = new Set(['2', '3', '4']);
+const ADMIN_SESSION_REVERIFY_MS = 6 * 60 * 60 * 1000;
 const GRADE_GAS_URL = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 const STAFF_SESSION_API_URL = GRADE_GAS_URL;
 const WISH_FIELDS = [
@@ -36,7 +37,7 @@ async function verifyAdmin(token: unknown): Promise<JsonObject> {
   const cached = await pg(query('seiseki_admin_sessions', { select:'staff_code,permission_level,expires_at,verified_at', token_hash:`eq.${tokenHash}`, limit:1 })) as JsonObject[];
   if (cached.length) {
     const session = cached[0];
-    const recentlyVerified = Date.now() - new Date(String(session.verified_at)).getTime() < 5 * 60 * 1000;
+    const recentlyVerified = Date.now() - new Date(String(session.verified_at)).getTime() < ADMIN_SESSION_REVERIFY_MS;
     const unexpired = new Date(String(session.expires_at)).getTime() > Date.now();
     if (recentlyVerified && unexpired && ADMIN_PERMISSION_LEVELS.has(String(session.permission_level))) return session;
   }
@@ -428,6 +429,18 @@ async function mirror(payload: JsonObject): Promise<JsonObject> {
   return { success: true, source: 'supabase', mirrorStatus: 'queued' };
 }
 
+async function logoutAdmin(payload: JsonObject): Promise<JsonObject> {
+  const token = String(payload.token ?? '').trim();
+  if (token) {
+    const tokenHash = await sha256Text(token);
+    await pg(query('seiseki_admin_sessions', { token_hash: `eq.${tokenHash}` }), {
+      method: 'DELETE', headers: { Prefer: 'return=minimal' },
+    });
+    await gas('logoutSystemPortal', { systemPortalSessionToken: token });
+  }
+  return { success: true };
+}
+
 async function dispatch(payload: JsonObject): Promise<JsonObject> {
   switch (payload.action) {
     case 'getStudents': case 'getStudentList': return getStudents(payload);
@@ -441,6 +454,7 @@ async function dispatch(payload: JsonObject): Promise<JsonObject> {
     case 'addSchool': case 'updateSchool': return saveSchool(payload);
     case 'deleteSchool': return deleteSchool(payload);
     case 'reconcileLegacy': return reconcileLegacy();
+    case 'logoutAdmin': return logoutAdmin(payload);
     case 'saveScore': return saveScore(payload);
     case 'saveReport': return saveReport(payload);
     case 'saveWish': return saveWish(payload);
