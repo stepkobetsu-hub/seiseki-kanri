@@ -606,6 +606,8 @@ async function init(){
   $('searchContent').addEventListener('input', debounce(renderMemos, 250));
   $('filterCounterpart').addEventListener('change', renderMemos);
   try {
+    // 面談一覧も同時に取得し、生徒・担当者データの完了を待たせない
+    const memoTask = loadMemos();
     const [sr, fr, localSearchStudents] = await Promise.all([
       api({ action:'getStudents' }),
       api({ action:'getStaffMembers' }),
@@ -616,7 +618,8 @@ async function init(){
     updateNameDatalist();
     renderStudents();
     renderStaff();
-    await loadMemos();
+    await memoTask;
+    renderMemos();
 
     // メール送信システムの最新フリガナも後から取り込み、初期表示は待たせない
     fetchSearchStudents_().then(searchStudents => {
@@ -829,6 +832,14 @@ async function loadMemos(){
   }
 }
 
+function memoTime_(value){
+  const text = String(value || '').trim();
+  if (!text) return 0;
+  const normalized = text.replace(/\//g, '-');
+  const time = Date.parse(normalized);
+  return Number.isFinite(time) ? time : 0;
+}
+
 function renderMemos(){
   const qName    = normalizeStudentSearch_($('searchName')?.value || '');
   const qStaff   = ($('filterStaff')?.value || '').trim();
@@ -850,8 +861,13 @@ function renderMemos(){
     return true;
   });
 
-  // 最新順（日付降順→登録日時降順）
-  filtered.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  // 最新順（日付降順→更新日時降順→登録日時降順）。日付形式が混在しても正しく比較する。
+  filtered.sort((a, b) =>
+    memoTime_(b.date) - memoTime_(a.date) ||
+    memoTime_(b.updatedAt) - memoTime_(a.updatedAt) ||
+    memoTime_(b.createdAt) - memoTime_(a.createdAt) ||
+    String(b.id || '').localeCompare(String(a.id || ''))
+  );
   memos = filtered;
 
   if (!memos.length) {

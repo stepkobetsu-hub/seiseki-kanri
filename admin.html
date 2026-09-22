@@ -706,7 +706,7 @@ tr:hover td{background:#f8fafc}
             <button id="meetListCampusJinryo" class="btn btn-ghost btn-sm" type="button" onclick="selectMeetingListCampus('神領')">神領</button>
             <button id="meetListCampusOte" class="btn btn-ghost btn-sm" type="button" onclick="selectMeetingListCampus('大手')">大手町</button>
           </div>
-          <div class="searchWrap"><input id="meetSearch" placeholder="名前・ID・内容で検索" oninput="loadMeetingMemos()"></div>
+          <div class="searchWrap"><input id="meetSearch" placeholder="名前・ID・内容で検索" oninput="scheduleMeetingMemosLoad()"></div>
           <span class="enrollmentFilter">
             <label><input type="checkbox" id="meetShowActive" checked onchange="loadMeetingMemos()">在籍生</label>
             <label><input type="checkbox" id="meetShowWithdrawn" onchange="loadMeetingMemos()">退塾生</label>
@@ -4904,17 +4904,22 @@ function todayStr() {
 }
 
 async function initMeetings() {
-  if (!students.length) {
-    const sr = await api({ action: 'getStudents' });
-    students = sr.students || [];
-  }
-  await loadStaffMembers();
+  const dateEl = document.getElementById('meetDate');
+  if (dateEl && !dateEl.value) dateEl.value = todayStr();
+
+  // 生徒・担当者・面談一覧を同時に取得し、遅い通信の待ち時間を重ねない
+  const studentTask = students.length
+    ? Promise.resolve()
+    : api({ action: 'getStudents' }).then(sr => { students = sr.students || []; });
+  await Promise.all([
+    studentTask,
+    loadStaffMembers(),
+    loadMeetingMemos()
+  ]);
+
   populateMeetingStudents();
   selectMeetingCampus(selectedMeetingCampus);
   toggleMeetingOther();
-  const dateEl = document.getElementById('meetDate');
-  if (dateEl && !dateEl.value) dateEl.value = todayStr();
-  await loadMeetingMemos();
 }
 
 function populateMeetingStudents() {
@@ -5220,37 +5225,80 @@ async function restoreAdminMemo(i){
   }
 }
 
+let meetingLoadRequestId = 0;
+let meetingSearchTimer = null;
+
+function scheduleMeetingMemosLoad() {
+  clearTimeout(meetingSearchTimer);
+  meetingSearchTimer = setTimeout(() => loadMeetingMemos(), 250);
+}
+
+function meetingMemoTime(value) {
+  const text = String(value || '').trim();
+  if (!text) return 0;
+  const normalized = text.replace(/\//g, '-');
+  const time = Date.parse(normalized);
+  return Number.isFinite(time) ? time : 0;
+}
+
+function sortMeetingMemosNewest(list) {
+  return [...(list || [])].sort((a, b) =>
+    meetingMemoTime(b.date) - meetingMemoTime(a.date) ||
+    meetingMemoTime(b.updatedAt) - meetingMemoTime(a.updatedAt) ||
+    meetingMemoTime(b.createdAt) - meetingMemoTime(a.createdAt) ||
+    String(b.id || '').localeCompare(String(a.id || ''))
+  );
+}
+
 async function loadMeetingMemos() {
-  await ensureEnrollmentIndex();
+  const requestId = ++meetingLoadRequestId;
+  const body = document.getElementById('meetBody');
+  if (body && !meetingMemos.length) {
+    body.innerHTML = '<tr><td colspan="6" class="noData">読み込み中...</td></tr>';
+  }
   if (enrollmentFilterIsEmpty('meetShowActive', 'meetShowWithdrawn')) {
     meetingMemos = [];
     renderMeetingTable([], '表示する生徒区分を選択してください。');
     return;
   }
-  const r = await api({
-    action: 'getMeetingMemos',
-    q: document.getElementById('meetSearch')?.value || '',
-    staff: document.getElementById('meetFilterStaff')?.value || '',
-    counterpart: document.getElementById('meetFilterCounterpart')?.value || ''
-  });
-  meetingMemos = r.memos || [];
-  meetingMemos = meetingMemos.filter(m =>
-    matchesEnrollmentRecord(m.studentId, 'meetShowActive', 'meetShowWithdrawn')
-  );
-  if (selectedMeetingListCampus) {
-    meetingMemos = meetingMemos.filter(m => String(m.campus || '') === selectedMeetingListCampus);
+
+  try {
+    // 在籍情報と面談一覧は互いに独立しているため、同時に取得する
+    const [r] = await Promise.all([
+      api({
+        action: 'getMeetingMemos',
+        q: document.getElementById('meetSearch')?.value || '',
+        staff: document.getElementById('meetFilterStaff')?.value || '',
+        counterpart: document.getElementById('meetFilterCounterpart')?.value || ''
+      }),
+      ensureEnrollmentIndex()
+    ]);
+    if (requestId !== meetingLoadRequestId) return;
+    if (!r.success) throw new Error(r.error || '面談メモを取得できませんでした');
+
+    meetingMemos = sortMeetingMemosNewest(r.memos || []).filter(m =>
+      matchesEnrollmentRecord(m.studentId, 'meetShowActive', 'meetShowWithdrawn')
+    );
+    if (selectedMeetingListCampus) {
+      meetingMemos = meetingMemos.filter(m => String(m.campus || '') === selectedMeetingListCampus);
+    }
+    renderMeetingTable(meetingMemos);
+  } catch (e) {
+    if (requestId !== meetingLoadRequestId) return;
+    meetingMemos = [];
+    renderMeetingTable([], e.message || '一覧を読み込めませんでした。');
   }
-  renderMeetingTable(meetingMemos);
 }
 
 function renderMeetingTable(list, emptyMessage) {
   const body = document.getElementById('meetBody');
   if (!body) return;
-  if (!list.length) {
+  const sortedList = sortMeetingMemosNewest(list);
+  if (!sortedList.length) {
     body.innerHTML = `<tr><td colspan="6" class="noData">${emptyMessage || 'データなし'}</td></tr>`;
     return;
   }
-  body.innerHTML = list.map(m => `
+  body.innerHTML = sortedList.map(m => `
     <tr>
       <td style="white-space:nowrap">${htmlEsc(formatEntryValue(m.date))}</td>
       <td><button onclick="goToCompare('${htmlEsc(m.studentId)}')" style="border:0;background:transparent;color:#1a56a0;font-weight:700;text-decoration:underline;cursor:pointer;padding:0">${htmlEsc(m.name)}</button>${withdrawnBadgeForStudentId(m.studentId)}<div style="color:#94a3b8;font-size:.72rem">No.${htmlEsc(m.studentId)} / ${htmlEsc(m.grade || '')}</div></td>
