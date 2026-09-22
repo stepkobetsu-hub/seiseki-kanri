@@ -606,19 +606,21 @@ async function init(){
   $('searchContent').addEventListener('input', debounce(renderMemos, 250));
   $('filterCounterpart').addEventListener('change', renderMemos);
   try {
-    // 面談一覧も同時に取得し、生徒・担当者データの完了を待たせない
-    const memoTask = loadMemos();
+    // 面談一覧は単独で先に取得する。GASへの同時要求で空応答になる競合を防ぐ。
+    await loadMemos();
+
     const [sr, fr, localSearchStudents] = await Promise.all([
       api({ action:'getStudents' }),
       api({ action:'getStaffMembers' }),
       fetchLocalSearchStudents_().catch(() => [])
     ]);
+    if (!sr.success) throw new Error(sr.error || '生徒一覧を読み込めませんでした');
+    if (!fr.success) throw new Error(fr.error || '担当者一覧を読み込めませんでした');
     students = mergeSearchKana_(sr.students || [], localSearchStudents);
     staffMembers = fr.staff || [];
     updateNameDatalist();
     renderStudents();
     renderStaff();
-    await memoTask;
     renderMemos();
 
     // メール送信システムの最新フリガナも後から取り込み、初期表示は待たせない
@@ -825,7 +827,8 @@ async function loadMemos(){
   $('memoList').innerHTML = '<div class="msg">読み込み中...</div>';
   try {
     const r = await api({ action:'getMeetingMemos' });
-    allMemos = r.memos || [];
+    if (!r.success) throw new Error(r.error || '面談一覧を読み込めませんでした');
+    allMemos = Array.isArray(r.memos) ? r.memos : [];
     renderMemos();
   } catch (e) {
     $('memoList').innerHTML = '<div class="msg">一覧を読み込めませんでした。</div>';
