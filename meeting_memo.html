@@ -339,11 +339,11 @@ body.auth-locked > #toast{display:none!important}
     <div class="loginHelp">管理画面・スタッフ用と同じ講師コード・パスワードを使います。</div>
     <div class="deviceLabel">この端末の種類</div>
     <div class="deviceChoices">
-      <button id="meetingDevicePersonal" class="deviceChoice selected" type="button" onclick="selectMeetingDevice_('personal')">
+      <button id="meetingDevicePersonal" class="deviceChoice" type="button" aria-pressed="false" onclick="selectMeetingDevice_('personal')">
         <strong>自分・家族の端末</strong>
         <small>ログアウトするまで維持</small>
       </button>
-      <button id="meetingDeviceShared" class="deviceChoice" type="button" onclick="selectMeetingDevice_('shared')">
+      <button id="meetingDeviceShared" class="deviceChoice" type="button" aria-pressed="false" onclick="selectMeetingDevice_('shared')">
         <strong>塾の共用端末</strong>
         <small>30分無操作でログアウト</small>
       </button>
@@ -668,16 +668,21 @@ async function api(data){
 }
 
 let meetingAppInitialized_ = false;
-let meetingDeviceMode_ = 'personal';
+let meetingDeviceMode_ = '';
 let meetingIdleTimer_ = null;
 const MEETING_IDLE_LIMIT_MS_ = 30 * 60 * 1000;
 const MEETING_IDLE_KEY_ = 'meetingMemoLastActivityAt';
 const MEETING_ACTIVITY_EVENTS_ = ['pointerdown','keydown','touchstart','scroll'];
 
 function selectMeetingDevice_(mode){
-  meetingDeviceMode_ = mode === 'shared' ? 'shared' : 'personal';
-  $('meetingDevicePersonal')?.classList.toggle('selected', meetingDeviceMode_ === 'personal');
-  $('meetingDeviceShared')?.classList.toggle('selected', meetingDeviceMode_ === 'shared');
+  meetingDeviceMode_ = mode === 'personal' || mode === 'shared' ? mode : '';
+  const personalSelected = meetingDeviceMode_ === 'personal';
+  const sharedSelected = meetingDeviceMode_ === 'shared';
+  $('meetingDevicePersonal')?.classList.toggle('selected', personalSelected);
+  $('meetingDeviceShared')?.classList.toggle('selected', sharedSelected);
+  $('meetingDevicePersonal')?.setAttribute('aria-pressed', String(personalSelected));
+  $('meetingDeviceShared')?.setAttribute('aria-pressed', String(sharedSelected));
+  if (meetingDeviceMode_) $('meetingLoginError').textContent = '';
 }
 function clearMeetingIdle_(){
   if (meetingIdleTimer_) clearTimeout(meetingIdleTimer_);
@@ -763,7 +768,7 @@ function showMeetingLogin_(message=''){
   $('meetingLoginError').textContent = message;
   const savedCode = localStorage.getItem('adminCodeInput') || '';
   if (savedCode) $('meetingLoginCode').value = savedCode;
-  selectMeetingDevice_(localStorage.getItem('adminDeviceMode') === 'personal' ? 'personal' : meetingDeviceMode_);
+  selectMeetingDevice_('');
 }
 async function meetingLogin(event){
   event?.preventDefault();
@@ -771,6 +776,10 @@ async function meetingLogin(event){
   const password = $('meetingLoginPassword').value;
   const button = $('meetingLoginButton');
   const error = $('meetingLoginError');
+  if (!meetingDeviceMode_) {
+    error.textContent = 'この端末の種類を選択してください。';
+    return;
+  }
   if (!code || !password) {
     error.textContent = '講師コードとパスワードを入力してください。';
     return;
