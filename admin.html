@@ -2046,6 +2046,17 @@ async function logout(options = {}) {
       document.getElementById('loginErr').textContent = 'Supabase移行後の初回のみ、もう一度ログインしてください。';
       return;
     }
+    const cutoverKey = 'seisekiSupabaseCutoverReconciledV2';
+    if (localStorage.getItem(cutoverKey) !== '1') {
+      const reconciled = await adminSupabaseApi({ action: 'reconcileLegacy' });
+      if (reconciled.success) {
+        localStorage.setItem(cutoverKey, '1');
+        enrollmentIndexReady = false;
+        clearSensitiveCache();
+      } else {
+        console.warn('在籍区分の再照合を完了できませんでした', reconciled.error);
+      }
+    }
     showMain();
     return;
   }
