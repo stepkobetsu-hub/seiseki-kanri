@@ -1060,7 +1060,11 @@ const RUNTIME_CONFIG = window.SEISEKI_CONFIG || {};
 const SUPABASE_URL = RUNTIME_CONFIG.supabaseUrl || localStorage.getItem('seisekiSupabaseUrl') || '';
 const SUPABASE_ANON_KEY = RUNTIME_CONFIG.supabaseAnonKey || localStorage.getItem('seisekiSupabaseAnonKey') || '';
 const DEFAULT_SUPABASE_AUTH_EMAIL = RUNTIME_CONFIG.supabaseAdminEmail || localStorage.getItem('seisekiSupabaseAdminEmail') || 'stepkobetsu@gmail.com';
-let DATA_SOURCE = localStorage.getItem('seisekiDataSource') || (SUPABASE_URL && SUPABASE_ANON_KEY ? 'supabase' : 'legacy-gas');
+// 緊急安定運用: 停止中のSupabaseへの接続待ちを避け、GASを直接使用する
+let DATA_SOURCE = 'legacy-gas';
+if (localStorage.getItem('seisekiDataSource') !== 'legacy-gas') {
+  localStorage.setItem('seisekiDataSource', 'legacy-gas');
+}
 const SUPABASE_ENABLED_ACTIONS = new Set(['getStudents', 'syncStudents', 'applySyncResult', 'getSyncLog']);
 let schools = [];
 let students = [];
@@ -3659,12 +3663,48 @@ async function initAdminReportTab() {
   await loadAdminReport();
 }
 async function loadAdminReport() {
-  await ensureEnrollmentIndex();
   const year = document.getElementById('rpAYear').value;
   const semester = document.getElementById('rpASemester').value;
   const campus = document.getElementById('rpACampus').value;
-  const r = await api({ action: 'getAllReports', year, semester, campus });
-  allReports = r.data || [];
+  const tbody = document.getElementById('rpABody');
+  const cacheKey = 'adminReportCache:' + [year, semester, campus].join('|');
+
+  // 前回取得分があれば即表示し、通信待ちで画面が固まって見えるのを防ぐ
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
+    if (cached && Array.isArray(cached.data)) {
+      allReports = cached.data;
+      filterAdminReport();
+    } else if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="16" class="noData">通知表データを読み込み中...</td></tr>';
+    }
+  } catch(e) {
+    sessionStorage.removeItem(cacheKey);
+  }
+
+  // 在籍情報と通知表を同時に取得（従来は直列で、待ち時間が合算されていた）
+  const [enrollmentResult, reportResult] = await Promise.allSettled([
+    ensureEnrollmentIndex(),
+    api({ action: 'getAllReports', year, semester, campus })
+  ]);
+  if (enrollmentResult.status === 'rejected') {
+    console.warn('在籍情報の取得に失敗しました', enrollmentResult.reason);
+  }
+  if (reportResult.status !== 'fulfilled' || !reportResult.value || reportResult.value.success === false) {
+    const message = reportResult.status === 'rejected'
+      ? String(reportResult.reason || '')
+      : String(reportResult.value?.error || '');
+    if (!allReports.length && tbody) {
+      tbody.innerHTML = '<tr><td colspan="16" class="noData" style="color:#dc2626">読み込みに失敗しました。上部の更新ボタンを1回だけ押してください。</td></tr>';
+    }
+    console.error('通知表データの取得に失敗しました', message);
+    return;
+  }
+
+  allReports = reportResult.value.data || [];
+  try {
+    sessionStorage.setItem(cacheKey, JSON.stringify({ data: allReports, savedAt: Date.now() }));
+  } catch(e) { /* 容量不足時はキャッシュなしで続行 */ }
   filterAdminReport();
 }
 function filterAdminReport() {
