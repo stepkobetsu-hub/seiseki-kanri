@@ -424,6 +424,14 @@ select.invalid,input.invalid{
 <script>
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 const STUDENT_SEARCH_GAS = 'https://script.google.com/macros/s/AKfycbxIH2VtgwRi50xduXgrkYrjD0yrzNfQ5vCWt1XgOzil6LZSgXNj6MJo9jPYvOkjNHdu/exec';
+const SEISEKI_ADMIN_RUNTIME_URL = 'https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
+const SUPABASE_MEETING_ACTIONS = new Set([
+  'getStudents', 'getStudentList', 'getMeetingMemos', 'saveMeetingMemo',
+  'deleteMeetingMemo', 'getStaffMembers', 'addStaffMember', 'deleteStaffMember'
+]);
+const SUPABASE_MEETING_WRITES = new Set([
+  'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember'
+]);
 let students = [];
 let staffMembers = [];
 let memos = [];
@@ -534,7 +542,42 @@ function showToast(text){
   el.classList.add('show');
   setTimeout(() => el.classList.remove('show'), 1800);
 }
+function meetingAdminToken_(){
+  return localStorage.getItem('adminSystemPortalSessionToken')
+    || sessionStorage.getItem('adminSystemPortalSessionToken')
+    || '';
+}
+function meetingMutationId_(){
+  return crypto.randomUUID ? crypto.randomUUID() : ('meeting-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+}
+async function meetingSupabaseApi_(data){
+  const token = meetingAdminToken_();
+  if (!token) throw new Error('管理画面へログインしてから、もう一度お試しください。');
+  const payload = { ...data, token };
+  if (SUPABASE_MEETING_WRITES.has(data.action) && !payload.mutationId) payload.mutationId = meetingMutationId_();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(SEISEKI_ADMIN_RUNTIME_URL, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=UTF-8'},
+      body:JSON.stringify(payload),
+      cache:'no-store',
+      signal:controller.signal
+    });
+    const result = await res.json().catch(() => ({}));
+    if (!res.ok || result.success !== true) {
+      throw new Error(result.error || (res.status === 401 || res.status === 403
+        ? 'ログインの有効期限が切れました。管理画面へ再ログインしてください。'
+        : 'Supabaseから取得できませんでした。'));
+    }
+    return result;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 async function api(data){
+  if (SUPABASE_MEETING_ACTIONS.has(data.action)) return meetingSupabaseApi_(data);
   const res = await fetch(GAS, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(data) });
   return await res.json();
 }
