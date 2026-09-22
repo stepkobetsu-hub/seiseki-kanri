@@ -136,11 +136,37 @@ textarea{
   min-height:40px;
 }
 .studentPicker{
+  display:none;
   margin-top:8px;
   border:1px solid #cbd8e6;
   border-radius:10px;
   background:#fff;
   overflow:hidden;
+  max-height:280px;
+  overflow-y:auto;
+}
+.studentPicker.show{display:block}
+.studentSearchHint{margin-top:7px;color:#64748b;font-size:.8rem}
+.selectedStudentPanel{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-top:10px;
+  padding:12px 14px;
+  border:2px solid #1769ba;
+  border-radius:12px;
+  background:#eaf4ff;
+}
+.selectedStudentInfo{min-width:0}
+.selectedStudentTitle{display:block;color:#124f8c;font-size:.78rem;font-weight:900;margin-bottom:3px}
+.selectedStudentText{color:#102033;font-size:.95rem;font-weight:900}
+.selectedStudentText.empty{color:#64748b;font-weight:700}
+.selectedStudentClear{flex:0 0 auto;padding:7px 12px;min-height:36px;background:#fff;color:#b42318;border-color:#f0b8b3;font-size:.78rem}
+.selectedStudentPanel.invalid{
+  border-color:#ef4444;
+  background:#fff5f5;
+  box-shadow:0 0 0 3px rgba(239,68,68,.15);
 }
 .studentPicker.invalid{
   border:2px solid #ef4444;
@@ -404,7 +430,15 @@ body.auth-locked > #toast{display:none!important}
         <label for="studentSearch">生徒検索</label>
         <input id="studentSearch" placeholder="生徒コード・氏名・フリガナ・ローマ字で検索" autocomplete="off">
         <input id="student" type="hidden">
+        <div id="studentSearchHint" class="studentSearchHint">文字を入力すると、一致する生徒だけ表示されます。</div>
         <div id="studentList" class="studentPicker" role="listbox" aria-label="生徒を選択"></div>
+        <div id="selectedStudentPanel" class="selectedStudentPanel" aria-live="polite">
+          <div class="selectedStudentInfo">
+            <span class="selectedStudentTitle">現在選択中の生徒</span>
+            <span id="selectedStudentText" class="selectedStudentText empty">まだ選択されていません。</span>
+          </div>
+          <button id="selectedStudentClear" class="selectedStudentClear" type="button" onclick="clearStudentSelection()" style="display:none">選択解除</button>
+        </div>
       </div>
       <div class="field">
         <label for="date">日付</label>
@@ -1014,41 +1048,73 @@ function updateNameDatalist(){
   options.innerHTML = list.map(s => `<option value="${esc(s.name)}">${esc(s.kana || '')}</option>`).join('');
 }
 
+function renderSelectedStudent_(){
+  const selectedId = String($('student').value || '');
+  const selected = students.find(s => String(s.id) === selectedId);
+  const text = $('selectedStudentText');
+  const clear = $('selectedStudentClear');
+  if (!selected) {
+    text.textContent = 'まだ選択されていません。';
+    text.classList.add('empty');
+    clear.style.display = 'none';
+    return;
+  }
+  text.textContent = `${selected.name}　No.${selected.id}　${selected.grade || ''}　${selected.campus || ''}`;
+  text.classList.remove('empty');
+  clear.style.display = '';
+}
 function renderStudents(){
   const selectedId = String($('student').value || '');
   const q = normalizeStudentSearch_($('studentSearch')?.value || '');
-  let list = currentCampus ? students.filter(s => s.campus === currentCampus) : students;
-  if (currentGradeGroup) list = list.filter(s => gradeMatchesGroup(s.grade, currentGradeGroup));
-  if (q) {
-    list = list.filter(s => {
-      const kana = s.kana || s.furigana || '';
-      const values = [s.id, s.name, kana, kanaToRomaji_(kana)].map(normalizeStudentSearch_);
-      return values.some(value => value.includes(q));
-    });
+  let eligible = currentCampus ? students.filter(s => s.campus === currentCampus) : students;
+  if (currentGradeGroup) eligible = eligible.filter(s => gradeMatchesGroup(s.grade, currentGradeGroup));
+  if (selectedId && !eligible.some(s => String(s.id) === selectedId)) $('student').value = '';
+
+  const listEl = $('studentList');
+  const hintEl = $('studentSearchHint');
+  if (!q) {
+    listEl.innerHTML = '';
+    listEl.classList.remove('show');
+    hintEl.textContent = '文字を入力すると、一致する生徒だけ表示されます。';
+    renderSelectedStudent_();
+    return;
   }
-  if (selectedId && !list.some(s => String(s.id) === selectedId)) $('student').value = '';
+
+  const matched = eligible.filter(s => {
+    const kana = s.kana || s.furigana || '';
+    const values = [s.id, s.name, kana, kanaToRomaji_(kana)].map(normalizeStudentSearch_);
+    return values.some(value => value.includes(q));
+  });
+  const visible = matched.slice(0, 30);
   const activeId = String($('student').value || '');
-  $('studentList').innerHTML = list.length ? list.map(s => {
+  listEl.classList.add('show');
+  hintEl.textContent = matched.length > 30
+    ? `${matched.length}人が該当（先頭30人を表示）`
+    : `${matched.length}人が該当`;
+  listEl.innerHTML = visible.length ? visible.map(s => {
     const selected = String(s.id) === activeId;
-    return `<button type="button" class="studentChoice${q ? ' searchResult' : ''}${selected ? ' selected' : ''}" data-student-id="${esc(s.id)}" role="option" aria-selected="${selected}" onclick="selectStudent('${esc(s.id)}')">
+    return `<button type="button" class="studentChoice searchResult${selected ? ' selected' : ''}" data-student-id="${esc(s.id)}" role="option" aria-selected="${selected}" onclick="selectStudent('${esc(s.id)}')">
       <span class="studentCheck">${selected ? '✓' : ''}</span>
       <span>${esc(s.name)} <span class="studentChoiceMeta">No.${esc(s.id)}</span></span>
       <span class="studentChoiceMeta">${esc(s.grade || '')}</span>
       <span class="studentChoiceMeta">${esc(s.campus || '')}</span>
     </button>`;
   }).join('') : '<div class="studentPickerEmpty">該当する生徒がいません。</div>';
+  renderSelectedStudent_();
 }
 function selectStudent(id){
   $('student').value = String(id || '');
+  $('studentSearch').value = '';
   $('studentList').classList.remove('invalid');
   $('studentSearch').classList.remove('invalid');
-  document.querySelectorAll('#studentList .studentChoice').forEach(row => {
-    const selected = String(row.dataset.studentId) === String(id);
-    row.classList.toggle('selected', selected);
-    row.setAttribute('aria-selected', selected ? 'true' : 'false');
-    const check = row.querySelector('.studentCheck');
-    if (check) check.textContent = selected ? '✓' : '';
-  });
+  $('selectedStudentPanel').classList.remove('invalid');
+  renderStudents();
+}
+function clearStudentSelection(){
+  $('student').value = '';
+  $('studentSearch').value = '';
+  renderStudents();
+  $('studentSearch').focus();
 }
 
 function renderStaff(){
@@ -1095,10 +1161,11 @@ async function saveMemo(sendEmail){
   // バリデーション
   const errEl = $('formError');
   const errs = [];
-  [$('studentList'),$('studentSearch'),$('date'),$('staff'),$('content')].forEach(el=>el?.classList.remove('invalid'));
+  [$('studentList'),$('studentSearch'),$('selectedStudentPanel'),$('date'),$('staff'),$('content')].forEach(el=>el?.classList.remove('invalid'));
   if (!payload.studentId){
     $('studentList').classList.add('invalid');
     $('studentSearch').classList.add('invalid');
+    $('selectedStudentPanel').classList.add('invalid');
     errs.push('・生徒名を選択してください');
   }
   if (!payload.date){ $('date').classList.add('invalid'); errs.push('・日付を入力してください'); }
@@ -1154,7 +1221,7 @@ function clearForm(keepStudent){
   toggleStaffOther();
   const errEl = $('formError');
   if (errEl) errEl.classList.remove('show');
-  [$('studentList'),$('studentSearch'),$('date'),$('staff'),$('staffOther'),$('content')].forEach(el=>el?.classList.remove('invalid'));
+  [$('studentList'),$('studentSearch'),$('selectedStudentPanel'),$('date'),$('staff'),$('staffOther'),$('content')].forEach(el=>el?.classList.remove('invalid'));
 }
 
 async function loadMemos(){
