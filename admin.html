@@ -1097,11 +1097,14 @@ const SUPABASE_ENABLED_ACTIONS = new Set([
   'getAllScores', 'getStudentScores', 'saveScore', 'deleteScore',
   'getAllReports', 'getReports', 'saveReport', 'deleteReport',
   'getAllWishes', 'getWish', 'saveWish', 'saveWishResult',
-  'getSchools', 'addSchool', 'updateSchool', 'deleteSchool'
+  'getSchools', 'addSchool', 'updateSchool', 'deleteSchool',
+  'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
+  'getStaffMembers', 'addStaffMember', 'deleteStaffMember'
 ]);
 const SUPABASE_WRITE_ACTIONS = new Set([
   'saveScore', 'deleteScore', 'saveReport', 'deleteReport',
-  'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool'
+  'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool',
+  'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember'
 ]);
 let DATA_SOURCE = 'supabase-admin-edge';
 localStorage.setItem('seisekiDataSource', DATA_SOURCE);
