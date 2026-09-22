@@ -63,10 +63,10 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 .withdrawalScheduledBadge{display:inline-block;margin-left:5px;padding:1px 6px;border-radius:10px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:.68rem;font-weight:700;vertical-align:middle;text-decoration:none}
 
 /* LOGIN */
-.loginWrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#e7f5ee}
-.loginBox{background:#f2fbf6;border:2px solid #9bd4b6;border-radius:var(--radius);padding:44px 40px;width:100%;max-width:520px;box-shadow:0 4px 24px rgba(16,120,70,.14)}
+.loginWrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#064e3b 0%,#0b6b4f 55%,#14532d 100%)}
+.loginBox{background:#f0fdf4;border:3px solid #166534;border-radius:var(--radius);padding:44px 40px;width:100%;max-width:520px;box-shadow:0 12px 38px rgba(0,30,20,.38)}
 .loginHead{text-align:center;margin-bottom:28px}
-.loginHead .imgWrap{background:linear-gradient(135deg,#e8f5ee 0%,#c8ecd8 100%);border-radius:16px;padding:12px;margin-bottom:12px;display:inline-block;border:2px solid #a3d9b8}
+.loginHead .imgWrap{background:linear-gradient(135deg,#dcfce7 0%,#86efac 100%);border-radius:16px;padding:12px;margin-bottom:12px;display:inline-block;border:2px solid #166534}
 .loginHead h2{font-size:1.2rem;font-weight:700;color:var(--text);margin-bottom:4px}
 .loginHead p{font-size:.82rem;color:var(--sub)}
 .fld{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
@@ -79,10 +79,13 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 .deviceChoice{min-height:92px;padding:14px 12px;border:2px solid #cbd5e1;border-radius:12px;background:#f8fafc;color:#1e293b;text-align:left;cursor:pointer;transition:.15s}
 .deviceChoice strong{display:block;font-size:1rem;margin-bottom:6px}
 .deviceChoice span{display:block;font-size:.76rem;line-height:1.45;color:#64748b;font-weight:600}
-.deviceChoice:hover{border-color:#60a5fa;background:#eff6ff}
-.deviceChoice.selected{border-color:var(--primary);background:#e8f0fb;box-shadow:0 0 0 2px rgba(26,86,160,.12)}
+.deviceChoice:hover{border-color:#15803d;background:#ecfdf5}
+.deviceChoice.selected{border-color:#166534;background:#dcfce7;box-shadow:0 0 0 2px rgba(22,101,52,.18)}
 .deviceWarning{margin:0 0 16px;padding:13px 14px;border:2px solid #dc2626;border-radius:10px;background:#fef2f2;color:#b91c1c;font-size:1rem;font-weight:800;line-height:1.5}
 .deviceWarning.hidden{display:none}
+.loginWrap .btn-primary{background:#166534;border:1px solid #14532d}
+.loginWrap .btn-primary:hover{background:#064e3b}
+.loginWrap .fld input:focus{border-color:#166534;box-shadow:0 0 0 2px rgba(22,101,52,.12)}
 @media(max-width:540px){
   .loginBox{padding:30px 20px}
   .deviceChoices{grid-template-columns:1fr}
