@@ -311,6 +311,8 @@ body.auth-locked > #toast{display:none!important}
 .loginField label{font-size:.84rem;color:#44576d}
 .loginButton{width:100%;background:#155aa5;color:#fff;border-color:#155aa5;font-size:1rem;margin-top:5px}
 .deviceLabel{font-size:.84rem;color:#44576d;font-weight:800;margin-bottom:7px}
+.deviceError{display:none;margin:0 0 10px;padding:12px 14px;border:2px solid #ef4444;border-radius:10px;background:#fff1f2;color:#b91c1c;font-size:1.08rem;font-weight:900;line-height:1.5;text-align:center}
+.deviceError.show{display:block}
 .deviceChoices{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
 .deviceChoice{padding:11px 9px;background:#f7fafc;color:#44576d;border:2px solid #d6e2ef;text-align:left;line-height:1.35}
 .deviceChoice strong{display:block;color:#17324f;font-size:.88rem}
@@ -338,6 +340,7 @@ body.auth-locked > #toast{display:none!important}
     <div class="loginTitle">面談メモ ログイン</div>
     <div class="loginHelp">管理画面・スタッフ用と同じ講師コード・パスワードを使います。</div>
     <div class="deviceLabel">この端末の種類</div>
+    <div id="meetingDeviceError" class="deviceError" role="alert" aria-live="assertive"></div>
     <div class="deviceChoices">
       <button id="meetingDevicePersonal" class="deviceChoice" type="button" aria-pressed="false" onclick="selectMeetingDevice_('personal')">
         <strong>自分・家族の端末</strong>
@@ -682,6 +685,11 @@ function selectMeetingDevice_(mode){
   $('meetingDeviceShared')?.classList.toggle('selected', sharedSelected);
   $('meetingDevicePersonal')?.setAttribute('aria-pressed', String(personalSelected));
   $('meetingDeviceShared')?.setAttribute('aria-pressed', String(sharedSelected));
+  const deviceError = $('meetingDeviceError');
+  if (deviceError) {
+    deviceError.textContent = '';
+    deviceError.classList.remove('show');
+  }
   if (meetingDeviceMode_) $('meetingLoginError').textContent = '';
 }
 function clearMeetingIdle_(){
@@ -777,7 +785,11 @@ async function meetingLogin(event){
   const button = $('meetingLoginButton');
   const error = $('meetingLoginError');
   if (!meetingDeviceMode_) {
-    error.textContent = 'この端末の種類を選択してください。';
+    const deviceError = $('meetingDeviceError');
+    deviceError.textContent = '⚠️ この端末の種類を選択してください。';
+    deviceError.classList.add('show');
+    error.textContent = '';
+    deviceError.scrollIntoView({ behavior:'smooth', block:'center' });
     return;
   }
   if (!code || !password) {
