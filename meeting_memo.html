@@ -577,7 +577,9 @@ async function meetingSupabaseApi_(data){
   }
 }
 async function api(data){
-  if (SUPABASE_MEETING_ACTIONS.has(data.action)) return meetingSupabaseApi_(data);
+  if (SUPABASE_MEETING_ACTIONS.has(data.action) && meetingAdminToken_()) {
+    return meetingSupabaseApi_(data);
+  }
   const res = await fetch(GAS, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(data) });
   return await res.json();
 }
