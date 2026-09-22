@@ -310,12 +310,20 @@ body.auth-locked > #toast{display:none!important}
 .loginField{margin-bottom:13px}
 .loginField label{font-size:.84rem;color:#44576d}
 .loginButton{width:100%;background:#155aa5;color:#fff;border-color:#155aa5;font-size:1rem;margin-top:5px}
+.deviceLabel{font-size:.84rem;color:#44576d;font-weight:800;margin-bottom:7px}
+.deviceChoices{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.deviceChoice{padding:11px 9px;background:#f7fafc;color:#44576d;border:2px solid #d6e2ef;text-align:left;line-height:1.35}
+.deviceChoice strong{display:block;color:#17324f;font-size:.88rem}
+.deviceChoice small{display:block;margin-top:3px;color:#64748b;font-size:.7rem}
+.deviceChoice.selected{background:#e9f2ff;border-color:#155aa5;color:#155aa5}
+.deviceChoice.selected strong{color:#155aa5}
 .loginError{min-height:1.4em;color:#dc2626;font-size:.84rem;line-height:1.5;margin-top:12px;text-align:center}
 .headActions{display:flex;align-items:center;gap:8px}
 .sessionStaff{font-size:.78rem;color:#52667c;font-weight:800}
 .logoutButton{padding:8px 10px;background:#fff;color:#b42318;border:1px solid #f0b8b3;font-size:.8rem}
 @media(max-width:600px){
   .loginCard{padding:22px 18px}
+  .deviceChoices{grid-template-columns:1fr}
   .sessionStaff{display:none}
   .headActions{gap:5px}
   .logoutButton,.home{padding:7px 8px;font-size:.75rem}
@@ -328,7 +336,18 @@ body.auth-locked > #toast{display:none!important}
   <form class="loginCard" onsubmit="meetingLogin(event)">
     <div class="loginMark">📝</div>
     <div class="loginTitle">面談メモ ログイン</div>
-    <div class="loginHelp">管理画面と同じ講師コード・パスワードを入力してください。<br>一度ログインすると、ログアウトするまでこの端末でログイン状態を保ちます。</div>
+    <div class="loginHelp">管理画面・スタッフ用と同じ講師コード・パスワードを使います。</div>
+    <div class="deviceLabel">この端末の種類</div>
+    <div class="deviceChoices">
+      <button id="meetingDevicePersonal" class="deviceChoice selected" type="button" onclick="selectMeetingDevice_('personal')">
+        <strong>自分・家族の端末</strong>
+        <small>ログアウトするまで維持</small>
+      </button>
+      <button id="meetingDeviceShared" class="deviceChoice" type="button" onclick="selectMeetingDevice_('shared')">
+        <strong>塾の共用端末</strong>
+        <small>30分無操作でログアウト</small>
+      </button>
+    </div>
     <div class="loginField">
       <label for="meetingLoginCode">講師コード</label>
       <input id="meetingLoginCode" inputmode="numeric" autocomplete="username" placeholder="講師コード">
@@ -597,9 +616,13 @@ function showToast(text){
   setTimeout(() => el.classList.remove('show'), 1800);
 }
 function meetingAdminToken_(){
-  return localStorage.getItem('adminSystemPortalSessionToken')
-    || sessionStorage.getItem('adminSystemPortalSessionToken')
-    || '';
+  const shared = sessionStorage.getItem('meetingDeviceMode') === 'shared'
+    || sessionStorage.getItem('adminDeviceMode') === 'school';
+  return shared
+    ? (sessionStorage.getItem('adminSystemPortalSessionToken') || '')
+    : (localStorage.getItem('adminSystemPortalSessionToken')
+      || sessionStorage.getItem('adminSystemPortalSessionToken')
+      || '');
 }
 function meetingMutationId_(){
   return crypto.randomUUID ? crypto.randomUUID() : ('meeting-' + Date.now() + '-' + Math.random().toString(36).slice(2));
@@ -645,32 +668,87 @@ async function api(data){
 }
 
 let meetingAppInitialized_ = false;
+let meetingDeviceMode_ = 'personal';
+let meetingIdleTimer_ = null;
+const MEETING_IDLE_LIMIT_MS_ = 30 * 60 * 1000;
+const MEETING_IDLE_KEY_ = 'meetingMemoLastActivityAt';
+const MEETING_ACTIVITY_EVENTS_ = ['pointerdown','keydown','touchstart','scroll'];
+
+function selectMeetingDevice_(mode){
+  meetingDeviceMode_ = mode === 'shared' ? 'shared' : 'personal';
+  $('meetingDevicePersonal')?.classList.toggle('selected', meetingDeviceMode_ === 'personal');
+  $('meetingDeviceShared')?.classList.toggle('selected', meetingDeviceMode_ === 'shared');
+}
+function clearMeetingIdle_(){
+  if (meetingIdleTimer_) clearTimeout(meetingIdleTimer_);
+  meetingIdleTimer_ = null;
+  MEETING_ACTIVITY_EVENTS_.forEach(name => document.removeEventListener(name, recordMeetingActivity_));
+}
+function recordMeetingActivity_(){
+  if (meetingDeviceMode_ !== 'shared' || sessionStorage.getItem('adminLoggedIn') !== '1') return;
+  sessionStorage.setItem(MEETING_IDLE_KEY_, String(Date.now()));
+  if (meetingIdleTimer_) clearTimeout(meetingIdleTimer_);
+  meetingIdleTimer_ = setTimeout(() => meetingLogout({ automatic:true }), MEETING_IDLE_LIMIT_MS_);
+}
+function scheduleMeetingIdle_(){
+  clearMeetingIdle_();
+  if (meetingDeviceMode_ !== 'shared') return;
+  MEETING_ACTIVITY_EVENTS_.forEach(name => document.addEventListener(name, recordMeetingActivity_, { passive:true }));
+  const last = Number(sessionStorage.getItem(MEETING_IDLE_KEY_)) || Date.now();
+  const remaining = Math.max(0, MEETING_IDLE_LIMIT_MS_ - (Date.now() - last));
+  meetingIdleTimer_ = setTimeout(() => meetingLogout({ automatic:true }), remaining);
+}
 function storeMeetingSession_(staff, fallbackCode){
+  clearMeetingIdle_();
   const token = String(staff.systemPortalSessionToken || '').trim();
-  localStorage.setItem('adminSystemPortalSessionToken', token);
-  localStorage.setItem('adminSystemPortalExpiresAt', '2100-01-01T00:00:00.000Z');
-  localStorage.setItem('adminLoggedIn', '1');
-  localStorage.setItem('adminDeviceMode', 'personal');
-  localStorage.setItem('adminStaffCode', String(staff.code || fallbackCode || ''));
-  localStorage.setItem('adminStaffName', String(staff.name || ''));
-  localStorage.setItem('adminCodeInput', String(staff.code || fallbackCode || ''));
-  sessionStorage.removeItem('adminSystemPortalSessionToken');
-  sessionStorage.removeItem('adminSystemPortalExpiresAt');
+  const code = String(staff.code || fallbackCode || '');
+  const name = String(staff.name || '');
+  if (meetingDeviceMode_ === 'shared') {
+    [
+      'adminSystemPortalSessionToken','adminSystemPortalExpiresAt','adminLoggedIn',
+      'adminStaffCode','adminStaffName','adminDeviceMode','adminCodeInput','adminPwInput'
+    ].forEach(key => localStorage.removeItem(key));
+    sessionStorage.setItem('meetingDeviceMode', 'shared');
+    sessionStorage.setItem('adminSystemPortalSessionToken', token);
+    sessionStorage.setItem('adminSystemPortalExpiresAt', String(staff.systemPortalExpiresAt || ''));
+    sessionStorage.setItem('adminLoggedIn', '1');
+    sessionStorage.setItem('adminDeviceMode', 'school');
+    sessionStorage.setItem('adminStaffCode', code);
+    sessionStorage.setItem('adminStaffName', name);
+    sessionStorage.setItem(MEETING_IDLE_KEY_, String(Date.now()));
+  } else {
+    [
+      'adminSystemPortalSessionToken','adminSystemPortalExpiresAt','adminLoggedIn',
+      'adminStaffCode','adminStaffName','adminDeviceMode','meetingDeviceMode',MEETING_IDLE_KEY_
+    ].forEach(key => sessionStorage.removeItem(key));
+    localStorage.setItem('adminSystemPortalSessionToken', token);
+    localStorage.setItem('adminSystemPortalExpiresAt', '2100-01-01T00:00:00.000Z');
+    localStorage.setItem('adminLoggedIn', '1');
+    localStorage.setItem('adminDeviceMode', 'personal');
+    localStorage.setItem('adminStaffCode', code);
+    localStorage.setItem('adminStaffName', name);
+    localStorage.setItem('adminCodeInput', code);
+  }
 }
 function clearMeetingSession_(){
+  clearMeetingIdle_();
   [
     'adminSystemPortalSessionToken','adminSystemPortalExpiresAt','adminLoggedIn',
     'adminStaffCode','adminStaffName','adminDeviceMode','adminCodeInput','adminPwInput'
   ].forEach(key => localStorage.removeItem(key));
-  ['adminSystemPortalSessionToken','adminSystemPortalExpiresAt','adminLoggedIn','adminStaffCode','adminStaffName','adminDeviceMode']
-    .forEach(key => sessionStorage.removeItem(key));
+  [
+    'adminSystemPortalSessionToken','adminSystemPortalExpiresAt','adminLoggedIn',
+    'adminStaffCode','adminStaffName','adminDeviceMode','meetingDeviceMode',MEETING_IDLE_KEY_
+  ].forEach(key => sessionStorage.removeItem(key));
 }
 async function showMeetingApp_(){
   document.body.classList.remove('auth-locked');
   $('loginGate').style.display = 'none';
-  const name = localStorage.getItem('adminStaffName') || sessionStorage.getItem('adminStaffName') || '';
-  const code = localStorage.getItem('adminStaffCode') || sessionStorage.getItem('adminStaffCode') || '';
+  const store = meetingDeviceMode_ === 'shared' ? sessionStorage : localStorage;
+  const name = store.getItem('adminStaffName') || '';
+  const code = store.getItem('adminStaffCode') || '';
   $('meetingSessionStaff').textContent = name ? name + (code ? '（' + code + '）' : '') : (code || '');
+  scheduleMeetingIdle_();
   if (!meetingAppInitialized_) {
     meetingAppInitialized_ = true;
     await init();
@@ -679,11 +757,13 @@ async function showMeetingApp_(){
   }
 }
 function showMeetingLogin_(message=''){
+  clearMeetingIdle_();
   document.body.classList.add('auth-locked');
   $('loginGate').style.display = 'flex';
   $('meetingLoginError').textContent = message;
   const savedCode = localStorage.getItem('adminCodeInput') || '';
   if (savedCode) $('meetingLoginCode').value = savedCode;
+  selectMeetingDevice_(localStorage.getItem('adminDeviceMode') === 'personal' ? 'personal' : meetingDeviceMode_);
 }
 async function meetingLogin(event){
   event?.preventDefault();
@@ -705,7 +785,10 @@ async function meetingLogin(event){
       throw new Error('面談メモを利用できる管理権限がありません。');
     }
     storeMeetingSession_(staff, code);
-    await meetingSupabaseApi_({ action:'persistAdminSession' });
+    if (meetingDeviceMode_ === 'personal') {
+      await meetingSupabaseApi_({ action:'persistAdminSession' });
+    }
+    await meetingSupabaseApi_({ action:'getStaffMembers' });
     $('meetingLoginPassword').value = '';
     await showMeetingApp_();
   } catch(e) {
@@ -716,7 +799,7 @@ async function meetingLogin(event){
     button.textContent = 'ログイン';
   }
 }
-async function meetingLogout(){
+async function meetingLogout(options = {}){
   const token = meetingAdminToken_();
   if (token) {
     try {
@@ -731,29 +814,38 @@ async function meetingLogout(){
   staffMembers = [];
   allMemos = [];
   memos = [];
-  showMeetingLogin_('ログアウトしました。');
+  showMeetingLogin_(options.automatic
+    ? '30分間操作がなかったため、自動でログアウトしました。'
+    : 'ログアウトしました。');
 }
 async function bootMeetingApp_(){
-  const sessionToken = meetingAdminToken_();
-  if (!sessionToken) {
+  if (localStorage.getItem('adminSystemPortalSessionToken')) {
+    meetingDeviceMode_ = 'personal';
+  } else if (sessionStorage.getItem('adminSystemPortalSessionToken')) {
+    meetingDeviceMode_ = 'shared';
+    sessionStorage.setItem('meetingDeviceMode', 'shared');
+  } else {
     showMeetingLogin_();
     return;
   }
-  if (!localStorage.getItem('adminSystemPortalSessionToken')) {
-    localStorage.setItem('adminSystemPortalSessionToken', sessionToken);
-    localStorage.setItem('adminSystemPortalExpiresAt', '2100-01-01T00:00:00.000Z');
-    localStorage.setItem('adminLoggedIn', '1');
-    localStorage.setItem('adminDeviceMode', 'personal');
+  if (meetingDeviceMode_ === 'shared') {
+    const last = Number(sessionStorage.getItem(MEETING_IDLE_KEY_)) || Date.now();
+    if (Date.now() - last >= MEETING_IDLE_LIMIT_MS_) {
+      await meetingLogout({ automatic:true });
+      return;
+    }
   }
   try {
-    await meetingSupabaseApi_({ action:'persistAdminSession' });
+    if (meetingDeviceMode_ === 'personal') {
+      await meetingSupabaseApi_({ action:'persistAdminSession' });
+    }
+    await meetingSupabaseApi_({ action:'getStaffMembers' });
     await showMeetingApp_();
   } catch(e) {
     clearMeetingSession_();
     showMeetingLogin_('ログインしてください。');
   }
 }
-
 
 async function fetchLocalSearchStudents_(){
   const res = await fetch('student_search_index.json?v=20260826-1', { cache:'no-store' });
