@@ -162,6 +162,29 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 .searchWrap input:focus{border-color:var(--primary)}
 .searchWrap::before{content:'🔍';position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:.78rem;opacity:.5;pointer-events:none}
 
+/* 成績×通知表：面談メモと同じ生徒検索 */
+.cmpStudentSearchWrap{position:relative;flex:1 1 420px;min-width:320px}
+.filterRow .cmpStudentSearchInput{width:100%;background:#fff;border:1px solid var(--border2);border-radius:8px;padding:8px 10px;color:#1e293b;font-size:.82rem;outline:none}
+.filterRow .cmpStudentSearchInput:focus{border-color:var(--primary);box-shadow:0 0 0 2px rgba(26,86,160,.1)}
+.cmpStudentSearchHint{margin-top:5px;color:#64748b;font-size:.72rem}
+.cmpStudentPicker{display:none;position:absolute;left:0;right:0;top:38px;z-index:80;border:1px solid #cbd8e6;border-radius:10px;background:#fff;overflow-y:auto;max-height:280px;box-shadow:0 8px 24px rgba(15,23,42,.18)}
+.cmpStudentPicker.show{display:block}
+.cmpStudentChoice{width:100%;display:grid;grid-template-columns:28px minmax(0,1fr) 62px 74px;gap:8px;align-items:center;min-height:42px;padding:8px 10px;border:0;border-bottom:1px solid #e8eef5;background:#fff8dc;color:#102033;text-align:left;font-weight:700;cursor:pointer}
+.cmpStudentChoice:last-child{border-bottom:0}
+.cmpStudentChoice:hover{background:#fff0bd}
+.cmpStudentChoice.selected{background:#dceeff;color:#0f4f90;box-shadow:inset 4px 0 #155aa5}
+.cmpStudentCheck{display:grid;place-items:center;width:22px;height:22px;border:1px solid #aebfd1;border-radius:6px;color:#fff;font-weight:900}
+.cmpStudentChoice.selected .cmpStudentCheck{background:#155aa5;border-color:#155aa5}
+.cmpStudentChoiceMeta{color:#64748b;font-size:.75rem;font-weight:700}
+.cmpStudentPickerEmpty{padding:16px;color:#64748b;text-align:center;font-size:.8rem}
+.cmpSelectedStudentPanel{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:7px;padding:8px 10px;border:2px solid #1769ba;border-radius:10px;background:#eaf4ff}
+.cmpSelectedStudentInfo{min-width:0}
+.cmpSelectedStudentTitle{display:block;color:#124f8c;font-size:.68rem;font-weight:900;margin-bottom:2px}
+.cmpSelectedStudentText{color:#102033;font-size:.82rem;font-weight:900}
+.cmpSelectedStudentText.empty{color:#64748b;font-weight:700}
+.cmpSelectedStudentClear{flex:0 0 auto;padding:5px 9px;min-height:30px;background:#fff;color:#b42318;border:1px solid #f0b8b3;border-radius:7px;font-size:.72rem;font-weight:700;cursor:pointer}
+@media(max-width:760px){.cmpStudentSearchWrap{flex-basis:100%;min-width:0}.cmpStudentChoice{grid-template-columns:26px minmax(0,1fr) 48px 58px}}
+
 /* TABLE */
 .tblWrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:.78rem}
@@ -458,9 +481,21 @@ tr:hover td{background:#f8fafc}
             <option value="">全学年</option>
             <option>中1</option><option>中2</option><option>中3</option>
           </select>
-          <select id="cmpStudent" onchange="loadCompare()">
-            <option value="">生徒を選択</option>
-          </select>
+          <div class="cmpStudentSearchWrap">
+            <input id="cmpStudentSearch" class="cmpStudentSearchInput" placeholder="生徒コード・氏名・フリガナ・ローマ字で検索" autocomplete="off" oninput="renderCmpStudentCandidates_()">
+            <select id="cmpStudent" onchange="loadCompare()" style="display:none" aria-hidden="true">
+              <option value="">生徒を選択</option>
+            </select>
+            <div id="cmpStudentSearchHint" class="cmpStudentSearchHint">文字を入力すると、一致する生徒だけ表示されます。</div>
+            <div id="cmpStudentList" class="cmpStudentPicker" role="listbox" aria-label="生徒を選択"></div>
+            <div id="cmpSelectedStudentPanel" class="cmpSelectedStudentPanel" aria-live="polite">
+              <div class="cmpSelectedStudentInfo">
+                <span class="cmpSelectedStudentTitle">現在選択中の生徒</span>
+                <span id="cmpSelectedStudentText" class="cmpSelectedStudentText empty">まだ選択されていません。</span>
+              </div>
+              <button id="cmpSelectedStudentClear" class="cmpSelectedStudentClear" type="button" onclick="clearCmpStudentSelection()" style="display:none">選択解除</button>
+            </div>
+          </div>
           <select id="cmpYear" onchange="loadCompare()"></select>
           <button id="cmpEntryBtn" class="btn btn-ghost btn-sm" onclick="openEntryInfoModal()" disabled>入塾時情報</button>
         </div>
@@ -3944,19 +3979,152 @@ async function initCompare() {
   students = r.students || [];
   filterCmpStudents();
 }
-function filterCmpStudents() {
-  const campus = document.getElementById('cmpCampus').value;
-  const grade = document.getElementById('cmpGrade').value;
+function normalizeCmpStudentSearch_(value) {
+  return String(value || '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[ァ-ヶ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60))
+    .replace(/[\\s　]+/g, '');
+}
+const CMP_ROMAJI_PAIRS_ = {
+  'きゃ':'kya','きゅ':'kyu','きょ':'kyo','ぎゃ':'gya','ぎゅ':'gyu','ぎょ':'gyo',
+  'しゃ':'sha','しゅ':'shu','しょ':'sho','じゃ':'ja','じゅ':'ju','じょ':'jo',
+  'ちゃ':'cha','ちゅ':'chu','ちょ':'cho','ぢゃ':'ja','ぢゅ':'ju','ぢょ':'jo',
+  'にゃ':'nya','にゅ':'nyu','にょ':'nyo','ひゃ':'hya','ひゅ':'hyu','ひょ':'hyo',
+  'びゃ':'bya','びゅ':'byu','びょ':'byo','ぴゃ':'pya','ぴゅ':'pyu','ぴょ':'pyo',
+  'みゃ':'mya','みゅ':'myu','みょ':'myo','りゃ':'rya','りゅ':'ryu','りょ':'ryo',
+  'うぃ':'wi','うぇ':'we','うぉ':'wo','ゔぁ':'va','ゔぃ':'vi','ゔぇ':'ve','ゔぉ':'vo',
+  'ふぁ':'fa','ふぃ':'fi','ふぇ':'fe','ふぉ':'fo','しぇ':'she','じぇ':'je','ちぇ':'che',
+  'てぃ':'ti','でぃ':'di','とぅ':'tu','どぅ':'du','つぁ':'tsa','つぃ':'tsi','つぇ':'tse','つぉ':'tso'
+};
+const CMP_ROMAJI_CHARS_ = {
+  'あ':'a','い':'i','う':'u','え':'e','お':'o','か':'ka','き':'ki','く':'ku','け':'ke','こ':'ko',
+  'が':'ga','ぎ':'gi','ぐ':'gu','げ':'ge','ご':'go','さ':'sa','し':'shi','す':'su','せ':'se','そ':'so',
+  'ざ':'za','じ':'ji','ず':'zu','ぜ':'ze','ぞ':'zo','た':'ta','ち':'chi','つ':'tsu','て':'te','と':'to',
+  'だ':'da','ぢ':'ji','づ':'zu','で':'de','ど':'do','な':'na','に':'ni','ぬ':'nu','ね':'ne','の':'no',
+  'は':'ha','ひ':'hi','ふ':'fu','へ':'he','ほ':'ho','ば':'bi','び':'bi','ぶ':'bu','べ':'be','ぼ':'bo',
+  'ぱ':'pa','ぴ':'pi','ぷ':'pu','ぺ':'pe','ぽ':'po','ま':'ma','み':'mi','む':'mu','め':'me','も':'mo',
+  'や':'ya','ゆ':'yu','よ':'yo','ら':'ra','り':'ri','る':'ru','れ':'re','ろ':'ro','わ':'wa','を':'o',
+  'ん':'n','ゔ':'vu','ぁ':'a','ぃ':'i','ぅ':'u','ぇ':'e','ぉ':'o','ゎ':'wa'
+};
+function cmpKanaToRomaji_(value) {
+  const kana = normalizeCmpStudentSearch_(value);
+  let out = '';
+  let smallTsu = false;
+  for (let i = 0; i < kana.length; i++) {
+    const ch = kana[i];
+    if (ch === 'っ') { smallTsu = true; continue; }
+    if (ch === 'ー') {
+      const vowel = (out.match(/[aeiou]$/) || [])[0];
+      if (vowel) out += vowel;
+      continue;
+    }
+    const pair = CMP_ROMAJI_PAIRS_[kana.slice(i, i + 2)];
+    let roma = pair || CMP_ROMAJI_CHARS_[ch] || ch;
+    if (pair) i++;
+    if (smallTsu) {
+      if (roma.startsWith('ch')) out += 't';
+      else if (/^[bcdfghjklmpqrstvwxyz]/.test(roma)) out += roma[0];
+      smallTsu = false;
+    }
+    out += roma;
+  }
+  return out;
+}
+function eligibleCmpStudents_() {
+  const campus = document.getElementById('cmpCampus')?.value || '';
+  const grade = document.getElementById('cmpGrade')?.value || '';
   let list = students;
   if (campus) list = list.filter(s => s.campus === campus);
   if (grade) list = list.filter(s => gradeMatchesGroup(s.grade, grade));
+  return list;
+}
+function renderCmpSelectedStudent_() {
+  const selectedId = String(document.getElementById('cmpStudent')?.value || '');
+  const selected = students.find(s => String(s.id) === selectedId);
+  const text = document.getElementById('cmpSelectedStudentText');
+  const clear = document.getElementById('cmpSelectedStudentClear');
+  if (!text || !clear) return;
+  if (!selected) {
+    text.textContent = 'まだ選択されていません。';
+    text.classList.add('empty');
+    clear.style.display = 'none';
+    return;
+  }
+  text.textContent = `${selected.name}　No.${selected.id}　${selected.grade || ''}　${selected.campus || ''}`;
+  text.classList.remove('empty');
+  clear.style.display = '';
+}
+function renderCmpStudentCandidates_() {
+  const input = document.getElementById('cmpStudentSearch');
+  const listEl = document.getElementById('cmpStudentList');
+  const hintEl = document.getElementById('cmpStudentSearchHint');
+  if (!input || !listEl || !hintEl) return;
+  const q = normalizeCmpStudentSearch_(input.value);
+  if (!q) {
+    listEl.innerHTML = '';
+    listEl.classList.remove('show');
+    hintEl.textContent = '文字を入力すると、一致する生徒だけ表示されます。';
+    renderCmpSelectedStudent_();
+    return;
+  }
+  const matched = eligibleCmpStudents_().filter(s => {
+    const kana = s.kana || s.furigana || '';
+    return [s.id, s.name, kana, cmpKanaToRomaji_(kana)]
+      .map(normalizeCmpStudentSearch_)
+      .some(value => value.includes(q));
+  });
+  const visible = matched.slice(0, 30);
+  const activeId = String(document.getElementById('cmpStudent')?.value || '');
+  listEl.classList.add('show');
+  hintEl.textContent = matched.length > 30
+    ? `${matched.length}人が該当（先頭30人を表示）`
+    : `${matched.length}人が該当`;
+  listEl.innerHTML = visible.length ? visible.map(s => {
+    const selected = String(s.id) === activeId;
+    return `<button type="button" class="cmpStudentChoice${selected ? ' selected' : ''}" role="option" aria-selected="${selected}" onclick="selectCmpStudent('${htmlEsc(s.id)}')">
+      <span class="cmpStudentCheck">${selected ? '✓' : ''}</span>
+      <span>${htmlEsc(s.name)} <span class="cmpStudentChoiceMeta">No.${htmlEsc(s.id)}</span></span>
+      <span class="cmpStudentChoiceMeta">${htmlEsc(s.grade || '')}</span>
+      <span class="cmpStudentChoiceMeta">${htmlEsc(s.campus || '')}</span>
+    </button>`;
+  }).join('') : '<div class="cmpStudentPickerEmpty">該当する生徒がいません。</div>';
+  renderCmpSelectedStudent_();
+}
+function filterCmpStudents() {
+  const list = eligibleCmpStudents_();
   const sel = document.getElementById('cmpStudent');
   const prev = sel.value;
   sel.innerHTML = '<option value="">生徒を選択</option>' + list.map(s =>
-    `<option value="${s.id}">${s.name}（${s.grade}）</option>`).join('');
-  if (prev) sel.value = prev;
-  updateCmpEntryButton();
+    `<option value="${htmlEsc(s.id)}">${htmlEsc(s.name)}（${htmlEsc(s.grade || '')}）</option>`).join('');
+  if (prev && list.some(s => String(s.id) === String(prev))) sel.value = prev;
+  renderCmpStudentCandidates_();
+  renderCmpSelectedStudent_();
+  updateCmpEntryButton(sel.value);
   updateCmpAdmissionDate(sel.value);
+}
+function selectCmpStudent(id) {
+  const sel = document.getElementById('cmpStudent');
+  if (!sel) return;
+  sel.value = String(id || '');
+  const input = document.getElementById('cmpStudentSearch');
+  if (input) input.value = '';
+  renderCmpStudentCandidates_();
+  renderCmpSelectedStudent_();
+  updateCmpEntryButton(sel.value);
+  updateCmpAdmissionDate(sel.value);
+  if (sel.value) loadCompare(sel.value);
+}
+function clearCmpStudentSelection() {
+  const sel = document.getElementById('cmpStudent');
+  const input = document.getElementById('cmpStudentSearch');
+  if (sel) sel.value = '';
+  if (input) input.value = '';
+  renderCmpStudentCandidates_();
+  renderCmpSelectedStudent_();
+  updateCmpEntryButton('');
+  updateCmpAdmissionDate('');
+  input?.focus();
 }
 function updateCmpAdmissionDate(sid) {
   const box = document.getElementById('cmpAdmissionDate');
@@ -4039,6 +4207,7 @@ async function loadCompare(overrideSid) {
     }
     sel.value = String(overrideSid);
   }
+  renderCmpSelectedStudent_();
   updateCmpAdmissionDate(sid);
   const [scoreRes, rpRes] = await Promise.all([
     api({ action: 'getStudentScores', studentId: sid }),
