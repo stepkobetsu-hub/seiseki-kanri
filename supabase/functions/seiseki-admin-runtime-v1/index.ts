@@ -7,9 +7,11 @@ const ADMIN_ACTIONS = new Set([
   'saveScore', 'deleteScore', 'getAllReports', 'getReports', 'saveReport',
   'deleteReport', 'getAllWishes', 'getWish', 'saveWish', 'saveWishResult',
   'getSchools', 'addSchool', 'updateSchool', 'deleteSchool',
-  'reconcileLegacy', 'logoutAdmin',
+  'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
+  'getStaffMembers', 'addStaffMember', 'deleteStaffMember',
+  'reconcileLegacy', 'persistAdminSession', 'logoutAdmin',
 ]);
-const WRITE_ACTIONS = new Set(['saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool']);
+const WRITE_ACTIONS = new Set(['saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember']);
 const ADMIN_PERMISSION_LEVELS = new Set(['2', '3', '4']);
 const ADMIN_SESSION_REVERIFY_MS = 6 * 60 * 60 * 1000;
 const GRADE_GAS_URL = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
@@ -37,9 +39,8 @@ async function verifyAdmin(token: unknown): Promise<JsonObject> {
   const cached = await pg(query('seiseki_admin_sessions', { select:'staff_code,permission_level,expires_at,verified_at', token_hash:`eq.${tokenHash}`, limit:1 })) as JsonObject[];
   if (cached.length) {
     const session = cached[0];
-    const recentlyVerified = Date.now() - new Date(String(session.verified_at)).getTime() < ADMIN_SESSION_REVERIFY_MS;
     const unexpired = new Date(String(session.expires_at)).getTime() > Date.now();
-    if (recentlyVerified && unexpired && ADMIN_PERMISSION_LEVELS.has(String(session.permission_level))) return session;
+    if (unexpired && ADMIN_PERMISSION_LEVELS.has(String(session.permission_level))) return session;
   }
   const response = await fetch(commonApiEndpoint(STAFF_SESSION_API_URL), {
     method: 'POST',
@@ -128,7 +129,7 @@ function student(row: JsonObject): JsonObject {
   const flag = status === 'active' ? '1' : status === 'withdrawal_scheduled' ? '0' : '';
   return {
     id: row.student_code, studentId: row.student_code, studentCode: row.student_code,
-    name: row.name ?? '', nameKana: row.name_kana ?? '', campus: row.campus ?? '',
+    name: row.name ?? '', nameKana: row.name_kana ?? '', kana: row.name_kana ?? '', furigana: row.name_kana ?? '', campus: row.campus ?? '',
     grade: row.grade ?? '', school: row.school_name ?? '',
     flag, enrollmentFlag: flag, enrollmentStatus: status,
     active: status === 'active', syncedAt: row.source_updated_at ?? row.updated_at ?? '',
@@ -299,6 +300,131 @@ async function sha256(rows: unknown[]): Promise<string> {
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+
+function meetingMemo(row: JsonObject): JsonObject {
+  return {
+    id: row.id, date: row.memo_date, studentId: row.student_code,
+    name: row.student_name ?? '', campus: row.campus ?? '', grade: row.grade ?? '',
+    school: row.school_name ?? '', counterpart: row.contact_person ?? '',
+    content: row.content ?? '', staff: row.staff_name ?? '',
+    createdAt: row.created_at ?? '', updatedAt: row.updated_at ?? '',
+  };
+}
+
+function meetingStaff(row: JsonObject): JsonObject {
+  return {
+    name: row.name ?? '', email: row.email ?? '',
+    notify: row.notify_ote === true,
+    notifyOte: row.notify_ote === true,
+    notifyJinryo: row.notify_jinryo === true,
+  };
+}
+
+async function readMeetingMemos(payload: JsonObject): Promise<JsonObject> {
+  const params: Record<string, unknown> = {
+    select: '*',
+    order: 'memo_date.desc,updated_at.desc',
+    limit: positiveInt(payload.limit, 2000, 5000),
+  };
+  if (payload.studentId) params.student_code = `eq.${String(payload.studentId)}`;
+  if (payload.staff) params.staff_name = `eq.${String(payload.staff)}`;
+  if (payload.counterpart && payload.counterpart !== '他') params.contact_person = `eq.${String(payload.counterpart)}`;
+  if (payload.counterpart === '他') params.contact_person = 'like.他*';
+  if (payload.campus) params.campus = `eq.${String(payload.campus)}`;
+  if (payload.q) {
+    const safe = String(payload.q).replace(/[()*.,%_]/g, ' ').trim();
+    if (safe) params.or = `(student_code.ilike.*${safe}*,student_name.ilike.*${safe}*,content.ilike.*${safe}*,staff_name.ilike.*${safe}*)`;
+  }
+  const rows = await pg(query('meeting_memos', params)) as JsonObject[];
+  return { success: true, memos: rows.map(meetingMemo), source: 'supabase' };
+}
+
+async function readMeetingStaff(): Promise<JsonObject> {
+  const rows = await pg(query('meeting_staff', { select: '*', order: 'name.asc' })) as JsonObject[];
+  return { success: true, staffMembers: rows.map(meetingStaff), staff: rows.map(row => String(row.name ?? '')), source: 'supabase' };
+}
+
+async function saveMeetingMemo(payload: JsonObject): Promise<JsonObject> {
+  const id = String(payload.id ?? '').trim() || crypto.randomUUID();
+  const studentId = String(payload.studentId ?? '').trim();
+  const memoDate = String(payload.date ?? '').trim();
+  const content = String(payload.content ?? '').trim();
+  const staffName = String(payload.staff ?? '').trim();
+  if (!studentId || !memoDate || !content || !staffName) {
+    throw new ResponseError(400, 'INVALID_MEETING_MEMO', 'studentId, date, content and staff are required');
+  }
+  const [studentRows, existingRows] = await Promise.all([
+    pg(query('students', { select: 'student_code,name,campus,grade,school_name', student_code: `eq.${studentId}`, limit: 1 })) as Promise<JsonObject[]>,
+    pg(query('meeting_memos', { select: 'created_at', id: `eq.${id}`, limit: 1 })) as Promise<JsonObject[]>,
+  ]);
+  if (!studentRows.length) throw new ResponseError(404, 'STUDENT_NOT_FOUND', 'Student not found');
+  const studentRow = studentRows[0];
+  const now = new Date().toISOString();
+  const row = {
+    id, memo_date: memoDate, student_code: studentId,
+    student_name: String(studentRow.name ?? ''), campus: String(studentRow.campus ?? ''),
+    grade: String(studentRow.grade ?? ''), school_name: String(studentRow.school_name ?? ''),
+    contact_person: String(payload.counterpart ?? ''), content, staff_name: staffName,
+    created_at: existingRows[0]?.created_at ?? now, updated_at: now,
+  };
+  const saved = await pg(query('meeting_memos', { on_conflict: 'id', select: '*' }), {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify(row),
+  }) as JsonObject[];
+  let email: unknown = undefined;
+  let warning = '';
+  if (payload.sendEmail === true) {
+    try {
+      const legacy = await gas('saveMeetingMemo', { ...payload, id });
+      email = legacy.email;
+    } catch {
+      warning = 'メモは保存しましたが、メール送信を確認できませんでした。';
+      email = { sent: false };
+    }
+  } else {
+    await mirror({ ...payload, id, action: 'saveMeetingMemo' });
+  }
+  return { success: true, memo: meetingMemo(saved[0] ?? row), email, warning, source: 'supabase' };
+}
+
+async function deleteMeetingMemo(payload: JsonObject): Promise<JsonObject> {
+  const id = String(payload.id ?? '').trim();
+  if (!id) throw new ResponseError(400, 'INVALID_MEETING_MEMO', 'id is required');
+  await pg(query('meeting_memos', { id: `eq.${id}` }), {
+    method: 'DELETE', headers: { Prefer: 'return=minimal' },
+  });
+  await mirror(payload);
+  return { success: true, source: 'supabase', mirrorStatus: 'queued' };
+}
+
+async function saveMeetingStaff(payload: JsonObject): Promise<JsonObject> {
+  const name = String(payload.name ?? '').trim();
+  if (!name) throw new ResponseError(400, 'INVALID_STAFF', 'name is required');
+  const now = new Date().toISOString();
+  await pg(query('meeting_staff', { on_conflict: 'name' }), {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({
+      name, email: String(payload.email ?? '').trim(),
+      notify_ote: payload.notifyOte === true || payload.notify === true,
+      notify_jinryo: payload.notifyJinryo === true, updated_at: now,
+    }),
+  });
+  await mirror(payload);
+  return readMeetingStaff();
+}
+
+async function deleteMeetingStaff(payload: JsonObject): Promise<JsonObject> {
+  const name = String(payload.name ?? '').trim();
+  if (!name) throw new ResponseError(400, 'INVALID_STAFF', 'name is required');
+  await pg(query('meeting_staff', { name: `eq.${name}` }), {
+    method: 'DELETE', headers: { Prefer: 'return=minimal' },
+  });
+  await mirror(payload);
+  return readMeetingStaff();
+}
+
 async function sha256Text(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
@@ -319,18 +445,29 @@ async function reconcileLegacy(): Promise<JsonObject> {
     gas('getStudentList'), gas('getAllScores'), gas('getAllReports'), gas('getAllWishes'), gas('getSchools'),
   ]);
   const legacyStudents = Array.isArray(studentResult.students) ? studentResult.students as JsonObject[] : [];
-  const masterStudentRows = legacyStudents.map(item => ({
-    student_code: String(item.id ?? item.studentId ?? '').trim(), name: String(item.name ?? '').trim(),
-    name_kana: String(item.nameKana ?? item.kana ?? '').trim() || null, campus: String(item.campus ?? '').trim() || null,
-    grade: String(item.grade ?? '').trim() || null, school_name: String(item.school ?? '').trim() || null,
-    active: String(item.enrollmentFlag ?? item.flag ?? '').trim() === '1',
-    enrollment_status: String(item.enrollmentFlag ?? item.flag ?? '').trim() === '1'
-      ? 'active'
-      : String(item.enrollmentFlag ?? item.flag ?? '').trim() === '0'
-        ? 'withdrawal_scheduled'
-        : 'withdrawn',
-    source_updated_at: item.syncedAt || new Date().toISOString(),
-  })).filter(row => row.student_code && row.name);
+  // The legacy GAS student list does not always include furigana. Preserve the
+  // verified kana already stored in Supabase instead of overwriting it with null.
+  const existingStudents = await pg(query('students', { select: 'student_code,name_kana', limit: 5000 })) as JsonObject[];
+  const existingKanaByCode = new Map(existingStudents.map(item => [
+    String(item.student_code ?? '').trim(),
+    String(item.name_kana ?? '').trim(),
+  ]));
+  const masterStudentRows = legacyStudents.map(item => {
+    const studentCode = String(item.id ?? item.studentId ?? '').trim();
+    return {
+      student_code: studentCode, name: String(item.name ?? '').trim(),
+      name_kana: String(item.nameKana ?? item.kana ?? existingKanaByCode.get(studentCode) ?? '').trim() || null,
+      campus: String(item.campus ?? '').trim() || null,
+      grade: String(item.grade ?? '').trim() || null, school_name: String(item.school ?? '').trim() || null,
+      active: String(item.enrollmentFlag ?? item.flag ?? '').trim() === '1',
+      enrollment_status: String(item.enrollmentFlag ?? item.flag ?? '').trim() === '1'
+        ? 'active'
+        : String(item.enrollmentFlag ?? item.flag ?? '').trim() === '0'
+          ? 'withdrawal_scheduled'
+          : 'withdrawn',
+      source_updated_at: item.syncedAt || new Date().toISOString(),
+    };
+  }).filter(row => row.student_code && row.name);
   const masterCodes = new Set(masterStudentRows.map(row => row.student_code));
   const linkedRecords = [
     ...(Array.isArray(scoreResult.scores) ? scoreResult.scores as JsonObject[] : []),
@@ -343,7 +480,7 @@ async function reconcileLegacy(): Promise<JsonObject> {
     if (code && !masterCodes.has(code) && !orphanByCode.has(code)) orphanByCode.set(code, item);
   }
   const orphanStudentRows = [...orphanByCode].map(([code, item]) => ({
-    student_code:code, name:String(item.name ?? '').trim() || code, name_kana:null,
+    student_code:code, name:String(item.name ?? '').trim() || code, name_kana:existingKanaByCode.get(code) || null,
     campus:String(item.campus ?? '').trim() || null, grade:String(item.grade ?? '').trim() || null,
     school_name:String(item.school ?? '').trim() || null, active:false, enrollment_status:'withdrawn', source_updated_at:new Date().toISOString(),
   }));
@@ -429,6 +566,22 @@ async function mirror(payload: JsonObject): Promise<JsonObject> {
   return { success: true, source: 'supabase', mirrorStatus: 'queued' };
 }
 
+
+async function persistAdminSession(payload: JsonObject): Promise<JsonObject> {
+  const token = String(payload.token ?? '').trim();
+  if (!token) throw new ResponseError(401, 'AUTH_REQUIRED', 'Authentication required');
+  const tokenHash = await sha256Text(token);
+  await pg(query('seiseki_admin_sessions', { token_hash: `eq.${tokenHash}` }), {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      expires_at: '2100-01-01T00:00:00.000Z',
+      verified_at: new Date().toISOString(),
+    }),
+  });
+  return { success: true, persistent: true };
+}
+
 async function logoutAdmin(payload: JsonObject): Promise<JsonObject> {
   const token = String(payload.token ?? '').trim();
   if (token) {
@@ -451,9 +604,16 @@ async function dispatch(payload: JsonObject): Promise<JsonObject> {
     case 'getAllWishes': return readWishes(payload, true);
     case 'getWish': return readWishes(payload, false);
     case 'getSchools': return getSchools();
+    case 'getMeetingMemos': return readMeetingMemos(payload);
+    case 'getStaffMembers': return readMeetingStaff();
+    case 'saveMeetingMemo': return saveMeetingMemo(payload);
+    case 'deleteMeetingMemo': return deleteMeetingMemo(payload);
+    case 'addStaffMember': return saveMeetingStaff(payload);
+    case 'deleteStaffMember': return deleteMeetingStaff(payload);
     case 'addSchool': case 'updateSchool': return saveSchool(payload);
     case 'deleteSchool': return deleteSchool(payload);
     case 'reconcileLegacy': return reconcileLegacy();
+    case 'persistAdminSession': return persistAdminSession(payload);
     case 'logoutAdmin': return logoutAdmin(payload);
     case 'saveScore': return saveScore(payload);
     case 'saveReport': return saveReport(payload);
