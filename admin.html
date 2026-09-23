@@ -176,6 +176,7 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 .cmpStudentCheck{display:grid;place-items:center;width:22px;height:22px;border:1px solid #aebfd1;border-radius:6px;color:#fff;font-weight:900}
 .cmpStudentChoice.selected .cmpStudentCheck{background:#155aa5;border-color:#155aa5}
 .cmpStudentChoiceMeta{color:#64748b;font-size:.75rem;font-weight:700}
+.cmpStudentChoice .withdrawnBadge,.cmpStudentChoice .withdrawalScheduledBadge{margin-left:7px;white-space:nowrap}
 .cmpStudentPickerEmpty{padding:16px;color:#64748b;text-align:center;font-size:.8rem}
 .cmpSelectedStudentPanel{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:7px;padding:8px 10px;border:2px solid #1769ba;border-radius:10px;background:#eaf4ff}
 .cmpSelectedStudentInfo{min-width:0}
@@ -4051,7 +4052,11 @@ function renderCmpSelectedStudent_() {
     clear.style.display = 'none';
     return;
   }
-  text.textContent = `${selected.name}　No.${selected.id}　${selected.grade || ''}　${selected.campus || ''}`;
+  const enrollmentStatus = studentListEnrollmentStatus(selected);
+  const statusLabel = enrollmentStatus === 'withdrawn'
+    ? '　【退塾生】'
+    : enrollmentStatus === 'withdrawalScheduled' ? '　【退塾予定】' : '';
+  text.textContent = `${selected.name}　No.${selected.id}　${selected.grade || ''}　${selected.campus || ''}${statusLabel}`;
   text.classList.remove('empty');
   clear.style.display = '';
 }
@@ -4082,9 +4087,15 @@ function renderCmpStudentCandidates_() {
     : `${matched.length}人が該当`;
   listEl.innerHTML = visible.length ? visible.map(s => {
     const selected = String(s.id) === activeId;
+    const enrollmentStatus = studentListEnrollmentStatus(s);
+    const statusBadge = enrollmentStatus === 'withdrawn'
+      ? '<span class="withdrawnBadge">退塾生</span>'
+      : enrollmentStatus === 'withdrawalScheduled'
+        ? '<span class="withdrawalScheduledBadge">退塾予定</span>'
+        : '';
     return `<button type="button" class="cmpStudentChoice${selected ? ' selected' : ''}" role="option" aria-selected="${selected}" onclick="selectCmpStudent('${htmlEsc(s.id)}')">
       <span class="cmpStudentCheck">${selected ? '✓' : ''}</span>
-      <span>${htmlEsc(s.name)} <span class="cmpStudentChoiceMeta">No.${htmlEsc(s.id)}</span></span>
+      <span>${htmlEsc(s.name)} <span class="cmpStudentChoiceMeta">No.${htmlEsc(s.id)}</span>${statusBadge}</span>
       <span class="cmpStudentChoiceMeta">${htmlEsc(s.grade || '')}</span>
       <span class="cmpStudentChoiceMeta">${htmlEsc(s.campus || '')}</span>
     </button>`;
