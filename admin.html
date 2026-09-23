@@ -607,7 +607,7 @@ tr:hover td{background:#f8fafc}
         <!-- 絞り込み行 -->
         <div class="filterRow" style="flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px">
           <div class="searchWrap">
-            <input type="text" id="stuSearch" placeholder="名前・IDで検索" oninput="onStudentFilterChange()">
+            <input type="text" id="stuSearch" placeholder="氏名・かな・ローマ字・IDで検索" oninput="onStudentFilterChange()">
           </div>
           <select id="stuCampus" onchange="onStudentFilterChange();buildSchoolDropdown()">
             <option value="">全校舎</option>
@@ -742,7 +742,7 @@ tr:hover td{background:#f8fafc}
             <button id="meetListCampusJinryo" class="btn btn-ghost btn-sm" type="button" onclick="selectMeetingListCampus('神領')">神領</button>
             <button id="meetListCampusOte" class="btn btn-ghost btn-sm" type="button" onclick="selectMeetingListCampus('大手')">大手町</button>
           </div>
-          <div class="searchWrap"><input id="meetSearch" placeholder="名前・ID・内容で検索" oninput="scheduleMeetingMemosLoad()"></div>
+          <div class="searchWrap"><input id="meetSearch" placeholder="氏名・かな・ローマ字・ID・内容で検索" oninput="scheduleMeetingMemosLoad()"></div>
           <span class="enrollmentFilter">
             <label><input type="checkbox" id="meetShowActive" checked onchange="loadMeetingMemos()">在籍生</label>
             <label><input type="checkbox" id="meetShowWithdrawn" onchange="loadMeetingMemos()">退塾生</label>
@@ -791,7 +791,7 @@ tr:hover td{background:#f8fafc}
         <div class="cardHead">🧾 テスト成績一覧</div>
         <div class="filterRow">
           <div class="searchWrap">
-            <input type="text" id="scASearch" placeholder="名前・IDで検索" oninput="filterAdminScores()">
+            <input type="text" id="scASearch" placeholder="氏名・かな・ローマ字・IDで検索" oninput="filterAdminScores()">
           </div>
           <span class="enrollmentFilter">
             <label><input type="checkbox" id="scAShowActive" checked onchange="filterAdminScores()">在籍生</label>
@@ -833,7 +833,7 @@ tr:hover td{background:#f8fafc}
         <div class="cardHead">📒 通知表一覧</div>
         <div class="filterRow">
           <div class="searchWrap">
-            <input type="text" id="rpASearch" placeholder="名前・IDで検索" oninput="filterAdminReport()">
+            <input type="text" id="rpASearch" placeholder="氏名・かな・ローマ字・IDで検索" oninput="filterAdminReport()">
           </div>
           <span class="enrollmentFilter">
             <label><input type="checkbox" id="rpAShowActive" checked onchange="filterAdminReport()">在籍生</label>
@@ -897,7 +897,7 @@ tr:hover td{background:#f8fafc}
             <option value="">全学年</option><option>中1</option><option>中2</option><option>中3</option>
           </select>
           <div class="searchWrap">
-            <input type="text" id="wishSearch" placeholder="名前・IDで検索" oninput="filterWishStudents()">
+            <input type="text" id="wishSearch" placeholder="氏名・かな・ローマ字・IDで検索" oninput="filterWishStudents()">
           </div>
           <span class="enrollmentFilter">
             <label><input type="checkbox" id="wishShowActive" checked onchange="filterWishStudents()">在籍生</label>
@@ -1152,6 +1152,8 @@ let pendingSync = null;
 let staffMembers = [];
 let staffMemberRecords = [];
 let meetingMemos = [];
+let meetingMemoSourceRows = [];
+let meetingMemoSourceLoaded = false;
 let adminScores = [];
 let renderedAdminScores = [];
 let renderedAdminReports = [];
@@ -1359,6 +1361,7 @@ function sbStudent(row) {
 }
 
 let enrollmentByStudentId = new Map();
+let studentSearchById = new Map();
 let enrollmentIndexReady = false;
 
 function normalizedEnrollmentFlag(student) {
@@ -1439,16 +1442,36 @@ function studentListPrintName(student) {
   return `${student.name}${suffix}`;
 }
 
+// 全画面共通の生徒検索：漢字・ひらがな・カタカナ・ローマ字・生徒番号に対応
+function matchesUnifiedStudentSearch_(record, query) {
+  const q = normalizeCmpStudentSearch_(query);
+  if (!q) return true;
+  const studentId = String(record?.studentId ?? record?.id ?? record?.studentCode ?? record?.student_code ?? '').trim();
+  const master = studentSearchById.get(studentId)
+    || students.find(s => String(s.id ?? s.studentId ?? s.studentCode ?? '') === studentId)
+    || {};
+  const name = record?.name ?? master.name ?? '';
+  const kana = record?.nameKana ?? record?.kana ?? record?.furigana
+    ?? master.nameKana ?? master.kana ?? master.furigana ?? '';
+  return [studentId, name, kana, cmpKanaToRomaji_(kana)]
+    .map(normalizeCmpStudentSearch_)
+    .some(value => value.includes(q));
+}
+
 async function ensureEnrollmentIndex(force) {
   if (enrollmentIndexReady && !force) return;
   const result = await api({ action: 'getStudents', limit: 1000 });
   if (!result.success) throw new Error(result.error || '在籍情報を取得できませんでした');
   const rows = result.students || [];
   enrollmentByStudentId = new Map();
+  studentSearchById = new Map();
   rows.forEach(student => {
     const id = String(student.id ?? student.studentId ?? student.student_code ?? '').trim();
     const flag = normalizedEnrollmentFlag(student);
-    if (id) enrollmentByStudentId.set(id, flag);
+    if (id) {
+      enrollmentByStudentId.set(id, flag);
+      studentSearchById.set(id, student);
+    }
   });
   // 面談画面の生徒選択にも同じ全件データを再利用し、二重取得と競合を防ぐ
   if (!students.length) students = rows;
@@ -3237,12 +3260,12 @@ function setStuSchoolSort(val) {
 }
 
 function _getFilteredSortedStudents() {
-  const q      = (document.getElementById('stuSearch').value || '').toLowerCase();
+  const q      = document.getElementById('stuSearch').value || '';
   const grades = selectedStuGrades();
   const campus = document.getElementById('stuCampus').value;
   const { showActive, showWithdrawn } = enrollmentSelection('stuShowActive', 'stuShowWithdrawn');
   let list = students.filter(s => matchesStudentListEnrollment(s, showActive, showWithdrawn));
-  if (q)      list = list.filter(s => s.name.toLowerCase().includes(q) || String(s.id).includes(q));
+  if (q)      list = list.filter(s => matchesUnifiedStudentSearch_(s, q));
   if (grades.length > 0 && grades.length < STU_ALL_GRADES.length) list = list.filter(s => grades.includes(normalizeGrade(s.grade)));
   if (campus) list = list.filter(s => s.campus === campus);
   if (_stuSchoolExclude.size > 0) list = list.filter(s => !_stuSchoolExclude.has(s.school || ''));
@@ -3360,7 +3383,7 @@ async function filterWishStudents() {
     matchesEnrollmentRecord(w.studentId, 'wishShowActive', 'wishShowWithdrawn') &&
     (!campus || w.campus === campus) &&
     (!grade || gradeMatchesGroup(w.grade, grade)) &&
-    (!q || String(w.name || '').toLowerCase().includes(q) || String(w.studentId || '').toLowerCase().includes(q))
+    matchesUnifiedStudentSearch_(w, q)
   );
   renderWishTable(filtered);
 }
@@ -3380,7 +3403,7 @@ async function loadAllWishes() {
     matchesEnrollmentRecord(w.studentId, 'wishShowActive', 'wishShowWithdrawn') &&
     (!campus || w.campus === campus) &&
     (!grade  || gradeMatchesGroup(w.grade, grade)) &&
-    (!q || String(w.name || '').toLowerCase().includes(q) || String(w.studentId || '').toLowerCase().includes(q))
+    matchesUnifiedStudentSearch_(w, q)
   );
   renderWishTable(wishes);
 }
@@ -3778,7 +3801,7 @@ function filterAdminScores() {
   const scores = adminScores.filter(d =>
     matchesEnrollmentRecord(d.studentId, 'scAShowActive', 'scAShowWithdrawn') &&
     (!grade || gradeMatchesGroup(d.grade, grade)) &&
-    (!q || String(d.name || '').toLowerCase().includes(q) || String(d.studentId || '').toLowerCase().includes(q))
+    matchesUnifiedStudentSearch_(d, q)
   ).sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   renderAdminScores(scores);
 }
@@ -3880,7 +3903,7 @@ function filterAdminReport() {
   const reports = allReports.filter(d =>
     matchesEnrollmentRecord(d.studentId, 'rpAShowActive', 'rpAShowWithdrawn') &&
     (!grade || gradeMatchesGroup(d.grade, grade)) &&
-    (!q || String(d.name || '').toLowerCase().includes(q) || String(d.studentId || '').toLowerCase().includes(q))
+    matchesUnifiedStudentSearch_(d, q)
   ).sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
   renderAdminReport(reports);
 }
@@ -5412,7 +5435,10 @@ let meetingSearchTimer = null;
 
 function scheduleMeetingMemosLoad() {
   clearTimeout(meetingSearchTimer);
-  meetingSearchTimer = setTimeout(() => loadMeetingMemos(), 250);
+  meetingSearchTimer = setTimeout(() => {
+    if (meetingMemoSourceLoaded) filterMeetingMemosFromSource_();
+    else loadMeetingMemos();
+  }, 120);
 }
 
 function meetingMemoTime(value) {
@@ -5432,6 +5458,25 @@ function sortMeetingMemosNewest(list) {
   );
 }
 
+function matchesMeetingMemoSearch_(memo, query) {
+  const q = normalizeCmpStudentSearch_(query);
+  if (!q) return true;
+  if (matchesUnifiedStudentSearch_(memo, q)) return true;
+  return [memo.content, memo.counterpart, memo.staff]
+    .map(normalizeCmpStudentSearch_)
+    .some(value => value.includes(q));
+}
+
+function filterMeetingMemosFromSource_() {
+  const q = document.getElementById('meetSearch')?.value || '';
+  meetingMemos = sortMeetingMemosNewest(meetingMemoSourceRows).filter(m =>
+    matchesEnrollmentRecord(m.studentId, 'meetShowActive', 'meetShowWithdrawn') &&
+    (!selectedMeetingListCampus || String(m.campus || '') === selectedMeetingListCampus) &&
+    matchesMeetingMemoSearch_(m, q)
+  );
+  renderMeetingTable(meetingMemos);
+}
+
 async function loadMeetingMemos(options) {
   const requestId = ++meetingLoadRequestId;
   const body = document.getElementById('meetBody');
@@ -5449,23 +5494,21 @@ async function loadMeetingMemos(options) {
     if (!options?.enrollmentReady) await ensureEnrollmentIndex();
     const r = await api({
       action: 'getMeetingMemos',
-      q: document.getElementById('meetSearch')?.value || '',
+      q: '',
       staff: document.getElementById('meetFilterStaff')?.value || '',
       counterpart: document.getElementById('meetFilterCounterpart')?.value || ''
     });
     if (requestId !== meetingLoadRequestId) return;
     if (!r.success) throw new Error(r.error || '面談メモを取得できませんでした');
 
-    meetingMemos = sortMeetingMemosNewest(r.memos || []).filter(m =>
-      matchesEnrollmentRecord(m.studentId, 'meetShowActive', 'meetShowWithdrawn')
-    );
-    if (selectedMeetingListCampus) {
-      meetingMemos = meetingMemos.filter(m => String(m.campus || '') === selectedMeetingListCampus);
-    }
-    renderMeetingTable(meetingMemos);
+    meetingMemoSourceRows = sortMeetingMemosNewest(r.memos || []);
+    meetingMemoSourceLoaded = true;
+    filterMeetingMemosFromSource_();
   } catch (e) {
     if (requestId !== meetingLoadRequestId) return;
     meetingMemos = [];
+    meetingMemoSourceRows = [];
+    meetingMemoSourceLoaded = false;
     renderMeetingTable([], e.message || '一覧を読み込めませんでした。');
   }
 }
