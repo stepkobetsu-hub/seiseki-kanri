@@ -4069,7 +4069,7 @@ function renderCmpStudentCandidates_() {
     return;
   }
   const matched = eligibleCmpStudents_().filter(s => {
-    const kana = s.kana || s.furigana || '';
+    const kana = s.nameKana || s.kana || s.furigana || '';
     return [s.id, s.name, kana, cmpKanaToRomaji_(kana)]
       .map(normalizeCmpStudentSearch_)
       .some(value => value.includes(q));
