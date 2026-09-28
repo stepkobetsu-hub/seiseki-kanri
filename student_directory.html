@@ -77,7 +77,7 @@ let mode='personal',students=[],ready=false,selectedId='',editable=null,request=
 function storage(){return localStorage}
 function token(){return storage().getItem(TOKEN)||''}
 function setStatus(text,error=false){el('status').textContent=text;el('status').classList.toggle('error',error)}
-async function api(action,extra={}){const response=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action,...extra})});if(!response.ok)throw Error('通信に失敗しました。もう一度お試しください。');return response.json()}
+async function api(action,extra={},signal){const response=await fetch(GAS,{signal,method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action,...extra})});if(!response.ok)throw Error('通信に失敗しました。もう一度お試しください。');return response.json()}
 function clearSession(){resetDetails();request++;listRequest++;localStorage.removeItem(INDEX_CACHE_KEY);for(const store of [localStorage,sessionStorage])for(const key of [TOKEN,EXPIRY,'adminLoggedIn','adminStaffCode','adminStaffName','adminDeviceMode'])store.removeItem(key);mode='';students=[];ready=false;editable=null;selectedId='';detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').replaceChildren();el('detail').classList.add('hidden')}
 function showLogin(message=''){el('app').classList.add('hidden');el('logout').classList.add('hidden');el('login').classList.remove('hidden');el('loginError').textContent=message;el('password').value='';}
 function showApp(){el('login').classList.add('hidden');el('app').classList.remove('hidden');el('logout').classList.remove('hidden');loadList()}
@@ -201,7 +201,7 @@ const detailCache=new Map(),detailPending=new Map();
 let detailEpoch=0,prefetchTimer=0;
 const DETAIL_REUSE_MS=15000;
 // Detail data stays only in this page's memory, never in browser storage.
-function resetDetails(){detailEpoch++;clearTimeout(prefetchTimer);detailCache.clear();detailPending.clear()}
+function resetDetails(){detailEpoch++;clearTimeout(prefetchTimer);detailCache.clear();for(const entry of detailPending.values())entry.controller.abort();detailPending.clear()}
 function validDetail(r,id){return r?.success===true&&String(r.student?.id)===String(id)}
 async function requestDetail(id){
   id=String(id);
@@ -212,14 +212,15 @@ async function requestDetail(id){
   detailCache.delete(id);
   const pending=detailPending.get(id);
   if(pending&&pending.session===session)return pending.promise;
-  const entry={session,promise:null};
-  entry.promise=api('getStudentDirectoryDetail',{studentId:id,systemPortalSessionToken:session}).then(r=>{
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);
+  const entry={session,promise:null,controller};
+  entry.promise=api('getStudentDirectoryDetail',{studentId:id,systemPortalSessionToken:session},controller.signal).then(r=>{
     if(epoch!==detailEpoch||session!==token())throw Error('情報を更新しました。もう一度選択してください。');
     if(!validDetail(r,id))throw Error(r.error||'取得できませんでした。');
     detailCache.set(id,{session,at:Date.now(),data:r});
     while(detailCache.size>3)detailCache.delete(detailCache.keys().next().value);
     return r;
-  }).finally(()=>{if(detailPending.get(id)===entry)detailPending.delete(id)});
+  }).catch(e=>{if(e.name==='AbortError')throw Error('通信に時間がかかっています。もう一度選択してください。');throw e}).finally(()=>{clearTimeout(timer);if(detailPending.get(id)===entry)detailPending.delete(id)});
   detailPending.set(id,entry);
   return entry.promise;
 }
