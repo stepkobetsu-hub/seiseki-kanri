@@ -2157,3 +2157,8 @@ function authorizeDrive() {
   getOrCreateDriveFolder_('入塾書類PDF');
   return 'Drive権限の確認が完了しました';
 }
+
+// 編集画面から初回の外部通信許可と同期動作を確認するための入口。
+function runStudentDirectorySync() {
+  return syncStudentDirectoryToMirror_();
+}
