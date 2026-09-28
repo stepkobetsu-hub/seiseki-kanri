@@ -149,6 +149,7 @@ function route(e) {
       case 'getStudentDirectoryList': result = getStudentDirectoryList(data); break;
       case 'getStudentDirectoryDetail': result = getStudentDirectoryDetail(data); break;
       case 'getStudentDirectorySnapshot': result = getStudentDirectorySnapshot(data); break;
+      case 'installStudentDirectoryAutoSync': result = installStudentDirectoryAutoSync(data); break;
       case 'saveStudentDirectory': result = saveStudentDirectory(data); break;
       case 'getAllScores':        result = getAllScores(data); break;
       case 'getStudentDetail':   result = getStudentDetail(data); break;
@@ -480,7 +481,8 @@ function getStudentDirectoryDetail(data) {
 }
 
 function getStudentDirectorySnapshot(data) {
-  requireSystemPortalAdmin_(data);
+  const syncKey = PropertiesService.getScriptProperties().getProperty('STUDENT_DIRECTORY_SYNC_KEY');
+  if (!syncKey || String(data.syncSecret || '') !== syncKey) requireSystemPortalAdmin_(data);
   const book = SpreadsheetApp.openById(MASTER_SPREADSHEET_ID);
   const master = book.getSheetByName(MASTER_SHEET_NAME);
   const schedule = book.getSheetByName('時間割マスタ');
@@ -504,6 +506,36 @@ function getStudentDirectorySnapshot(data) {
     details.push(directoryDetailFromRows_(id, row, formulas[n], scheduleById.get(id) || [], scheduleRows[0].slice(4, 28), scheduleRows[1].slice(4, 28)));
   }
   return { success: true, fetchedAt: new Date().toISOString(), details: details };
+}
+
+function installStudentDirectoryAutoSync(data) {
+  requireSystemPortalAdmin_(data);
+  const syncKey = String(data.syncSecret || '');
+  if (!/^[a-f0-9]{64}$/.test(syncKey)) throw new Error('同期の設定値が正しくありません');
+  PropertiesService.getScriptProperties().setProperty('STUDENT_DIRECTORY_SYNC_KEY', syncKey);
+  const exists = ScriptApp.getProjectTriggers().some(trigger => trigger.getHandlerFunction() === 'syncStudentDirectoryToMirror_');
+  if (!exists) ScriptApp.newTrigger('syncStudentDirectoryToMirror_').timeBased().everyMinutes(5).create();
+  return { success: true, intervalMinutes: 5, installed: !exists };
+}
+
+function syncStudentDirectoryToMirror_() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) return;
+  try {
+    const syncKey = PropertiesService.getScriptProperties().getProperty('STUDENT_DIRECTORY_SYNC_KEY');
+    if (!syncKey) throw new Error('生徒情報の同期設定がありません');
+    const snapshot = getStudentDirectorySnapshot({ syncSecret: syncKey });
+    const endpoint = 'https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
+    const response = UrlFetchApp.fetch(endpoint, {
+      method: 'post', contentType: 'application/json',
+      payload: JSON.stringify({ action: 'ingestStudentDirectory', syncSecret: syncKey, snapshot: snapshot }),
+      muteHttpExceptions: true
+    });
+    const result = JSON.parse(response.getContentText() || '{}');
+    if (response.getResponseCode() !== 200 || result.success !== true) {
+      throw new Error('生徒情報の同期先が応答しませんでした（HTTP ' + response.getResponseCode() + '）');
+    }
+  } finally { lock.releaseLock(); }
 }
 
 function directoryDetailFromRows_(id, row, formulas, scheduleData, weekdays, hours) {
