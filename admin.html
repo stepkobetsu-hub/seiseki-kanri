@@ -334,7 +334,6 @@ tr:hover td{background:#f8fafc}
     <div class="sideItem" onclick="aNav('compare',this)"><span class="ico">📊</span> 成績×通知表</div>
     <div class="sideSection">管理</div>
     <div class="sideItem" onclick="aNav('students',this)"><span class="ico">👥</span> 生徒一覧</div>
-    <div class="sideItem" onclick="aNav('directory',this)"><span class="ico">🔎</span> 生徒情報検索</div>
     <div class="sideItem" onclick="aNav('meetings',this)"><span class="ico">🗒️</span> 面談・メモ</div>
     <div class="sideItem" onclick="aNav('schools',this)"><span class="ico">🏫</span> 学校</div>
     <div class="sideItem" onclick="aNav('scores',this)"><span class="ico">🧾</span> テスト成績</div>
@@ -602,32 +601,6 @@ tr:hover td{background:#f8fafc}
       </div>
     </div>
 
-    <!-- 生徒情報検索：原本シートの選択した生徒のみ詳細取得 -->
-    <div id="aTab_directory" style="display:none">
-      <div class="card">
-        <div class="cardHead">🔎 生徒情報検索</div>
-        <div class="filterRow" style="flex-wrap:wrap">
-          <div class="searchWrap"><input id="directorySearch" autocomplete="off" placeholder="氏名・ひらがな・ローマ字・生徒番号" oninput="renderDirectoryCandidates()"></div>
-          <label><input id="directoryWithdrawn" type="checkbox" onchange="renderDirectoryCandidates()">退塾生も表示</label>
-          <button class="btn btn-outline btn-sm" type="button" onclick="loadDirectoryList()">🔄 最新情報を取得</button>
-        </div>
-        <p id="directoryStatus" aria-live="polite" style="color:#64748b;font-size:.8rem"></p>
-        <div id="directoryCandidates" class="listBox" style="max-height:300px;overflow:auto"></div>
-      </div>
-      <div id="directoryDetail" class="card" style="display:none"></div>
-    </div>
-    <dialog id="directoryZoom" style="border:0;border-radius:12px;max-width:min(620px,92vw);width:100%;padding:24px;box-shadow:0 12px 45px #0005">
-      <strong id="directoryZoomLabel"></strong>
-      <p id="directoryZoomValue" style="font-size:1.45rem;overflow-wrap:anywhere"></p>
-      <form method="dialog"><button class="btn btn-primary" type="submit">閉じる</button></form>
-    </dialog>
-    <dialog id="directoryEditor" style="border:0;border-radius:12px;max-width:min(720px,95vw);width:100%;max-height:90vh;overflow:auto;padding:24px;box-shadow:0 12px 45px #0005">
-      <h2>生徒情報を編集</h2><p style="color:#64748b;font-size:.85rem">原本の☆マスタを更新します。数式欄は変更できません。</p>
-      <div id="directoryEditFields"></div>
-      <p id="directoryEditStatus" role="alert"></p>
-      <button class="btn btn-primary" type="button" onclick="saveDirectoryEdit()">変更を確認</button>
-      <button class="btn btn-outline" type="button" onclick="document.getElementById('directoryEditor').close()">キャンセル</button>
-    </dialog>
 
     <!-- 生徒一覧 -->
     <div id="aTab_students" style="display:none">
@@ -1150,6 +1123,7 @@ tr:hover td{background:#f8fafc}
 
 <script src="assets/js/supabase-config.js"></script>
 <script>
+if (location.hash === '#directory') location.replace('student_directory.html');
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 const RUNTIME_CONFIG = window.SEISEKI_CONFIG || {};
 const SUPABASE_URL = RUNTIME_CONFIG.supabaseUrl || localStorage.getItem('seisekiSupabaseUrl') || '';
@@ -1196,7 +1170,7 @@ let currentMeetingMemoId = '';
 let schoolScheduleHistory = {};
 let schoolAutoSaveTimers = {};
 let activeScheduleCell = null;
-const TABS = ['speed','compare','students','directory','meetings','schools','scores','report','wish','entry','sync','settings'];
+const TABS = ['speed','compare','students','meetings','schools','scores','report','wish','entry','sync','settings'];
 // タブ履歴管理（グローバル宣言）
 let _navHist = [];
 let _navIdx = -1;
@@ -1299,14 +1273,6 @@ function getSupabaseSession() {
 }
 
 function clearSensitiveCache() {
-  directoryRequestId++;
-  directoryStudents = [];
-  directoryEditable = null;
-  directorySelectedId = '';
-  document.getElementById('directoryCandidates')?.replaceChildren();
-  document.getElementById('directoryDetail')?.replaceChildren();
-  document.getElementById('directoryEditor')?.close();
-  document.getElementById('directoryZoom')?.close();
   _cache = { students: null, allScores: null, allReports: null, allWishes: null, studentDetail: {} };
   students = [];
   allScores = [];
@@ -2216,7 +2182,6 @@ function reloadData() {
     if (sid) loadCompare(sid); else initCompare();
   }
   else if (visibleTab === 'students') loadStudents();
-  else if (visibleTab === 'directory') loadDirectoryList();
   else if (visibleTab === 'meetings') initMeetings();
   else if (visibleTab === 'schools') loadSchools();
   else if (visibleTab === 'scores') initAdminScoresTab();
@@ -2280,7 +2245,6 @@ function aNav(name, el) {
   if (window.innerWidth <= 760) closeSidebar();
   if (name === 'speed') loadSpeed();
   if (name === 'students') loadStudents();
-  if (name === 'directory') loadDirectoryList();
   if (name === 'meetings') initMeetings();
   if (name === 'schools') loadSchools();
   if (name === 'scores') initAdminScoresTab();
@@ -3350,171 +3314,6 @@ function filterStudents() {
       </div>
       <div style="color:#94a3b8;font-size:.8rem">📊→</div>
     </div>`).join('');
-}
-
-// 個人情報をページや端末に保持しない。候補には最小限の項目のみ入れる。
-let directoryStudents = [];
-let directoryRequestId = 0;
-let directoryEditable = null;
-let directorySelectedId = '';
-const DIRECTORY_EDIT_LABELS = { E:'生徒氏名',F:'フリガナ',H:'校舎',K:'学年',L:'生徒ログインPASS',M:'口座振替提出',N:'口座振替有効',P:'学校名',Q:'保護者氏名',R:'保護者フリガナ',S:'保護者続柄',T:'郵便番号',U:'住所（都道府県・市区町村）',V:'住所（番地）',W:'住所（建物名）',X:'保護者メール',Y:'保護者携帯',Z:'保護者自宅電話',AA:'第2保護者氏名',AB:'第2保護者フリガナ',AC:'第2保護者続柄',AE:'第2保護者携帯',AW:'成績パス' };
-async function directoryApi(action, studentId, changes) {
-  if (!hasValidAdminSessionToken()) return { success:false, error:'管理者として再ログインしてください。' };
-  try {
-    return await legacyApi({ action, studentId, changes, systemPortalSessionToken:getAdminSessionToken() });
-  } catch (_) { return { success:false, error:'生徒マスタに接続できません。再取得してください。' }; }
-}
-function directoryStatus(message) {
-  document.getElementById('directoryStatus').textContent = message;
-}
-async function loadDirectoryList() {
-  directoryStudents = [];
-  directoryEditable = null;
-  directorySelectedId = '';
-  const request = ++directoryRequestId;
-  document.getElementById('directoryCandidates').replaceChildren();
-  document.getElementById('directoryDetail').style.display = 'none';
-  directoryStatus('原本の生徒マスタを確認しています…');
-  const response = await directoryApi('getStudentDirectoryList');
-  if (request !== directoryRequestId || !hasValidAdminSessionToken()) return;
-  if (!response.success) { directoryStatus(response.error || '取得できませんでした'); return; }
-  directoryStudents = response.students || [];
-  directoryStatus(`原本から取得：${new Date(response.fetchedAt).toLocaleString('ja-JP')} ／ 氏名などを入力してください。`);
-  renderDirectoryCandidates();
-}
-function renderDirectoryCandidates() {
-  const box = document.getElementById('directoryCandidates');
-  box.replaceChildren();
-  const q = normalizeCmpStudentSearch_(document.getElementById('directorySearch').value);
-  if (!q) return;
-  const includeWithdrawn = document.getElementById('directoryWithdrawn').checked;
-  const matches = directoryStudents.filter(s => {
-    if (!includeWithdrawn && !['1','0'].includes(String(s.flag))) return false;
-    return [s.id, s.name, s.kana, cmpKanaToRomaji_(s.kana)]
-      .map(normalizeCmpStudentSearch_).some(value => value.includes(q));
-  });
-  matches.slice(0, 30).forEach(s => {
-    const button = document.createElement('button');
-    button.type = 'button'; button.className = 'listRow';
-    button.style.cssText = 'width:100%;border:0;border-bottom:1px solid #e2e8f0;text-align:left;background:#fff;cursor:pointer';
-    button.textContent = `${s.name}（${s.kana || 'フリガナなし'}） No.${s.id} ／ ${s.grade || ''} ／ ${s.campus || ''}${['1','0'].includes(String(s.flag)) ? '' : '【退塾】'}`;
-    button.addEventListener('click', () => loadDirectoryDetail(s.id));
-    box.append(button);
-  });
-  directoryStatus(`${matches.length}人が該当${matches.length > 30 ? '（先頭30人）' : ''}。選択すると原本の詳細を取得します。`);
-}
-function directoryField(container, label, value, options = {}) {
-  const field = document.createElement('button');
-  field.type = 'button';
-  field.style.cssText = 'display:block;width:100%;padding:11px;text-align:left;border:1px solid #dbe5ee;border-radius:9px;background:#fff;margin:7px 0;cursor:pointer;overflow-wrap:anywhere';
-  const heading = document.createElement('span');
-  heading.style.cssText = 'display:block;font-size:.72rem;color:#64748b';
-  heading.textContent = label;
-  const content = document.createElement('span');
-  content.style.cssText = `display:block;font-size:${options.small ? '.84rem' : '1.12rem'};font-weight:${options.small ? '500' : '700'}`;
-  const display = String(value ?? '').trim() || '未入力';
-  content.textContent = options.secret && display !== '未入力' ? '••••（タップして確認）' : display;
-  field.append(heading, content);
-  field.addEventListener('click', () => {
-    const dialog = document.getElementById('directoryZoom');
-    document.getElementById('directoryZoomLabel').textContent = label;
-    document.getElementById('directoryZoomValue').textContent = display;
-    dialog.showModal();
-  });
-  container.append(field);
-  if (options.phone && display !== '未入力') {
-    const digits = display.replace(/[^0-9+]/g, '');
-    if (/^\+?\d{9,15}$/.test(digits)) {
-      const call = document.createElement('a');
-      call.href = `tel:${digits}`; call.textContent = '📞 電話をかける';
-      call.style.cssText = 'display:inline-block;margin:0 0 8px 8px;color:#166534';
-      container.append(call);
-    }
-  }
-}
-async function loadDirectoryDetail(id) {
-  const request = ++directoryRequestId;
-  const card = document.getElementById('directoryDetail');
-  card.style.display = 'block'; card.textContent = '生徒マスタと時間割を取得しています…';
-  const response = await directoryApi('getStudentDirectoryDetail', id);
-  if (request !== directoryRequestId || !hasValidAdminSessionToken()) return;
-  if (!response.success || String(response.student?.id) !== String(id)) {
-    card.textContent = response.error || '詳細を取得できませんでした。'; return;
-  }
-  const s = response.student;
-  directoryEditable = response.editable;
-  directorySelectedId = s.id;
-  card.replaceChildren();
-  const title = document.createElement('h2'); title.textContent = `${s.name || '氏名未入力'}（No.${s.id}）`;
-  card.append(title);
-  const stamp = document.createElement('p');
-  stamp.style.cssText = 'font-size:.75rem;color:#64748b';
-  stamp.textContent = `原本から取得：${new Date(response.fetchedAt).toLocaleString('ja-JP')}`;
-  card.append(stamp);
-  [['フリガナ',s.kana],['学年',s.grade],['学校名',s.school],['保護者携帯',s.guardianPhone],['保護者自宅電話',s.homePhone],['第2保護者携帯',s.secondPhone]]
-    .forEach(([label,value]) => directoryField(card,label,value,{phone:label.includes('電話') || label.includes('携帯')}));
-  const lessonTitle = document.createElement('h3'); lessonTitle.textContent = '通塾時間割'; card.append(lessonTitle);
-  if (!s.lessons?.length) { const empty = document.createElement('p'); empty.textContent = '登録されている授業枠はありません。'; card.append(empty); }
-  (s.lessons || []).forEach(lesson => directoryField(card,'授業',`${lesson.weekday} ${lesson.time} ${lesson.subject}`));
-  if (s.course || s.options) directoryField(card,'コース・オプション',[s.course,s.options].filter(Boolean).join('＋'),{small:true});
-  if (s.note) directoryField(card,'時間割の備考',s.note,{small:true});
-  const misc = document.createElement('h3'); misc.textContent = 'その他の情報（タップで拡大）'; card.append(misc);
-  [['保護者氏名',s.guardian],['第2保護者氏名',s.secondGuardian],['郵便番号',s.postcode],['住所',s.address],
-   ['保護者メール',s.guardianEmail],['第2保護者メール',s.secondEmail],['口座振替提出（M列）',s.debitSubmitted],
-   ['口座振替有効（N列）',s.debitEnabled],['生徒ログインPASS（L列）',s.loginPassword],['成績パス（AW列）',s.gradePassword]]
-    .forEach(([label,value]) => directoryField(card,label,value,{small:true,secret:label.includes('PASS') || label.includes('パス')}));
-  const grades = document.createElement('button'); grades.type = 'button'; grades.className = 'btn btn-primary';
-  grades.textContent = '📊 成績管理で個人成績を見る';
-  grades.style.cssText = 'display:block;margin:22px 0 0';
-  grades.addEventListener('click', () => goToCompare(s.id));
-  card.append(grades);
-  const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'btn btn-outline';
-  edit.textContent = '✏️ 生徒マスタの情報を編集'; edit.style.cssText = 'display:block;margin:12px 0';
-  edit.addEventListener('click', openDirectoryEditor); card.append(edit);
-  const timetable = document.createElement('a');
-  timetable.href = 'https://docs.google.com/spreadsheets/d/1CIJkTlYUcUkbb8jBdFc6L8D5ubTGsxwNxFv01ten-Zk/edit#gid=829117795';
-  timetable.target = '_blank'; timetable.rel = 'noopener';
-  timetable.textContent = '時間割の変更は「時間割マスタ」へ'; card.append(timetable);
-}
-
-function openDirectoryEditor() {
-  if (!directoryEditable || !directorySelectedId) return;
-  const body = document.getElementById('directoryEditFields'); body.replaceChildren();
-  Object.entries(DIRECTORY_EDIT_LABELS).forEach(([letter,label]) => {
-    const source = directoryEditable[letter];
-    if (!source || source.formula) return;
-    const wrapper = document.createElement('label'); wrapper.style.cssText = 'display:block;margin:12px 0;font-weight:600';
-    wrapper.textContent = `${label}（${letter}列）`;
-    const input = document.createElement('input'); input.dataset.letter = letter;
-    input.type = letter === 'L' || letter === 'AW' ? 'password' : 'text';
-    input.autocomplete = 'off'; input.value = source.value || '';
-    input.style.cssText = 'display:block;width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:7px';
-    wrapper.append(input); body.append(wrapper);
-  });
-  document.getElementById('directoryEditStatus').textContent = '';
-  document.getElementById('directoryEditor').showModal();
-}
-async function saveDirectoryEdit() {
-  const status = document.getElementById('directoryEditStatus');
-  const changes = {};
-  const lines = [];
-  document.querySelectorAll('#directoryEditFields input[data-letter]').forEach(input => {
-    const letter = input.dataset.letter;
-    const before = directoryEditable[letter].value || '';
-    const after = input.value;
-    if (before === after) return;
-    changes[letter] = { before, after };
-    const secret = letter === 'L' || letter === 'AW';
-    lines.push(`${DIRECTORY_EDIT_LABELS[letter]}：${secret ? '（変更前後の値は非表示）' : `「${before || '空欄'}」→「${after || '空欄'}」`}`);
-  });
-  if (!lines.length) { status.textContent = '変更はありません。'; return; }
-  if (!confirm(`本当に書き換えますか？\n生徒番号：${directorySelectedId}\n\n${lines.join('\n')}`)) return;
-  status.textContent = '原本に保存しています…';
-  const response = await directoryApi('saveStudentDirectory', directorySelectedId, changes);
-  if (!response.success) { status.textContent = response.error || '保存できませんでした。再取得してください。'; return; }
-  document.getElementById('directoryEditor').close();
-  await loadDirectoryDetail(directorySelectedId);
-  directoryStatus('原本に保存し、内容を読み直しました。');
 }
 
 // 成績×通知表へジャンプ
