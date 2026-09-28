@@ -476,7 +476,9 @@ function getStudentDirectoryDetail(data) {
   }
   const masterRow = findRow(master, 2);
   if (masterRow < 0) throw new Error('生徒が見つかりません');
-  const row = master.getRange(masterRow, 1, 1, 49).getDisplayValues()[0];
+  const masterCells = master.getRange(masterRow, 1, 1, 49);
+  const row = masterCells.getDisplayValues()[0];
+  const formulas = masterCells.getFormulas()[0];
   const scheduleRow = findRow(schedule, 3);
   const scheduleData = scheduleRow < 0 ? [] : schedule.getRange(scheduleRow, 1, 1, 38).getDisplayValues()[0];
   const weekdays = schedule.getRange(1, 5, 1, 24).getDisplayValues()[0];
@@ -500,7 +502,7 @@ function getStudentDirectoryDetail(data) {
   const editable = {};
   ['E','F','H','K','L','M','N','P','Q','R','S','T','U','V','W','X','Y','Z','AA','AB','AC','AE','AW'].forEach(letter => {
     const index = directoryColumn_(letter) - 1;
-    editable[letter] = { value: row[index], formula: !!master.getRange(masterRow, index + 1).getFormula() };
+    editable[letter] = { value: row[index], formula: !!formulas[index] };
   });
   return { success: true, fetchedAt: new Date().toISOString(), editable: editable, student: {
     id: id, flag: row[1], name: row[4], kana: row[5], campus: row[7], grade: row[10], school: row[15],

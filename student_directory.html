@@ -105,6 +105,16 @@ const CHARS = {
   'ん':'n','ゔ':'vu','ぁ':'a','ぃ':'i','ぅ':'u','ぇ':'e','ぉ':'o','ゎ':'wa'
 };
 function romaji(v){const s=normalize(v);let result='',small=false;for(let i=0;i<s.length;i++){if(s[i]==='っ'){small=true;continue}if(s[i]==='ー'){result+=(result.match(/[aeiou]$/)||[''])[0];continue}const pair=PAIRS[s.slice(i,i+2)],part=pair||CHARS[s[i]]||s[i];if(pair)i++;if(small&&/^[bcdfghjklmpqrstvwxyz]/.test(part))result+=part.startsWith('ch')?'t':part[0];small=false;result+=part}return result}
+const SEARCH_KEYS=new WeakMap();
+function searchKeys(student){
+  let keys=SEARCH_KEYS.get(student);
+  if(!keys){
+    keys=[student.id,student.name,student.kana,romaji(student.kana)].map(normalize);
+    SEARCH_KEYS.set(student,keys);
+  }
+  return keys;
+}
+function prepareSearch(list){list.forEach(searchKeys);return list}
 function readCachedIndex(){
   try{const cache=JSON.parse(localStorage.getItem(INDEX_CACHE_KEY)||'null');if(!cache||cache.staffCode!==localStorage.getItem('adminStaffCode')||Date.now()-cache.time>7*86400000||!Array.isArray(cache.students))return [];return cache.students.filter(s=>s&&/^\d+$/.test(String(s.id))&&typeof s.name==='string')}
   catch{return []}
@@ -119,13 +129,14 @@ async function fastIndex(seq){
     const data=await response.json().catch(()=>({}));
     if(!response.ok||data.success!==true||!Array.isArray(data.students)||!data.students.length)return;
     if(seq!==listRequest||!token())return;
-    students=data.students.map(s=>({id:String(s.id),flag:String(s.flag??''),name:String(s.name||''),kana:String(s.kana||s.nameKana||''),campus:String(s.campus||''),grade:String(s.grade||'')}));
+    students=prepareSearch(data.students.map(s=>({id:String(s.id),flag:String(s.flag??''),name:String(s.name||''),kana:String(s.kana||s.nameKana||''),campus:String(s.campus||''),grade:String(s.grade||'')})));
+
     ready=true;renderCandidates();
   }finally{clearTimeout(timer)}
 }
 async function loadList(){
   const seq=++listRequest;request++;editable=null;selectedId='';detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').classList.add('hidden');
-  const cached=readCachedIndex();students=cached;ready=!!cached.length;listRefreshing=true;el('refresh').disabled=true;
+  const cached=readCachedIndex();students=prepareSearch(cached);ready=!!cached.length;listRefreshing=true;el('refresh').disabled=true;
   if(ready)renderCandidates();else{el('candidates').replaceChildren();setStatus('生徒の検索候補を準備しています…')}
   if(!ready){try{await fastIndex(seq)}catch{} if(seq!==listRequest)return}
   if(!ready)setStatus('生徒マスタから最新の候補を取得しています…');
@@ -134,7 +145,7 @@ async function loadList(){
     if(seq!==listRequest)return;
     if(!r.success)throw Error(r.error||'取得できませんでした。');
     if(!Array.isArray(r.students)||!r.students.length)throw Error('原本から生徒を取得できませんでした。');
-    students=r.students;ready=true;saveCachedIndex(students);
+    students=prepareSearch(r.students);ready=true;saveCachedIndex(students);
   }catch(e){
     if(seq!==listRequest)return;
     if(/ログイン情報|ログインしてください|管理権限/.test(e.message)){clearSession();showLogin('再ログインしてください。');return}
@@ -145,7 +156,7 @@ async function loadList(){
   }finally{if(seq===listRequest)el('refresh').disabled=false}
   if(seq!==listRequest)return;listRefreshing=false;renderCandidates();
 }
-function renderCandidates(){if(!ready||detailView)return;const updating=listRefreshing?' ／ 原本の最新情報を確認中…':'';const q=normalize(el('search').value);const box=el('candidates');box.replaceChildren();if(!q){setStatus(`${students.length}人を読み込みました。名前・かな・ローマ字・番号を入力してください。${updating}`);return}const matches=students.filter(s=>[s.id,s.name,s.kana,romaji(s.kana)].some(v=>normalize(v).includes(q)));setStatus(matches.length?`${matches.length}人が該当します。生徒を選んでください。${updating}`:`「${el('search').value}」に一致する生徒はいません。${updating}`);for(const s of matches.slice(0,40)){const b=document.createElement('button');b.type='button';b.className='candidate';const name=document.createElement('strong');name.textContent=`${s.name}（${s.kana||'フリガナなし'}）`;const line=document.createElement('small');line.textContent=`No.${s.id} `;const candidateStatus=statusBadge(s.flag);if(candidateStatus)line.append(candidateStatus);line.append(document.createTextNode(` ／ ${s.grade||''} ／ ${s.campus||''}`));const badge=document.createElement('span');badge.className='candidateBadge';badge.textContent='✦';badge.setAttribute('aria-hidden','true');const inner=document.createElement('span');inner.className='candidateText';inner.append(name,line);const arrow=document.createElement('span');arrow.className='candidateArrow';arrow.textContent='›';arrow.setAttribute('aria-hidden','true');b.append(badge,inner,arrow);b.addEventListener('click',()=>loadDetail(s.id));box.append(b)}if(matches.length>40)setStatus(`${matches.length}人が該当します。先頭40人を表示しています。`)}
+function renderCandidates(){if(!ready||detailView)return;const updating=listRefreshing?' ／ 原本の最新情報を確認中…':'';const q=normalize(el('search').value);const box=el('candidates');box.replaceChildren();if(!q){setStatus(`${students.length}人を読み込みました。名前・かな・ローマ字・番号を入力してください。${updating}`);return}const matches=students.filter(s=>searchKeys(s).some(v=>v.includes(q)));setStatus(matches.length?`${matches.length}人が該当します。生徒を選んでください。${updating}`:`「${el('search').value}」に一致する生徒はいません。${updating}`);const fragment=document.createDocumentFragment();for(const s of matches.slice(0,40)){const b=document.createElement('button');b.type='button';b.className='candidate';const name=document.createElement('strong');name.textContent=`${s.name}（${s.kana||'フリガナなし'}）`;const line=document.createElement('small');line.textContent=`No.${s.id} `;const candidateStatus=statusBadge(s.flag);if(candidateStatus)line.append(candidateStatus);line.append(document.createTextNode(` ／ ${s.grade||''} ／ ${s.campus||''}`));const badge=document.createElement('span');badge.className='candidateBadge';badge.textContent='✦';badge.setAttribute('aria-hidden','true');const inner=document.createElement('span');inner.className='candidateText';inner.append(name,line);const arrow=document.createElement('span');arrow.className='candidateArrow';arrow.textContent='›';arrow.setAttribute('aria-hidden','true');b.append(badge,inner,arrow);b.addEventListener('click',()=>loadDetail(s.id));fragment.append(b)}box.append(fragment);if(matches.length>40)setStatus(`${matches.length}人が該当します。先頭40人を表示しています。`)}
 function field(parent,label,value,opts={}){const wrap=document.createElement('div'),b=document.createElement('button');b.type='button';b.className='field'+(opts.big?' big':'')+(opts.small?' small':'');const l=document.createElement('span'),v=document.createElement('span');l.className='label';l.textContent=label;v.className='value';const shown=String(value??'').trim()||'未入力';v.textContent=opts.secret&&shown!=='未入力'?'••••（タップして確認）':shown;b.append(l,v);b.onclick=()=>{el('zoomLabel').textContent=label;el('zoomValue').textContent=shown;el('zoom').showModal()};wrap.append(b);if(opts.phone&&shown!=='未入力'){const digits=shown.replace(/[^+0-9]/g,'');if(/^\+?\d{9,15}$/.test(digits)){const a=document.createElement('a');a.href='tel:'+digits;a.className='phone';a.textContent='📞 電話をかける';wrap.append(a)}}parent.append(wrap)}
 function checkboxChecked(value){return /^(true|1)$/i.test(String(value??'').trim())}
 function checkboxText(letter,checked){return letter==='M'?(checked?'提出済み':'未提出'):(checked?'有効':'無効')}
