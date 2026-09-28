@@ -614,8 +614,14 @@ async function putDirectoryDetails(details: JsonObject[], fetchedAt: string): Pr
 }
 
 async function syncDirectory(payload: JsonObject): Promise<JsonObject> {
+  const state = await pg(query('student_directory_sync_state', { select:'last_success_at,row_count', singleton:'eq.true', limit:1 })) as JsonObject[];
+  if (payload.force !== true && state.length && Date.now() - Date.parse(String(state[0].last_success_at ?? '')) < 45000) {
+    return { success:true, count:state[0].row_count, fetchedAt:state[0].last_success_at, source:'mirror', skipped:true };
+  }
   const result = await gas('getStudentDirectorySnapshot', { systemPortalSessionToken: String(payload.token ?? '') });
   const count = await putDirectoryDetails(result.details as JsonObject[], String(result.fetchedAt ?? new Date().toISOString()));
+  await pg(query('student_directory_sync_state', { singleton:'eq.true' }), { method:'PATCH', headers:{ Prefer:'return=minimal' },
+    body:JSON.stringify({ last_success_at:new Date().toISOString(), row_count:count }) });
   return { success:true, count, fetchedAt:result.fetchedAt, source:'master-sheet' };
 }
 
