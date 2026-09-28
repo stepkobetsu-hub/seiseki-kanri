@@ -155,7 +155,7 @@ function renderDebitSection(card,s){
       if(saving){checkbox.checked=beforeChecked;return}
       if(beforeChecked===afterChecked)return;
       const id=selectedId;
-      if(!confirm(`この変更を保存しますか？\n生徒番号：${id}\n${LABELS[letter]}：${beforeChecked?'☑':'□'} → ${afterChecked?'☑':'□'}`)){
+      if(!confirm(`この変更を保存しますか？\n生徒番号：${id}\n生徒名：${s.name||'氏名未入力'}\n${LABELS[letter]}：${beforeChecked?'☑':'□'} → ${afterChecked?'☑':'□'}`)){
         checkbox.checked=beforeChecked;return;
       }
       saving=true;grid.querySelectorAll('input').forEach(input=>input.disabled=true);notice.textContent='原本に保存しています…';
