@@ -10,8 +10,9 @@ const ADMIN_ACTIONS = new Set([
   'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
   'getStaffMembers', 'addStaffMember', 'deleteStaffMember',
   'reconcileLegacy', 'persistAdminSession', 'logoutAdmin',
+  'syncStudentDirectory', 'getStudentDirectoryDetail', 'saveStudentDirectory',
 ]);
-const WRITE_ACTIONS = new Set(['saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember']);
+const WRITE_ACTIONS = new Set(['saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember', 'saveStudentDirectory']);
 const ADMIN_PERMISSION_LEVELS = new Set(['2', '3', '4']);
 const ADMIN_SESSION_REVERIFY_MS = 6 * 60 * 60 * 1000;
 const GRADE_GAS_URL = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
@@ -594,9 +595,60 @@ async function logoutAdmin(payload: JsonObject): Promise<JsonObject> {
   return { success: true };
 }
 
+
+async function putDirectoryDetails(details: JsonObject[], fetchedAt: string): Promise<number> {
+  if (!Array.isArray(details) || !details.length || details.length > 1000) throw new Error('Invalid directory snapshot');
+  const seen = new Set<string>();
+  const rows = details.map(item => {
+    const id = String((item.student as JsonObject)?.id ?? '');
+    if (!/^\d{1,10}$/.test(id) || seen.has(id) || item.success !== true || !item.editable) throw new Error('Invalid directory detail');
+    seen.add(id);
+    return { student_code: id, detail: item, source_fetched_at: fetchedAt, updated_at: new Date().toISOString() };
+  });
+  for (let i = 0; i < rows.length; i += 50) {
+    await pg(query('student_directory_details', { on_conflict: 'student_code' }), {
+      method:'POST', headers:{ Prefer:'resolution=merge-duplicates,return=minimal' }, body:JSON.stringify(rows.slice(i, i + 50)),
+    });
+  }
+  return rows.length;
+}
+
+async function syncDirectory(payload: JsonObject): Promise<JsonObject> {
+  const result = await gas('getStudentDirectorySnapshot', { systemPortalSessionToken: String(payload.token ?? '') });
+  const count = await putDirectoryDetails(result.details as JsonObject[], String(result.fetchedAt ?? new Date().toISOString()));
+  return { success:true, count, fetchedAt:result.fetchedAt, source:'master-sheet' };
+}
+
+async function readDirectoryDetail(payload: JsonObject): Promise<JsonObject> {
+  const id = String(payload.studentId ?? '').trim();
+  if (!/^\d{1,10}$/.test(id)) throw new ResponseError(400, 'INVALID_STUDENT', 'Invalid student ID');
+  const rows = await pg(query('student_directory_details', { select:'detail,source_fetched_at', student_code:`eq.${id}`, limit:1 })) as JsonObject[];
+  if (!rows.length) return { success:false, code:'MIRROR_NOT_READY', error:'Directory mirror is not ready' };
+  const detail = parseObject(rows[0].detail);
+  if (String((detail.student as JsonObject)?.id ?? '') !== id) throw new Error('Directory mirror mismatch');
+  return { ...detail, source:'supabase', sourceFetchedAt:rows[0].source_fetched_at };
+}
+
+async function saveDirectoryDetail(payload: JsonObject): Promise<JsonObject> {
+  const result = await gas('saveStudentDirectory', {
+    studentId:payload.studentId, changes:payload.changes,
+    systemPortalSessionToken:String(payload.token ?? ''),
+  });
+  try {
+    await putDirectoryDetails([result], String(result.fetchedAt ?? new Date().toISOString()));
+    return { ...result, mirrorStatus:'updated' };
+  } catch (error) {
+    console.error('Directory mirror update after master save failed', String(error));
+    return { ...result, mirrorStatus:'pending' };
+  }
+}
+
 async function dispatch(payload: JsonObject): Promise<JsonObject> {
   switch (payload.action) {
     case 'getStudents': case 'getStudentList': return getStudents(payload);
+    case 'syncStudentDirectory': return syncDirectory(payload);
+    case 'getStudentDirectoryDetail': return readDirectoryDetail(payload);
+    case 'saveStudentDirectory': return saveDirectoryDetail(payload);
     case 'getAllScores': return readScores(payload, true);
     case 'getStudentScores': return readScores(payload, false);
     case 'getAllReports': return readReports(payload, true);
