@@ -146,6 +146,9 @@ function route(e) {
       // 管理者
       case 'getStudents':        result = getStudents(); break;
       case 'getStudentList':     result = getStudentList(); break;
+      case 'getStudentDirectoryList': result = getStudentDirectoryList(data); break;
+      case 'getStudentDirectoryDetail': result = getStudentDirectoryDetail(data); break;
+      case 'saveStudentDirectory': result = saveStudentDirectory(data); break;
       case 'getAllScores':        result = getAllScores(data); break;
       case 'getStudentDetail':   result = getStudentDetail(data); break;
       case 'staffLogin':         result = staffLogin(data); break;
@@ -193,7 +196,9 @@ function route(e) {
       default: result = { success: false, error: '不明なアクション: ' + data.action };
     }
   } catch(err) {
-    result = { success: false, error: err.message, stack: err.stack };
+    result = /^getStudentDirectory|^saveStudentDirectory/.test(String(data.action))
+      ? { success: false, error: err.message }
+      : { success: false, error: err.message, stack: err.stack };
   }
 
   return ContentService
@@ -438,6 +443,113 @@ function getStudentList() {
     });
   }
   return { success: true, students };
+}
+
+// 管理者専用の検索。個人連絡先とパスワードは一覧レスポンスに含めない。
+function getStudentDirectoryList(data) {
+  requireSystemPortalAdmin_(data);
+  const sheet = SpreadsheetApp.openById(MASTER_SPREADSHEET_ID).getSheetByName(MASTER_SHEET_NAME);
+  if (!sheet) throw new Error('生徒マスタを取得できません');
+  const last = sheet.getLastRow();
+  const rows = last >= 2 ? sheet.getRange(2, 1, last - 1, 11).getDisplayValues() : [];
+  return { success: true, fetchedAt: new Date().toISOString(), students: rows.filter(row => /^\d+$/.test(String(row[0]).trim())).map(row => ({
+    id: String(row[0]).trim(), flag: String(row[1]).trim(), name: row[4], kana: row[5],
+    campus: row[7], grade: row[10]
+  })) };
+}
+
+// A列の番号で結合し、選択した1名だけを返す。必ずサーバー側で管理者セッションを検証する。
+function getStudentDirectoryDetail(data) {
+  requireSystemPortalAdmin_(data);
+  const id = String(data.studentId || '').trim();
+  if (!/^\d{1,10}$/.test(id)) throw new Error('生徒番号が正しくありません');
+  const book = SpreadsheetApp.openById(MASTER_SPREADSHEET_ID);
+  const master = book.getSheetByName(MASTER_SHEET_NAME);
+  const schedule = book.getSheetByName('時間割マスタ');
+  if (!master || !schedule) throw new Error('生徒マスタまたは時間割マスタを取得できません');
+  function findRow(sheet, first) {
+    const last = sheet.getLastRow();
+    if (last < first) return -1;
+    const ids = sheet.getRange(first, 1, last - first + 1, 1).getDisplayValues();
+    const index = ids.findIndex(row => String(row[0]).trim() === id);
+    return index < 0 ? -1 : index + first;
+  }
+  const masterRow = findRow(master, 2);
+  if (masterRow < 0) throw new Error('生徒が見つかりません');
+  const row = master.getRange(masterRow, 1, 1, 49).getDisplayValues()[0];
+  const scheduleRow = findRow(schedule, 3);
+  const scheduleData = scheduleRow < 0 ? [] : schedule.getRange(scheduleRow, 1, 1, 38).getDisplayValues()[0];
+  const weekdays = schedule.getRange(1, 5, 1, 24).getDisplayValues()[0];
+  const hours = schedule.getRange(2, 5, 1, 24).getDisplayValues()[0];
+  const weekdayOrder = { '月': 1, '火': 2, '水': 3, '木': 4, '金': 5, '土': 6 };
+  const seen = {};
+  const lessons = [];
+  for (let n = 0; n < 24; n++) {
+    const subject = String(scheduleData[n + 4] || '').trim();
+    if (!subject) continue;
+    const weekday = String(weekdays[n] || '').charAt(0);
+    const time = String(hours[n] || '').trim().replace(/\s*[-〜～]\s*/, '–');
+    if (!weekdayOrder[weekday] || !time) continue;
+    const key = weekday + '|' + time + '|' + subject;
+    if (seen[key]) continue;
+    seen[key] = true;
+    lessons.push({ weekday: weekday + '曜日', time: time, subject: subject, order: weekdayOrder[weekday], slot: n });
+  }
+  lessons.sort((a, b) => a.order - b.order || Number(a.time.slice(0, 2).replace(/\D/g, '')) - Number(b.time.slice(0, 2).replace(/\D/g, '')) || a.slot - b.slot);
+  lessons.forEach(lesson => { delete lesson.order; delete lesson.slot; });
+  const editable = {};
+  ['E','F','H','K','L','M','N','P','Q','R','S','T','U','V','W','X','Y','Z','AA','AB','AC','AE','AW'].forEach(letter => {
+    const index = directoryColumn_(letter) - 1;
+    editable[letter] = { value: row[index], formula: !!master.getRange(masterRow, index + 1).getFormula() };
+  });
+  return { success: true, fetchedAt: new Date().toISOString(), editable: editable, student: {
+    id: id, flag: row[1], name: row[4], kana: row[5], campus: row[7], grade: row[10], school: row[15],
+    loginPassword: row[11], debitSubmitted: row[12], debitEnabled: row[13],
+    guardian: row[16], postcode: row[19], address: [row[20], row[21], row[22]].filter(Boolean).join(' '),
+    guardianEmail: row[23], guardianPhone: row[24], homePhone: row[25],
+    secondGuardian: row[26], secondEmail: row[29], secondPhone: row[30], gradePassword: row[48],
+    lessons: lessons, course: scheduleData[34] || '', options: [scheduleData[35], scheduleData[36]].filter(Boolean).join('＋'), note: scheduleData[37] || ''
+  } };
+}
+
+function directoryColumn_(letter) {
+  return String(letter).split('').reduce((sum, c) => sum * 26 + c.charCodeAt(0) - 64, 0);
+}
+
+// 競合があれば一切更新しない。数式セルの書き換えも拒否する。
+function saveStudentDirectory(data) {
+  requireSystemPortalAdmin_(data);
+  const id = String(data.studentId || '').trim();
+  if (!/^\d{1,10}$/.test(id)) throw new Error('生徒番号が正しくありません');
+  const changes = data.changes || {};
+  const allowed = ['E','F','H','K','L','M','N','P','Q','R','S','T','U','V','W','X','Y','Z','AA','AB','AC','AE','AW'];
+  const keys = Object.keys(changes);
+  if (!keys.length || keys.length > allowed.length || keys.some(k => !allowed.includes(k))) throw new Error('更新する項目が正しくありません');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sheet = SpreadsheetApp.openById(MASTER_SPREADSHEET_ID).getSheetByName(MASTER_SHEET_NAME);
+    if (!sheet) throw new Error('原本の生徒マスタを開けません');
+    const ids = sheet.getRange(2, 1, Math.max(1, sheet.getLastRow() - 1), 1).getDisplayValues();
+    const index = ids.findIndex(row => String(row[0]).trim() === id);
+    if (index < 0) throw new Error('生徒が見つかりません');
+    const rowNumber = index + 2;
+    const pending = keys.map(letter => {
+      const edit = changes[letter];
+      if (!edit || typeof edit.before !== 'string' || typeof edit.after !== 'string' || edit.after.length > 1000) throw new Error('更新値が正しくありません');
+      const cell = sheet.getRange(rowNumber, directoryColumn_(letter));
+      if (cell.getFormula()) throw new Error('数式の項目は編集できません。再取得してください');
+      if (cell.getDisplayValue() !== edit.before) throw new Error('他の変更がありました。最新情報を読み直してください');
+      return { letter: letter, cell: cell, after: edit.after };
+    });
+    pending.forEach(item => {
+      if (!item.after) item.cell.clearContent();
+      else if (['M','N'].includes(item.letter) && /^(TRUE|FALSE)$/i.test(item.after)) item.cell.setValue(item.after.toUpperCase() === 'TRUE');
+      else item.cell.setValue(item.after);
+    });
+    SpreadsheetApp.flush();
+    return getStudentDirectoryDetail(data);
+  } finally { lock.releaseLock(); }
 }
 
 function getAllScores(data) {
