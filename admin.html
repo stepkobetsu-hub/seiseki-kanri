@@ -2111,6 +2111,7 @@ async function logout(options = {}) {
   localStorage.removeItem('adminCodeInput');
   localStorage.removeItem('adminPwInput');
   localStorage.removeItem('adminEmailInput');
+  localStorage.removeItem('stepStudentDirectorySearchIndexV1');
   adminDeviceMode = '';
   document.getElementById('loginPage').style.display = 'flex';
   document.getElementById('mainHeader').style.display = 'none';
