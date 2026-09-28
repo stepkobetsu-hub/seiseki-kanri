@@ -467,22 +467,17 @@ function getStudentDirectoryDetail(data) {
   const master = book.getSheetByName(MASTER_SHEET_NAME);
   const schedule = book.getSheetByName('時間割マスタ');
   if (!master || !schedule) throw new Error('生徒マスタまたは時間割マスタを取得できません');
-  function findRow(sheet, first) {
-    const last = sheet.getLastRow();
-    if (last < first) return -1;
-    const ids = sheet.getRange(first, 1, last - first + 1, 1).getDisplayValues();
-    const index = ids.findIndex(row => String(row[0]).trim() === id);
-    return index < 0 ? -1 : index + first;
-  }
-  const masterRow = findRow(master, 2);
-  if (masterRow < 0) throw new Error('生徒が見つかりません');
-  const masterCells = master.getRange(masterRow, 1, 1, 49);
-  const row = masterCells.getDisplayValues()[0];
-  const formulas = masterCells.getFormulas()[0];
-  const scheduleRow = findRow(schedule, 3);
-  const scheduleData = scheduleRow < 0 ? [] : schedule.getRange(scheduleRow, 1, 1, 38).getDisplayValues()[0];
-  const weekdays = schedule.getRange(1, 5, 1, 24).getDisplayValues()[0];
-  const hours = schedule.getRange(2, 5, 1, 24).getDisplayValues()[0];
+  const masterLast = master.getLastRow();
+  const masterRows = masterLast >= 2 ? master.getRange(2, 1, masterLast - 1, 49).getDisplayValues() : [];
+  const masterIndex = masterRows.findIndex(row => String(row[0]).trim() === id);
+  if (masterIndex < 0) throw new Error('生徒が見つかりません');
+  const row = masterRows[masterIndex];
+  const formulas = master.getRange(masterIndex + 2, 1, 1, 49).getFormulas()[0];
+  const scheduleLast = Math.max(2, schedule.getLastRow());
+  const scheduleRows = schedule.getRange(1, 1, scheduleLast, 38).getDisplayValues();
+  const scheduleData = scheduleRows.slice(2).find(row => String(row[0]).trim() === id) || [];
+  const weekdays = scheduleRows[0].slice(4, 28);
+  const hours = scheduleRows[1].slice(4, 28);
   const weekdayOrder = { '月': 1, '火': 2, '水': 3, '木': 4, '金': 5, '土': 6 };
   const seen = {};
   const lessons = [];
