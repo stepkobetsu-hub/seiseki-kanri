@@ -10,7 +10,7 @@ const ADMIN_ACTIONS = new Set([
   'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
   'getStaffMembers', 'addStaffMember', 'deleteStaffMember',
   'reconcileLegacy', 'persistAdminSession', 'logoutAdmin',
-  'syncStudentDirectory', 'getStudentDirectoryDetail', 'saveStudentDirectory',
+  'syncStudentDirectory', 'getStudentDirectoryDetail', 'saveStudentDirectory', 'enableStudentDirectoryAutoSync',
 ]);
 const WRITE_ACTIONS = new Set(['saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember', 'saveStudentDirectory']);
 const ADMIN_PERMISSION_LEVELS = new Set(['2', '3', '4']);
@@ -649,10 +649,39 @@ async function saveDirectoryDetail(payload: JsonObject): Promise<JsonObject> {
   }
 }
 
+async function directorySyncKey(): Promise<string> {
+  return sha256Text('STEP_DIRECTORY_SYNC_V1:' + env('FORESTA_SYNC_SECRET'));
+}
+function sameSecret(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+async function enableDirectoryAutoSync(payload: JsonObject): Promise<JsonObject> {
+  const result = await gas('installStudentDirectoryAutoSync', {
+    systemPortalSessionToken: String(payload.token ?? ''),
+    syncSecret: await directorySyncKey(),
+  });
+  return { success:true, intervalMinutes:result.intervalMinutes, installed:result.installed };
+}
+async function ingestDirectorySnapshot(payload: JsonObject): Promise<JsonObject> {
+  const received = String(payload.syncSecret ?? '');
+  if (!sameSecret(received, await directorySyncKey())) throw new ResponseError(401, 'SYNC_FORBIDDEN', 'Invalid sync credentials');
+  const snapshot = parseObject(payload.snapshot);
+  const count = await putDirectoryDetails(snapshot.details as JsonObject[], String(snapshot.fetchedAt ?? new Date().toISOString()));
+  await pg(query('student_directory_sync_state', { singleton:'eq.true' }), {
+    method:'PATCH', headers:{ Prefer:'return=minimal' },
+    body:JSON.stringify({ last_success_at:new Date().toISOString(), row_count:count }),
+  });
+  return { success:true, count, fetchedAt:snapshot.fetchedAt };
+}
+
 async function dispatch(payload: JsonObject): Promise<JsonObject> {
   switch (payload.action) {
     case 'getStudents': case 'getStudentList': return getStudents(payload);
     case 'syncStudentDirectory': return syncDirectory(payload);
+    case 'enableStudentDirectoryAutoSync': return enableDirectoryAutoSync(payload);
     case 'getStudentDirectoryDetail': return readDirectoryDetail(payload);
     case 'saveStudentDirectory': return saveDirectoryDetail(payload);
     case 'getAllScores': return readScores(payload, true);
@@ -690,6 +719,7 @@ Deno.serve(async request => {
   try {
     const payload = await request.json() as JsonObject;
     const action = String(payload.action ?? '');
+    if (action === 'ingestStudentDirectory') return json(await ingestDirectorySnapshot(payload));
     if (!ADMIN_ACTIONS.has(action)) throw new ResponseError(400, 'UNSUPPORTED_ACTION', 'Unsupported action');
     await verifyAdmin(payload.token);
     EdgeRuntime.waitUntil(retryFailedMirrors().catch(error => console.error('Mirror retry failed', error)));
