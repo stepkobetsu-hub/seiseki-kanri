@@ -537,6 +537,7 @@ function saveStudentDirectory(data) {
     const pending = keys.map(letter => {
       const edit = changes[letter];
       if (!edit || typeof edit.before !== 'string' || typeof edit.after !== 'string' || edit.after.length > 1000) throw new Error('更新値が正しくありません');
+      if (/^\s*=/.test(edit.after)) throw new Error('数式として解釈される入力は保存できません');
       const cell = sheet.getRange(rowNumber, directoryColumn_(letter));
       if (cell.getFormula()) throw new Error('数式の項目は編集できません。再取得してください');
       if (cell.getDisplayValue() !== edit.before) throw new Error('他の変更がありました。最新情報を読み直してください');
