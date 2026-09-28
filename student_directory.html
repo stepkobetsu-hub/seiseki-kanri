@@ -254,12 +254,25 @@ async function mirrorApi(action,extra={},signal){
   if(!response.ok)throw Error(data.error||'生徒情報の通信に失敗しました。');
   return data;
 }
+let directoryAutoSyncSetupAttempted=false;
 async function refreshDirectoryMirror(force=false){
   if(!token()||directorySyncBusy||(!force&&Date.now()-directorySyncedAt<45000))return;
   directorySyncBusy=true;
   try{
     const r=await mirrorApi('syncStudentDirectory',{force});
-    if(r.success){directorySyncedAt=Date.now();detailCache.clear()}
+    if(r.success){
+      directorySyncedAt=Date.now();detailCache.clear();
+      if(!directoryAutoSyncSetupAttempted){
+        directoryAutoSyncSetupAttempted=true;
+        mirrorApi('enableStudentDirectoryAutoSync').then(setup=>{
+          document.documentElement.dataset.directoryAutoSync=setup.success?'enabled':'error';
+          if(!setup.success)console.warn('生徒マスタの定期同期設定:',setup.error||'失敗');
+        }).catch(error=>{
+          document.documentElement.dataset.directoryAutoSync='error';
+          console.warn('生徒マスタの定期同期設定:',error);
+        });
+      }
+    }
   }catch(e){console.warn('生徒情報の同期を後で再試行します。',e)}
   finally{directorySyncBusy=false}
 }
