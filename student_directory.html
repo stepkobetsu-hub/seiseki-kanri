@@ -267,9 +267,11 @@ async function refreshDirectoryMirror(force=false){
         directoryAutoSyncSetupAttempted=true;
         mirrorApi('enableStudentDirectoryAutoSync').then(setup=>{
           document.documentElement.dataset.directoryAutoSync=setup.success?'enabled':'error';
+          if(!setup.success)document.documentElement.dataset.directoryAutoSyncError=String(setup.error||setup.message||'unknown').slice(0,180);
           if(!setup.success)console.warn('生徒マスタの定期同期設定:',setup.error||'失敗');
         }).catch(error=>{
           document.documentElement.dataset.directoryAutoSync='error';
+          document.documentElement.dataset.directoryAutoSyncError=String(error).slice(0,180);
           console.warn('生徒マスタの定期同期設定:',error);
         });
       }
