@@ -779,6 +779,7 @@ function storeMeetingSession_(staff, fallbackCode){
 }
 function clearMeetingSession_(){
   clearMeetingIdle_();
+  localStorage.removeItem('stepStudentDirectorySearchIndexV1');
   [
     'adminSystemPortalSessionToken','adminSystemPortalExpiresAt','adminLoggedIn',
     'adminStaffCode','adminStaffName','adminDeviceMode','adminCodeInput','adminPwInput'

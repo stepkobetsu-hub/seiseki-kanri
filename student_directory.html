@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>生徒情報検索 | 個別指導STEP</title>
-<link rel="icon" type="image/svg+xml" href="images/student-directory/favicon.svg">
+<link rel="icon" type="image/svg+xml" href="images/student-directory/favicon.svg?v=2">
 <meta name="robots" content="noindex,nofollow">
 <style>
 :root{font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif;color:#183148;background:#f0f5f8}*{box-sizing:border-box}body{margin:0}button,input{font:inherit}button{cursor:pointer}button:disabled{opacity:.55;cursor:wait}header{background:#155343;color:white;padding:18px max(16px,calc((100vw - 1040px)/2));display:flex;justify-content:space-between;align-items:center;gap:12px}h1{font-size:1.35rem;margin:0}h2{font-size:1.2rem;margin:0 0 14px}h3{font-size:1rem;margin:25px 0 9px}.sub{font-size:.8rem;opacity:.85}main{max-width:1040px;margin:22px auto;padding:0 16px 50px}.card{background:white;border:1px solid #dbe6eb;border-radius:14px;box-shadow:0 4px 16px #14364b0b;padding:20px;margin-bottom:16px}.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.search{width:min(100%,520px);font-size:1.12rem;padding:12px 14px;border:2px solid #a6bdc8;border-radius:9px}.search:focus,input:focus{outline:2px solid #328369;outline-offset:1px}.btn{border:1px solid #25735a;background:#25735a;color:white;padding:10px 15px;border-radius:9px;font-weight:650;text-decoration:none;display:inline-block}.btn.secondary{background:white;color:#175443}.btn.small{padding:6px 10px;font-size:.8rem}.muted{color:#627683;font-size:.85rem}.error{color:#ad2a32}#status{min-height:1.5em;margin:12px 0}.candidates{max-height:370px;overflow:auto;border-radius:9px}.candidate{display:block;width:100%;text-align:left;padding:12px 14px;background:#fff;border:0;border-bottom:1px solid #e3eaef}.candidate:hover,.candidate:focus{background:#ebf7f0}.candidate strong{font-size:1.06rem}.candidate small{color:#607381;display:block;margin-top:3px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:10px}.field{background:#f8fafb;border:1px solid #dce7eb;border-radius:9px;padding:12px;text-align:left;overflow-wrap:anywhere;width:100%}.field.big{background:#f0f9f4}.field .label{display:block;font-size:.76rem;color:#607580;margin-bottom:5px}.field .value{font-size:1.16rem;font-weight:680;white-space:pre-wrap}.field.small .value{font-size:.9rem;font-weight:500}.phone{display:inline-block;color:#12634c;margin:4px 0 10px 8px}.lesson{padding:11px 13px;background:#f2f8f5;border-left:4px solid #278165;border-radius:6px;margin:7px 0;font-weight:600}.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}dialog{border:0;border-radius:14px;width:min(650px,95vw);max-height:90vh;overflow:auto;padding:24px;box-shadow:0 20px 70px #001b2d55}dialog::backdrop{background:#0c233b77}.edit-field{display:block;margin:12px 0;font-weight:600}.edit-field input{display:block;width:100%;padding:10px;border:1px solid #b5c7ce;border-radius:7px;margin-top:5px}.login{max-width:440px;margin:65px auto}.login input{width:100%;padding:12px;border:1px solid #b4c6cc;border-radius:8px;margin:6px 0 13px}.device{display:flex;gap:8px;margin:13px 0}.device button{flex:1;background:white;color:#185742;border:1px solid #98b7a6;border-radius:8px;padding:10px}.device button.selected{background:#e4f5eb;border:2px solid #25735a}.hidden{display:none!important}@media(max-width:600px){header{padding:14px 16px;align-items:flex-start}.card{padding:15px}.login{margin:26px auto}.grid{grid-template-columns:1fr 1fr}.field .value{font-size:1rem}.field.small .value{font-size:.83rem}}
@@ -20,6 +20,15 @@ main{margin-top:25px}.card{border-color:#dbe8e2;border-radius:18px;box-shadow:0 
 #detail{border-top:5px solid #abd9bc}#detail h2{display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#174c3a;font-size:1.3rem}#detail h3{display:flex;align-items:center;gap:7px;color:#225947}#detail h3::before{content:'';display:inline-block;width:6px;height:18px;border-radius:8px;background:#85caa0}.field.big{background:#eef9f2}.field:hover{border-color:#8fcaab;background:#f3fbf6}.statusBadge{display:inline-flex;align-items:center;border-radius:100px;padding:3px 10px;font-size:.73rem;font-weight:750;white-space:nowrap}.statusBadge.withdrawn{color:#ae2f43;background:#ffedf0;border:1px solid #f3bdc6}.statusBadge.scheduled{color:#a85b0d;background:#fff3df;border:1px solid #f4cf9a}
 @media(max-width:600px){header{min-height:76px}.brandIcon{width:39px;height:39px;border-radius:12px}.brand h1{font-size:1.15rem}.brand .sub{font-size:.7rem}.card{padding:18px}.searchWrap{width:100%}.searchRow #refresh{width:100%}}
 .detailTop{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px}.detailTop h2{margin:0}.detailGrades{white-space:nowrap;border-radius:100px;background:#e7f6ed;color:#175d42;border:1px solid #9bcfb1}.detailGrades:hover{background:#d5f0df}@media(max-width:600px){.detailGrades{width:100%;text-align:center}}
+
+/* 明るいミントとやさしいアクセント */
+body{background:radial-gradient(circle at 98% 5%,#fff1cf 0,transparent 350px),radial-gradient(circle at 3% 38%,#e6f8f0 0,transparent 450px),#fbfdfb;color:#244a3d}
+header{background:linear-gradient(105deg,#79d9b0,#acebd2);color:#174b3b;box-shadow:0 4px 18px #3c9a712a}
+header::after{color:#ffffff55}.brandIcon{background:#fffefa;border-color:#fff;box-shadow:0 3px 12px #28795020}.brand .sub{color:#295d4b}
+header #logout{color:#175443;background:#fff;border-color:#def5e7}.card{background:#fff;border-color:#d7ede2;box-shadow:0 10px 30px #44896814}
+.searchCard{background:linear-gradient(150deg,#fff 45%,#f5fcf8 80%,#fff9ed);border-top-color:#80d3a4}.searchTitleIcon{background:#fff0ca;box-shadow:0 2px 8px #d6a74720}.searchWrapIcon{filter:saturate(1.3)}.search{border-color:#96d4ae;background:#fffdfa;box-shadow:0 3px 12px #6cab8211}.btn{background:#2b9a6f;border-color:#2b9a6f}.btn.secondary{background:#fffefa;color:#256c50;border-color:#8dcfa7}.btn.secondary:hover{background:#eafaef}
+.candidate{background:linear-gradient(112deg,#f7fdf7,#fffdf9);border-color:#d2ebdc;box-shadow:0 5px 14px #31845a13}.candidate:hover,.candidate:focus{background:#ecfaee;border-color:#70cb97}.candidateBadge{background:#d5f4df;color:#258354}.candidate:nth-child(3n+2) .candidateBadge{background:#fff0cf;color:#af791f}.candidate:nth-child(3n) .candidateBadge{background:#fce8e6;color:#bb7770}.candidateArrow{background:#e0f6e8}
+#detail{border-top-color:#a5dec0}.field.big{background:#f1fbf5}.meetingMemo{background:#fffefb;border-color:#d9ebdf}.detailGrades{background:#e8f8ee;color:#1c7050;border-color:#a5ddba}
 </style>
 </head>
 <body>
@@ -35,19 +44,20 @@ main{margin-top:25px}.card{border-color:#dbe8e2;border-radius:18px;box-shadow:0 
 const GAS='https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 const SHEET='https://docs.google.com/spreadsheets/d/1CIJkTlYUcUkbb8jBdFc6L8D5ubTGsxwNxFv01ten-Zk/edit#gid=829117795';
 const TOKEN='adminSystemPortalSessionToken', EXPIRY='adminSystemPortalExpiresAt';
+const INDEX_CACHE_KEY='stepStudentDirectorySearchIndexV1';
 const LABELS={E:'生徒氏名',F:'フリガナ',H:'校舎',K:'学年',L:'生徒ログインPASS',M:'口座振替提出',N:'口座振替有効',P:'学校名',Q:'保護者氏名',R:'保護者フリガナ',S:'保護者続柄',T:'郵便番号',U:'住所（都道府県・市区町村）',V:'住所（番地）',W:'住所（建物名）',X:'保護者メール',Y:'保護者携帯',Z:'保護者自宅電話',AA:'第2保護者氏名',AB:'第2保護者フリガナ',AC:'第2保護者続柄',AE:'第2保護者携帯',AW:'成績パス'};
 const el=id=>document.getElementById(id);
 function statusBadge(flag){const value=String(flag??'').trim();if(value!=='0'&&value!=='')return null;const badge=document.createElement('span');badge.className='statusBadge '+(value===''?'withdrawn':'scheduled');badge.textContent=value===''?'退塾':'退塾予定';return badge}
-let mode='personal',students=[],ready=false,selectedId='',editable=null,request=0;
+let mode='personal',students=[],ready=false,selectedId='',editable=null,request=0,listRequest=0,listRefreshing=false;
 function storage(){return localStorage}
 function token(){return storage().getItem(TOKEN)||''}
 function setStatus(text,error=false){el('status').textContent=text;el('status').classList.toggle('error',error)}
 async function api(action,extra={}){const response=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action,...extra})});if(!response.ok)throw Error('通信に失敗しました。もう一度お試しください。');return response.json()}
-function clearSession(){for(const store of [localStorage,sessionStorage])for(const key of [TOKEN,EXPIRY,'adminLoggedIn','adminStaffCode','adminStaffName','adminDeviceMode'])store.removeItem(key);mode='';students=[];ready=false;editable=null;selectedId='';el('detail').replaceChildren();el('detail').classList.add('hidden')}
+function clearSession(){request++;listRequest++;localStorage.removeItem(INDEX_CACHE_KEY);for(const store of [localStorage,sessionStorage])for(const key of [TOKEN,EXPIRY,'adminLoggedIn','adminStaffCode','adminStaffName','adminDeviceMode'])store.removeItem(key);mode='';students=[];ready=false;editable=null;selectedId='';el('detail').replaceChildren();el('detail').classList.add('hidden')}
 function showLogin(message=''){el('app').classList.add('hidden');el('logout').classList.add('hidden');el('login').classList.remove('hidden');el('loginError').textContent=message;el('password').value='';}
 function showApp(){el('login').classList.add('hidden');el('app').classList.remove('hidden');el('logout').classList.remove('hidden');loadList()}
 async function logout(){const t=token();clearSession();showLogin();if(t)api('logoutSystemPortal',{systemPortalSessionToken:t}).catch(()=>{})}
-async function start(){if(!token()){showLogin();return}el('app').classList.remove('hidden');setStatus('ログイン状態を確認しています…');try{const r=await api('verifySystemPortal',{systemPortalSessionToken:token()});if(!r.success)throw Error(r.error||'再ログインしてください。');showApp()}catch(e){clearSession();showLogin(e.message)}}
+async function start(){if(!token()){showLogin();return}showApp()}
 async function login(){const code=el('code').value.trim(),password=el('password').value;if(!code||!password){el('loginError').textContent='講師番号とパスワードを入力してください。';return}el('loginButton').disabled=true;el('loginError').textContent='確認しています…';try{const r=await api('staffLogin',{code,password});if(!r.success||!r.systemPortalSessionToken)throw Error(r.error||'この画面には管理権限が必要です。');const store=storage();store.setItem('adminDeviceMode',mode);store.setItem('adminLoggedIn','1');store.setItem('adminStaffCode',r.code||code);store.setItem('adminStaffName',r.name||'');store.setItem(TOKEN,r.systemPortalSessionToken);store.setItem(EXPIRY,r.systemPortalExpiresAt||'');el('password').value='';showApp()}catch(e){el('loginError').textContent=e.message}finally{el('loginButton').disabled=false}}
 function normalize(v){return String(v||'').normalize('NFKC').toLowerCase().replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-96)).replace(/[\s　]+/g,'')}
 const PAIRS = {
@@ -72,8 +82,47 @@ const CHARS = {
   'ん':'n','ゔ':'vu','ぁ':'a','ぃ':'i','ぅ':'u','ぇ':'e','ぉ':'o','ゎ':'wa'
 };
 function romaji(v){const s=normalize(v);let result='',small=false;for(let i=0;i<s.length;i++){if(s[i]==='っ'){small=true;continue}if(s[i]==='ー'){result+=(result.match(/[aeiou]$/)||[''])[0];continue}const pair=PAIRS[s.slice(i,i+2)],part=pair||CHARS[s[i]]||s[i];if(pair)i++;if(small&&/^[bcdfghjklmpqrstvwxyz]/.test(part))result+=part.startsWith('ch')?'t':part[0];small=false;result+=part}return result}
-async function loadList(){const seq=++request;students=[];ready=false;editable=null;selectedId='';el('detail').classList.add('hidden');el('candidates').replaceChildren();setStatus('生徒マスタから読み込み中… 検索結果は読み込み後に表示します。');el('refresh').disabled=true;try{const r=await api('getStudentDirectoryList',{systemPortalSessionToken:token()});if(seq!==request)return;if(!r.success)throw Error(r.error||'読み込めませんでした。');students=r.students||[];if(!students.length)throw Error('原本から生徒を取得できませんでした。最新情報を取得し直してください。');ready=true;renderCandidates()}catch(e){if(seq!==request)return;setStatus('一覧を取得できませんでした：'+e.message,true)}finally{if(seq===request)el('refresh').disabled=false}}
-function renderCandidates(){if(!ready)return;const q=normalize(el('search').value);const box=el('candidates');box.replaceChildren();if(!q){setStatus(`${students.length}人を読み込みました。名前・かな・ローマ字・番号を入力してください。`);return}const matches=students.filter(s=>[s.id,s.name,s.kana,romaji(s.kana)].some(v=>normalize(v).includes(q)));setStatus(matches.length?`${matches.length}人が該当します。生徒を選んでください。`:`「${el('search').value}」に一致する生徒はいません。`);for(const s of matches.slice(0,40)){const b=document.createElement('button');b.type='button';b.className='candidate';const name=document.createElement('strong');name.textContent=`${s.name}（${s.kana||'フリガナなし'}）`;const line=document.createElement('small');line.textContent=`No.${s.id} `;const candidateStatus=statusBadge(s.flag);if(candidateStatus)line.append(candidateStatus);line.append(document.createTextNode(` ／ ${s.grade||''} ／ ${s.campus||''}`));const badge=document.createElement('span');badge.className='candidateBadge';badge.textContent='✦';badge.setAttribute('aria-hidden','true');const inner=document.createElement('span');inner.className='candidateText';inner.append(name,line);const arrow=document.createElement('span');arrow.className='candidateArrow';arrow.textContent='›';arrow.setAttribute('aria-hidden','true');b.append(badge,inner,arrow);b.addEventListener('click',()=>loadDetail(s.id));box.append(b)}if(matches.length>40)setStatus(`${matches.length}人が該当します。先頭40人を表示しています。`)}
+function readCachedIndex(){
+  try{const cache=JSON.parse(localStorage.getItem(INDEX_CACHE_KEY)||'null');if(!cache||cache.staffCode!==localStorage.getItem('adminStaffCode')||Date.now()-cache.time>7*86400000||!Array.isArray(cache.students))return [];return cache.students.filter(s=>s&&/^\d+$/.test(String(s.id))&&typeof s.name==='string')}
+  catch{return []}
+}
+function saveCachedIndex(list){
+  try{localStorage.setItem(INDEX_CACHE_KEY,JSON.stringify({staffCode:localStorage.getItem('adminStaffCode'),time:Date.now(),students:list.map(s=>({id:s.id,flag:s.flag,name:s.name,kana:s.kana,campus:s.campus,grade:s.grade}))}))}catch{}
+}
+async function fastIndex(seq){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),3500);
+  try{
+    const response=await fetch(MEETING_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action:'getStudentList',token:token(),limit:1000}),cache:'no-store',signal:controller.signal});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||data.success!==true||!Array.isArray(data.students)||!data.students.length)return;
+    if(seq!==listRequest||!token())return;
+    students=data.students.map(s=>({id:String(s.id),flag:String(s.flag??''),name:String(s.name||''),kana:String(s.kana||s.nameKana||''),campus:String(s.campus||''),grade:String(s.grade||'')}));
+    ready=true;renderCandidates();
+  }finally{clearTimeout(timer)}
+}
+async function loadList(){
+  const seq=++listRequest;request++;editable=null;selectedId='';el('detail').classList.add('hidden');
+  const cached=readCachedIndex();students=cached;ready=!!cached.length;listRefreshing=true;el('refresh').disabled=true;
+  if(ready)renderCandidates();else{el('candidates').replaceChildren();setStatus('生徒の検索候補を準備しています…')}
+  if(!ready){try{await fastIndex(seq)}catch{} if(seq!==listRequest)return}
+  if(!ready)setStatus('生徒マスタから最新の候補を取得しています…');
+  try{
+    const r=await api('getStudentDirectoryList',{systemPortalSessionToken:token()});
+    if(seq!==listRequest)return;
+    if(!r.success)throw Error(r.error||'取得できませんでした。');
+    if(!Array.isArray(r.students)||!r.students.length)throw Error('原本から生徒を取得できませんでした。');
+    students=r.students;ready=true;saveCachedIndex(students);
+  }catch(e){
+    if(seq!==listRequest)return;
+    if(/ログイン情報|ログインしてください|管理権限/.test(e.message)){clearSession();showLogin('再ログインしてください。');return}
+    listRefreshing=false;
+    if(ready){renderCandidates();setStatus('候補は表示中です。原本の最新情報は取得できませんでした。更新ボタンで再取得してください。',true)}
+    else setStatus('一覧を取得できませんでした：'+e.message,true);
+    return;
+  }finally{if(seq===listRequest)el('refresh').disabled=false}
+  if(seq!==listRequest)return;listRefreshing=false;renderCandidates();
+}
+function renderCandidates(){if(!ready)return;const updating=listRefreshing?' ／ 原本の最新情報を確認中…':'';const q=normalize(el('search').value);const box=el('candidates');box.replaceChildren();if(!q){setStatus(`${students.length}人を読み込みました。名前・かな・ローマ字・番号を入力してください。${updating}`);return}const matches=students.filter(s=>[s.id,s.name,s.kana,romaji(s.kana)].some(v=>normalize(v).includes(q)));setStatus(matches.length?`${matches.length}人が該当します。生徒を選んでください。${updating}`:`「${el('search').value}」に一致する生徒はいません。${updating}`);for(const s of matches.slice(0,40)){const b=document.createElement('button');b.type='button';b.className='candidate';const name=document.createElement('strong');name.textContent=`${s.name}（${s.kana||'フリガナなし'}）`;const line=document.createElement('small');line.textContent=`No.${s.id} `;const candidateStatus=statusBadge(s.flag);if(candidateStatus)line.append(candidateStatus);line.append(document.createTextNode(` ／ ${s.grade||''} ／ ${s.campus||''}`));const badge=document.createElement('span');badge.className='candidateBadge';badge.textContent='✦';badge.setAttribute('aria-hidden','true');const inner=document.createElement('span');inner.className='candidateText';inner.append(name,line);const arrow=document.createElement('span');arrow.className='candidateArrow';arrow.textContent='›';arrow.setAttribute('aria-hidden','true');b.append(badge,inner,arrow);b.addEventListener('click',()=>loadDetail(s.id));box.append(b)}if(matches.length>40)setStatus(`${matches.length}人が該当します。先頭40人を表示しています。`)}
 function field(parent,label,value,opts={}){const wrap=document.createElement('div'),b=document.createElement('button');b.type='button';b.className='field'+(opts.big?' big':'')+(opts.small?' small':'');const l=document.createElement('span'),v=document.createElement('span');l.className='label';l.textContent=label;v.className='value';const shown=String(value??'').trim()||'未入力';v.textContent=opts.secret&&shown!=='未入力'?'••••（タップして確認）':shown;b.append(l,v);b.onclick=()=>{el('zoomLabel').textContent=label;el('zoomValue').textContent=shown;el('zoom').showModal()};wrap.append(b);if(opts.phone&&shown!=='未入力'){const digits=shown.replace(/[^+0-9]/g,'');if(/^\+?\d{9,15}$/.test(digits)){const a=document.createElement('a');a.href='tel:'+digits;a.className='phone';a.textContent='📞 電話をかける';wrap.append(a)}}parent.append(wrap)}
 function section(parent,title,values,opts={}){const h=document.createElement('h3');h.textContent=title;parent.append(h);const grid=document.createElement('div');grid.className='grid';values.forEach(([label,value,extra])=>field(grid,label,value,{...opts,...extra}));parent.append(grid)}
 async function loadDetail(id){const seq=++request;selectedId='';editable=null;el('detail').classList.remove('hidden');el('detail').textContent='生徒情報と時間割を取得しています…';try{const r=await api('getStudentDirectoryDetail',{studentId:id,systemPortalSessionToken:token()});if(seq!==request)return;if(!r.success||String(r.student?.id)!==String(id))throw Error(r.error||'取得できませんでした。');selectedId=id;editable=r.editable;renderDetail(r.student)}catch(e){if(seq===request)el('detail').textContent='詳細を取得できませんでした：'+e.message}}
