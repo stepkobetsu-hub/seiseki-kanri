@@ -148,6 +148,7 @@ function route(e) {
       case 'getStudentList':     result = getStudentList(); break;
       case 'getStudentDirectoryList': result = getStudentDirectoryList(data); break;
       case 'getStudentDirectoryDetail': result = getStudentDirectoryDetail(data); break;
+      case 'getStudentDirectorySnapshot': result = getStudentDirectorySnapshot(data); break;
       case 'saveStudentDirectory': result = saveStudentDirectory(data); break;
       case 'getAllScores':        result = getAllScores(data); break;
       case 'getStudentDetail':   result = getStudentDetail(data); break;
@@ -473,11 +474,39 @@ function getStudentDirectoryDetail(data) {
   if (masterIndex < 0) throw new Error('生徒が見つかりません');
   const row = masterRows[masterIndex];
   const formulas = master.getRange(masterIndex + 2, 1, 1, 49).getFormulas()[0];
-  const scheduleLast = Math.max(2, schedule.getLastRow());
-  const scheduleRows = schedule.getRange(1, 1, scheduleLast, 38).getDisplayValues();
+  const scheduleRows = schedule.getRange(1, 1, Math.max(2, schedule.getLastRow()), 38).getDisplayValues();
   const scheduleData = scheduleRows.slice(2).find(row => String(row[0]).trim() === id) || [];
-  const weekdays = scheduleRows[0].slice(4, 28);
-  const hours = scheduleRows[1].slice(4, 28);
+  return directoryDetailFromRows_(id, row, formulas, scheduleData, scheduleRows[0].slice(4, 28), scheduleRows[1].slice(4, 28));
+}
+
+function getStudentDirectorySnapshot(data) {
+  requireSystemPortalAdmin_(data);
+  const book = SpreadsheetApp.openById(MASTER_SPREADSHEET_ID);
+  const master = book.getSheetByName(MASTER_SHEET_NAME);
+  const schedule = book.getSheetByName('時間割マスタ');
+  if (!master || !schedule) throw new Error('生徒マスタまたは時間割マスタを取得できません');
+  const count = Math.max(0, master.getLastRow() - 1);
+  if (count > 1000) throw new Error('生徒マスタが上限を超えています');
+  const masterRows = count ? master.getRange(2, 1, count, 49).getDisplayValues() : [];
+  const formulas = count ? master.getRange(2, 1, count, 49).getFormulas() : [];
+  const scheduleRows = schedule.getRange(1, 1, Math.max(2, schedule.getLastRow()), 38).getDisplayValues();
+  const scheduleById = new Map();
+  for (const row of scheduleRows.slice(2)) {
+    const id = String(row[0]).trim();
+    if (id && !scheduleById.has(id)) scheduleById.set(id, row);
+  }
+  const details = [];
+  const seen = new Set();
+  for (let n = 0; n < masterRows.length; n++) {
+    const row = masterRows[n], id = String(row[0]).trim();
+    if (!/^\d{1,10}$/.test(id) || seen.has(id)) continue;
+    seen.add(id);
+    details.push(directoryDetailFromRows_(id, row, formulas[n], scheduleById.get(id) || [], scheduleRows[0].slice(4, 28), scheduleRows[1].slice(4, 28)));
+  }
+  return { success: true, fetchedAt: new Date().toISOString(), details: details };
+}
+
+function directoryDetailFromRows_(id, row, formulas, scheduleData, weekdays, hours) {
   const weekdayOrder = { '月': 1, '火': 2, '水': 3, '木': 4, '金': 5, '土': 6 };
   const seen = {};
   const lessons = [];
@@ -508,7 +537,6 @@ function getStudentDirectoryDetail(data) {
     lessons: lessons, course: scheduleData[34] || '', options: [scheduleData[35], scheduleData[36]].filter(Boolean).join('＋'), note: scheduleData[37] || ''
   } };
 }
-
 function directoryColumn_(letter) {
   return String(letter).split('').reduce((sum, c) => sum * 26 + c.charCodeAt(0) - 64, 0);
 }
