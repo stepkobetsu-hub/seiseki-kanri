@@ -78,7 +78,7 @@ function storage(){return localStorage}
 function token(){return storage().getItem(TOKEN)||''}
 function setStatus(text,error=false){el('status').textContent=text;el('status').classList.toggle('error',error)}
 async function api(action,extra={}){const response=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action,...extra})});if(!response.ok)throw Error('通信に失敗しました。もう一度お試しください。');return response.json()}
-function clearSession(){request++;listRequest++;localStorage.removeItem(INDEX_CACHE_KEY);for(const store of [localStorage,sessionStorage])for(const key of [TOKEN,EXPIRY,'adminLoggedIn','adminStaffCode','adminStaffName','adminDeviceMode'])store.removeItem(key);mode='';students=[];ready=false;editable=null;selectedId='';detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').replaceChildren();el('detail').classList.add('hidden')}
+function clearSession(){resetDetails();request++;listRequest++;localStorage.removeItem(INDEX_CACHE_KEY);for(const store of [localStorage,sessionStorage])for(const key of [TOKEN,EXPIRY,'adminLoggedIn','adminStaffCode','adminStaffName','adminDeviceMode'])store.removeItem(key);mode='';students=[];ready=false;editable=null;selectedId='';detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').replaceChildren();el('detail').classList.add('hidden')}
 function showLogin(message=''){el('app').classList.add('hidden');el('logout').classList.add('hidden');el('login').classList.remove('hidden');el('loginError').textContent=message;el('password').value='';}
 function showApp(){el('login').classList.add('hidden');el('app').classList.remove('hidden');el('logout').classList.remove('hidden');loadList()}
 async function logout(){const t=token();clearSession();showLogin();if(t)api('logoutSystemPortal',{systemPortalSessionToken:t}).catch(()=>{})}
@@ -137,6 +137,7 @@ async function fastIndex(seq){
   }finally{clearTimeout(timer)}
 }
 async function loadList(){
+  resetDetails();
   const seq=++listRequest;request++;editable=null;selectedId='';detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').classList.add('hidden');
   const cached=readCachedIndex();students=prepareSearch(cached);ready=!!cached.length;listRefreshing=true;el('refresh').disabled=true;
   if(ready)renderCandidates();else{el('candidates').replaceChildren();setStatus('生徒の検索候補を準備しています…')}
@@ -158,7 +159,7 @@ async function loadList(){
   }finally{if(seq===listRequest)el('refresh').disabled=false}
   if(seq!==listRequest)return;listRefreshing=false;renderCandidates();
 }
-function renderCandidates(){if(!ready||detailView)return;const updating=listRefreshing?' ／ 原本の最新情報を確認中…':'';const q=normalize(el('search').value);const box=el('candidates');box.replaceChildren();if(!q){setStatus(`${students.length}人を読み込みました。名前・かな・ローマ字・番号を入力してください。${updating}`);return}const matches=students.filter(s=>searchKeys(s).some(v=>v.includes(q)));setStatus(matches.length?`${matches.length}人が該当します。生徒を選んでください。${updating}`:`「${el('search').value}」に一致する生徒はいません。${updating}`);const fragment=document.createDocumentFragment();for(const s of matches.slice(0,40)){const b=document.createElement('button');b.type='button';b.className='candidate';const name=document.createElement('strong');name.textContent=`${s.name}（${s.kana||'フリガナなし'}）`;const line=document.createElement('small');line.textContent=`No.${s.id} `;const candidateStatus=statusBadge(s.flag);if(candidateStatus)line.append(candidateStatus);line.append(document.createTextNode(` ／ ${s.grade||''} ／ ${s.campus||''}`));const badge=document.createElement('span');badge.className='candidateBadge';badge.textContent='✦';badge.setAttribute('aria-hidden','true');const inner=document.createElement('span');inner.className='candidateText';inner.append(name,line);const arrow=document.createElement('span');arrow.className='candidateArrow';arrow.textContent='›';arrow.setAttribute('aria-hidden','true');b.append(badge,inner,arrow);b.addEventListener('click',()=>loadDetail(s.id));fragment.append(b)}box.append(fragment);if(matches.length>40)setStatus(`${matches.length}人が該当します。先頭40人を表示しています。`)}
+function renderCandidates(){clearTimeout(prefetchTimer);if(!ready||detailView)return;const updating=listRefreshing?' ／ 原本の最新情報を確認中…':'';const q=normalize(el('search').value);const box=el('candidates');box.replaceChildren();if(!q){setStatus(`${students.length}人を読み込みました。名前・かな・ローマ字・番号を入力してください。${updating}`);return}const matches=students.filter(s=>searchKeys(s).some(v=>v.includes(q)));prefetchDetails(matches);setStatus(matches.length?`${matches.length}人が該当します。生徒を選んでください。${updating}`:`「${el('search').value}」に一致する生徒はいません。${updating}`);const fragment=document.createDocumentFragment();for(const s of matches.slice(0,40)){const b=document.createElement('button');b.type='button';b.className='candidate';const name=document.createElement('strong');name.textContent=`${s.name}（${s.kana||'フリガナなし'}）`;const line=document.createElement('small');line.textContent=`No.${s.id} `;const candidateStatus=statusBadge(s.flag);if(candidateStatus)line.append(candidateStatus);line.append(document.createTextNode(` ／ ${s.grade||''} ／ ${s.campus||''}`));const badge=document.createElement('span');badge.className='candidateBadge';badge.textContent='✦';badge.setAttribute('aria-hidden','true');const inner=document.createElement('span');inner.className='candidateText';inner.append(name,line);const arrow=document.createElement('span');arrow.className='candidateArrow';arrow.textContent='›';arrow.setAttribute('aria-hidden','true');b.append(badge,inner,arrow);b.addEventListener('click',()=>loadDetail(s.id));fragment.append(b)}box.append(fragment);if(matches.length>40)setStatus(`${matches.length}人が該当します。先頭40人を表示しています。`)}
 function field(parent,label,value,opts={}){const wrap=document.createElement('div'),b=document.createElement('button');b.type='button';b.className='field'+(opts.big?' big':'')+(opts.small?' small':'');const l=document.createElement('span'),v=document.createElement('span');l.className='label';l.textContent=label;v.className='value';const shown=String(value??'').trim()||'未入力';v.textContent=opts.secret&&shown!=='未入力'?'••••（タップして確認）':shown;b.append(l,v);b.onclick=()=>{el('zoomLabel').textContent=label;el('zoomValue').textContent=shown;el('zoom').showModal()};wrap.append(b);if(opts.phone&&shown!=='未入力'){const digits=shown.replace(/[^+0-9]/g,'');if(/^\+?\d{9,15}$/.test(digits)){const a=document.createElement('a');a.href='tel:'+digits;a.className='phone';a.textContent='📞 電話をかける';wrap.append(a)}}parent.append(wrap)}
 function checkboxChecked(value){return /^(true|1)$/i.test(String(value??'').trim())}
 function checkboxText(letter,checked){return letter==='M'?(checked?'提出済み':'未提出'):(checked?'有効':'無効')}
@@ -185,9 +186,9 @@ function renderDebitSection(card,s){
       }
       saving=true;grid.querySelectorAll('input').forEach(input=>input.disabled=true);notice.textContent='原本に保存しています…';
       try{
-        const response=await api('saveStudentDirectory',{studentId:id,changes:{[letter]:{before,after:afterChecked?'TRUE':'FALSE'}},systemPortalSessionToken:token()});
+        resetDetails();const response=await api('saveStudentDirectory',{studentId:id,changes:{[letter]:{before,after:afterChecked?'TRUE':'FALSE'}},systemPortalSessionToken:token()});
         if(!response.success)throw Error(response.error||'保存できませんでした。');
-        if(selectedId===id){await loadDetail(id);setStatus('☆マスタへ保存し、最新の内容を読み直しました。')}
+        if(selectedId===id){await showSavedDetail(id,response);setStatus('☆マスタへ保存し、最新の内容を読み直しました。')}
       }catch(error){
         if(selectedId===id&&checkbox.isConnected){saving=false;checkbox.checked=beforeChecked;grid.querySelectorAll('input').forEach(input=>{const cell=editable?.[input.dataset.letter];input.disabled=!cell||!!cell.formula});state.textContent=checkboxText(letter,beforeChecked);notice.textContent='保存できませんでした：'+error.message;notice.classList.add('error')}
       }
@@ -195,7 +196,53 @@ function renderDebitSection(card,s){
   }
 }
 function section(parent,title,values,opts={}){const h=document.createElement('h3');h.textContent=title;parent.append(h);const grid=document.createElement('div');grid.className='grid';values.forEach(([label,value,extra])=>field(grid,label,value,{...opts,...extra}));parent.append(grid)}
-async function loadDetail(id){const seq=++request,started=performance.now();el('detail').dataset.loadState='loading';delete el('detail').dataset.loadMs;selectedId='';editable=null;detailView=true;document.querySelector('.searchCard').classList.add('viewingDetail');el('candidates').replaceChildren();el('detail').classList.remove('hidden');el('detail').textContent='生徒情報と時間割を取得しています…';window.scrollTo({top:0,behavior:'instant'});try{const r=await api('getStudentDirectoryDetail',{studentId:id,systemPortalSessionToken:token()});if(seq!==request)return;if(!r.success||String(r.student?.id)!==String(id))throw Error(r.error||'取得できませんでした。');selectedId=id;editable=r.editable;renderDetail(r.student);el('detail').dataset.loadMs=String(Math.round(performance.now()-started));el('detail').dataset.loadState='loaded'}catch(e){if(seq===request){el('detail').dataset.loadState='error';el('detail').textContent='詳細を取得できませんでした：'+e.message}}}
+
+const detailCache=new Map(),detailPending=new Map();
+let detailEpoch=0,prefetchTimer=0;
+const DETAIL_REUSE_MS=15000;
+// Detail data stays only in this page's memory, never in browser storage.
+function resetDetails(){detailEpoch++;clearTimeout(prefetchTimer);detailCache.clear();detailPending.clear()}
+function validDetail(r,id){return r?.success===true&&String(r.student?.id)===String(id)}
+async function requestDetail(id){
+  id=String(id);
+  const session=token(),epoch=detailEpoch;
+  if(!session)throw Error('ログインしてください。');
+  const cached=detailCache.get(id);
+  if(cached&&cached.session===session&&Date.now()-cached.at<DETAIL_REUSE_MS)return cached.data;
+  detailCache.delete(id);
+  const pending=detailPending.get(id);
+  if(pending&&pending.session===session)return pending.promise;
+  const entry={session,promise:null};
+  entry.promise=api('getStudentDirectoryDetail',{studentId:id,systemPortalSessionToken:session}).then(r=>{
+    if(epoch!==detailEpoch||session!==token())throw Error('情報を更新しました。もう一度選択してください。');
+    if(!validDetail(r,id))throw Error(r.error||'取得できませんでした。');
+    detailCache.set(id,{session,at:Date.now(),data:r});
+    while(detailCache.size>3)detailCache.delete(detailCache.keys().next().value);
+    return r;
+  }).finally(()=>{if(detailPending.get(id)===entry)detailPending.delete(id)});
+  detailPending.set(id,entry);
+  return entry.promise;
+}
+function prefetchDetails(matches){
+  clearTimeout(prefetchTimer);
+  if(!token()||document.hidden||!matches.length||matches.length>2)return;
+  const ids=matches.map(s=>String(s.id)),epoch=detailEpoch;
+  prefetchTimer=setTimeout(()=>{
+    if(epoch!==detailEpoch||detailView)return;
+    for(const id of ids){
+      if(detailPending.size>=2&&!detailPending.has(id))break;
+      requestDetail(id).catch(()=>{});
+    }
+  },200);
+}
+function showSavedDetail(id,r){
+  resetDetails();
+  if(!validDetail(r,id))return loadDetail(id);
+  request++;selectedId=id;editable=r.editable;detailView=true;
+  renderDetail(r.student);
+}
+
+async function loadDetail(id){const seq=++request,started=performance.now();el('detail').dataset.loadState='loading';delete el('detail').dataset.loadMs;selectedId='';editable=null;detailView=true;document.querySelector('.searchCard').classList.add('viewingDetail');el('candidates').replaceChildren();el('detail').classList.remove('hidden');el('detail').textContent='生徒情報と時間割を取得しています…';window.scrollTo({top:0,behavior:'instant'});try{const r=await requestDetail(id);if(seq!==request)return;if(!r.success||String(r.student?.id)!==String(id))throw Error(r.error||'取得できませんでした。');selectedId=id;editable=r.editable;renderDetail(r.student);el('detail').dataset.loadMs=String(Math.round(performance.now()-started));el('detail').dataset.loadState='loaded'}catch(e){if(seq===request){el('detail').dataset.loadState='error';el('detail').textContent='詳細を取得できませんでした：'+e.message}}}
 function renderDetail(s){const card=el('detail');card.replaceChildren();const title=document.createElement('h2');title.textContent=s.name||'氏名未入力';const enrollment=statusBadge(s.flag);const detailTop=document.createElement('div');detailTop.className='detailTop';const detailMeta=document.createElement('div');detailMeta.className='detailMeta';const identity=document.createElement('div');identity.className='detailIdentity';identity.append(document.createTextNode(`No.${s.id}`));if(enrollment)identity.append(enrollment);const topGrades=document.createElement('a');topGrades.className='btn small detailGrades';topGrades.href=`admin.html?studentId=${encodeURIComponent(s.id)}#compare`;topGrades.textContent='📊 この生徒の成績を見る';const topMaster=document.createElement('a');topMaster.className='btn secondary small masterShortcut';topMaster.href=SHEET;topMaster.target='_blank';topMaster.rel='noopener';topMaster.textContent='★生徒マスタへ';const detailLinks=document.createElement('div');detailLinks.className='detailLinks';detailLinks.append(topMaster,topGrades);detailMeta.append(identity,detailLinks);detailTop.append(title,detailMeta);card.append(detailTop);section(card,'基本情報',[['生徒氏名',s.name],['フリガナ',s.kana],['学年',s.grade],['学校名',s.school]],{big:true});section(card,'連絡先',[['保護者携帯',s.guardianPhone,{phone:true}],['保護者自宅電話',s.homePhone,{phone:true}],['第2保護者携帯',s.secondPhone,{phone:true}]],{big:true});renderMeetingSection(card,s.id);const h=document.createElement('h3');h.textContent='通塾時間割';card.append(h);if(s.lessons?.length){for(const v of s.lessons){const p=document.createElement('div');p.className='lesson';p.textContent=`${v.weekday} ${v.time} ${v.subject}`;card.append(p)}}else{const p=document.createElement('p');p.className='muted';p.textContent='登録されている授業枠はありません。';card.append(p)}if(s.course||s.options||s.note)section(card,'コース・備考',[['コース・オプション',[s.course,s.options].filter(Boolean).join('＋')],['時間割の備考',s.note]],{small:true});renderDebitSection(card,s);section(card,'その他の情報（タップで拡大）',[['保護者氏名',s.guardian],['第2保護者氏名',s.secondGuardian],['郵便番号',s.postcode],['住所',s.address],['保護者メール',s.guardianEmail],['第2保護者メール',s.secondEmail],['生徒ログインPASS（L列）',s.loginPassword,{secret:true}],['成績パス（AW列）',s.gradePassword,{secret:true}]],{small:true});const actions=document.createElement('div');actions.className='actions';const edit=document.createElement('button');edit.className='btn';edit.type='button';edit.textContent='✏️ 生徒マスタを編集';edit.onclick=openEditor;const sheet=document.createElement('a');sheet.className='btn secondary';sheet.href=SHEET;sheet.target='_blank';sheet.rel='noopener';sheet.textContent='時間割の変更はシートへ';const grades=document.createElement('a');grades.className='btn secondary';grades.href=`admin.html?studentId=${encodeURIComponent(s.id)}#compare`;grades.textContent='📊 この生徒の成績を見る';actions.append(edit,sheet,grades);card.append(actions)}
 const MEETING_API='https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
 function meetingDate(value){const raw=String(value||'');if(/^\d{4}-\d{2}-\d{2}/.test(raw))return raw.slice(0,10);const d=new Date(raw);return Number.isNaN(d.valueOf())?raw:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
@@ -227,7 +274,7 @@ async function loadMeetingRecords(id,area){
   }catch(e){if(selectedId!==id||!area.isConnected)return;area.replaceChildren();area.className='meetingStatus error';area.append(document.createTextNode('面談記録を読み込めませんでした：'+(e.name==='AbortError'?'時間がかかっています。':e.message)+' '));const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';retry.onclick=()=>{area.className='meetingStatus';area.textContent='面談記録を読み込み中…';loadMeetingRecords(id,area)};area.append(retry)}finally{clearTimeout(timer)}
 }
 function openEditor(){if(!selectedId||!editable)return;const body=el('editFields');body.replaceChildren();for(const [letter,label] of Object.entries(LABELS)){const source=editable[letter];if(!source||source.formula)continue;const wrap=document.createElement('label');wrap.className='edit-field';wrap.textContent=`${label}（${letter}列）`;const input=document.createElement('input');input.dataset.letter=letter;if(['M','N'].includes(letter)){wrap.classList.add('checkboxEdit');input.type='checkbox';input.checked=checkboxChecked(source.value);wrap.append(input)}else{input.type=['L','AW'].includes(letter)?'password':'text';input.autocomplete='off';input.value=source.value??'';wrap.append(input)}body.append(wrap)}el('editStatus').textContent='';el('editor').showModal()}
-async function save(){const changes={},lines=[];for(const input of el('editFields').querySelectorAll('input')){const letter=input.dataset.letter,before=String(editable[letter].value??''),isCheckbox=['M','N'].includes(letter),after=isCheckbox?(input.checked?'TRUE':'FALSE'):input.value;if(isCheckbox?checkboxChecked(before)===input.checked:before===after)continue;changes[letter]={before,after};lines.push(`${LABELS[letter]}：${isCheckbox?`${checkboxChecked(before)?'☑':'□'} → ${input.checked?'☑':'□'}`:['L','AW'].includes(letter)?'（変更前後の値は非表示）':`「${before||'空欄'}」→「${after||'空欄'}」`}`)}if(!lines.length){el('editStatus').textContent='変更はありません。';return}if(!confirm(`この変更を保存しますか？\n生徒番号：${selectedId}\n\n${lines.join('\n')}`))return;el('save').disabled=true;el('editStatus').textContent='原本に保存しています…';try{const id=selectedId,r=await api('saveStudentDirectory',{studentId:id,changes,systemPortalSessionToken:token()});if(!r.success)throw Error(r.error||'保存できませんでした。');el('editor').close();await loadDetail(id);setStatus('☆マスタへ保存し、最新の内容を読み直しました。')}catch(e){el('editStatus').textContent=e.message}finally{el('save').disabled=false}}
+async function save(){const changes={},lines=[];for(const input of el('editFields').querySelectorAll('input')){const letter=input.dataset.letter,before=String(editable[letter].value??''),isCheckbox=['M','N'].includes(letter),after=isCheckbox?(input.checked?'TRUE':'FALSE'):input.value;if(isCheckbox?checkboxChecked(before)===input.checked:before===after)continue;changes[letter]={before,after};lines.push(`${LABELS[letter]}：${isCheckbox?`${checkboxChecked(before)?'☑':'□'} → ${input.checked?'☑':'□'}`:['L','AW'].includes(letter)?'（変更前後の値は非表示）':`「${before||'空欄'}」→「${after||'空欄'}」`}`)}if(!lines.length){el('editStatus').textContent='変更はありません。';return}if(!confirm(`この変更を保存しますか？\n生徒番号：${selectedId}\n\n${lines.join('\n')}`))return;el('save').disabled=true;el('editStatus').textContent='原本に保存しています…';try{resetDetails();const id=selectedId,r=await api('saveStudentDirectory',{studentId:id,changes,systemPortalSessionToken:token()});if(!r.success)throw Error(r.error||'保存できませんでした。');el('editor').close();await showSavedDetail(id,r);setStatus('☆マスタへ保存し、最新の内容を読み直しました。')}catch(e){el('editStatus').textContent=e.message}finally{el('save').disabled=false}}
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>el(b.dataset.close).close());el('loginButton').onclick=login;el('password').onkeydown=e=>{if(e.key==='Enter')login()};el('refresh').onclick=loadList;el('search').oninput=()=>{if(detailView){request++;selectedId='';editable=null;detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').replaceChildren();el('detail').classList.add('hidden')}renderCandidates()};el('save').onclick=save;el('logout').onclick=()=>logout();start();
 </script>
 </body>
