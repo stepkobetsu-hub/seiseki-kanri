@@ -39,3 +39,10 @@
 
 ## Android 0.2.1の検証
 PR #40のGitHub Actionsで単体テスト、debug APK生成、Lintが成功。変更前セルの不変性、別セルを送信しないこと、初回nullと重複防止のテストを追加。mainの[配布用ビルド](https://github.com/stepkobetsu-hub/seiseki-kanri/actions/runs/36785532157)でrelease APK生成・Lint・固定署名照合が成功し、[既存APK URL](https://github.com/stepkobetsu-hub/seiseki-kanri/releases/download/past-exam-scanner-latest/STEP-PastExam-Scanner.apk)を0.2.1へ更新済み。公開APKのSHA-256：`16469eb2e27e434df55ae59b2665ce84aded48be78010294794e901403a2465d`。実機操作は未検証。
+
+## 2026-10-01 アップロード障害の対応（承認待ち）
+- v130更新時にデプロイ実行者が `mintcocoajasmine@gmail.com` へ変わり、PDFフォルダ所有者 `stepkobetsu@gmail.com` と不一致になった。Advanced Drive APIで canAddChildren=false / canEdit=false、DriveApp.createFileのAccess deniedを確認。こちらのデプロイ時の確認不足。
+- 既存デプロイID・URLを保持し、所有者 stepkobetsu@gmail.com が実行する v131 に更新済み。フォルダの共有権限は拡大していない。
+- 所有者アカウントで script.external_request（Supabaseへの通信）が未承認。実行時に UrlFetchApp.fetch の権限不足を確認。Google承認後に公開URL経由のPDFアップロード・savePatch・再読込を検証する必要がある。現時点では復旧完了ではない。
+- 一時診断コードは公開版に含めず、エディターからも削除済み。APK更新はこの権限修復のためには不要。
+- 今後は更新前に実行者が stepkobetsu@gmail.com であることとDriveへの書込可否を確認する。
