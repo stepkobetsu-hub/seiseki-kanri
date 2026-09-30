@@ -1,4 +1,4 @@
-import {ExamApi,cellKey} from './registration.mjs';
+import {ExamApi,cellKey} from './registration.mjs?v=1.0.1-fetch2';
 const $=id=>document.getElementById(id),api=new ExamApi(window.PAST_EXAM_UPLOAD_CONFIG);
 const pendingKey='stepPastExamWebPastExamPendingV1';
 let schools=[],ready=false,busy=false,pending=null;
