@@ -2,6 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:id="@+id/mainScroll"
     android:fillViewport="true"
     android:background="#EEF4F8">
 
@@ -27,6 +28,40 @@
             android:textSize="14sp"
             android:textColor="#475569"
             android:paddingBottom="16dp" />
+
+        <Button
+            android:id="@+id/addHomeIcon"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="ホーム画面にアイコンを追加" />
+
+        <LinearLayout
+            android:id="@+id/completionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="12dp"
+            android:orientation="vertical"
+            android:padding="20dp"
+            android:background="@drawable/completion_bg"
+            android:accessibilityLiveRegion="polite"
+            android:visibility="gone">
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="✓ 登録完了"
+                android:textSize="32sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF" />
+            <TextView
+                android:id="@+id/completionDetails"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textSize="16sp"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
 
         <TextView style="@style/FieldLabel" android:text="担当者" />
         <EditText

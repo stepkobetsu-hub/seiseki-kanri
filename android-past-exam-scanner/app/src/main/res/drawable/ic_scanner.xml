@@ -1,0 +1,4 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><shape android:shape="rectangle"><solid android:color="#145DA0" /><corners android:radius="20dp" /><size android:width="108dp" android:height="108dp" /></shape></item>
+    <item android:drawable="@drawable/ic_scanner_foreground" />
+</layer-list>

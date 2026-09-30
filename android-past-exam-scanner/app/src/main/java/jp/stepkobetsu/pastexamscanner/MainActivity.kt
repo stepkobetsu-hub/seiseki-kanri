@@ -1,5 +1,12 @@
 package jp.stepkobetsu.pastexamscanner
 
+import android.content.Intent
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import android.app.Activity
 import android.net.Uri
 import android.os.Bundle
@@ -127,6 +134,7 @@ class MainActivity : AppCompatActivity() {
             .forEach { it.onItemSelectedListener = updateListener }
 
         binding.teacher.doAfterTextChanged { updateFileNamePreview() }
+        binding.addHomeIcon.setOnClickListener { addHomeIcon() }
         binding.retrySchools.setOnClickListener { loadSchools() }
 
         binding.scanButton.setOnClickListener {
@@ -237,6 +245,7 @@ class MainActivity : AppCompatActivity() {
                 binding.scanStatus.text = "まだスキャンしていません"
                 binding.scanStatus.setTextColor(0xFF475569.toInt())
                 binding.uploadButton.isEnabled = false
+                showRegistrationComplete(fileName)
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 setBusy(false, "登録できませんでした：${e.message}" +
@@ -434,6 +443,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setBusy(busy: Boolean, message: String) {
+        if (busy) binding.completionCard.visibility = View.GONE
         binding.progress.visibility = if (busy) View.VISIBLE else View.GONE
         binding.scanButton.isEnabled = !busy && schools.isNotEmpty() && pending == null
         binding.uploadButton.isEnabled = !busy && (pending != null || (scannedPdfUri != null && schools.isNotEmpty()))
@@ -442,6 +452,46 @@ class MainActivity : AppCompatActivity() {
         listOf(binding.teacher, binding.school, binding.grade, binding.subject, binding.year, binding.exam, binding.kind)
             .forEach { it.isEnabled = !busy && pending == null }
         binding.message.text = message
+    }
+
+    private fun showRegistrationComplete(fileName: String) {
+        binding.completionDetails.text = "過去問DBへの反映を確認しました。\n$fileName"
+        binding.completionCard.visibility = View.VISIBLE
+        binding.root.post { binding.root.smoothScrollTo(0, 0) }
+        val title = TextView(this).apply {
+            text = "✓ 登録完了"
+            textSize = 30f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setTextColor(0xFF166534.toInt())
+            val padding = (24 * resources.displayMetrics.density).toInt()
+            setPadding(padding, padding, padding, padding / 2)
+        }
+        AlertDialog.Builder(this)
+            .setCustomTitle(title)
+            .setMessage("過去問DBへの反映を確認しました。\n\n$fileName")
+            .setPositiveButton("確認しました", null)
+            .show()
+    }
+
+    private fun addHomeIcon() {
+        if (!ShortcutManagerCompat.isRequestPinShortcutSupported(this)) {
+            AlertDialog.Builder(this)
+                .setTitle("ホーム画面にアイコンを追加")
+                .setMessage("アプリ一覧で「STEP過去問スキャナー」を長押しし、ホーム画面へ移動してください。")
+                .setPositiveButton("閉じる", null)
+                .show()
+            return
+        }
+        val shortcut = ShortcutInfoCompat.Builder(this, "step-past-exam-scanner")
+            .setShortLabel("STEP過去問")
+            .setLongLabel("STEP過去問スキャナー")
+            .setIcon(IconCompat.createWithResource(this, R.drawable.ic_scanner))
+            .setIntent(Intent(this, MainActivity::class.java).setAction(Intent.ACTION_MAIN)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP))
+            .build()
+        val requested = ShortcutManagerCompat.requestPinShortcut(this, shortcut, null)
+        Toast.makeText(this, if (requested) "端末の追加画面で「追加」を押してください。"
+            else "アプリ一覧から長押ししてホーム画面へ移動してください。", Toast.LENGTH_LONG).show()
     }
 
     private fun showMessage(message: String) {
