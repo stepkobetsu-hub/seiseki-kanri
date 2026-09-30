@@ -1,0 +1,24 @@
+{
+  "id": "./",
+  "name": "STEP過去問スキャナー",
+  "short_name": "過去問スキャン",
+  "description": "iPhone・AndroidでスキャンしたPDFを過去問DBへ登録",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "lang": "ja",
+  "background_color": "#eef4f8",
+  "theme_color": "#145da0",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
