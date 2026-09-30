@@ -11,6 +11,9 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.core.widget.doAfterTextChanged
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
@@ -25,19 +28,27 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS)
+        .writeTimeout(120, TimeUnit.SECONDS)
+        .callTimeout(180, TimeUnit.SECONDS)
+        .build()
     private val gasUrl = "https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec"
     private val pass = "step123"
 
     private data class School(val id: String, val name: String, val examCount: Int)
 
     private var schools: List<School> = emptyList()
-    private var db = JSONObject()
     private var scannedPdfUri: Uri? = null
+    private var pending: JSONObject? = null
+    private val preferences by lazy { getSharedPreferences("scanner", MODE_PRIVATE) }
 
     private val scannerOptions by lazy {
         GmsDocumentScannerOptions.Builder()
@@ -51,6 +62,7 @@ class MainActivity : AppCompatActivity() {
     private val scanner by lazy { GmsDocumentScanning.getClient(scannerOptions) }
 
     private val scannerLauncher = registerForActivityResult(StartIntentSenderForResult()) { activityResult ->
+        setBusy(false, "")
         if (activityResult.resultCode != Activity.RESULT_OK) return@registerForActivityResult
         val result = GmsDocumentScanningResult.fromActivityResultIntent(activityResult.data)
         val pdf = result?.pdf
@@ -70,10 +82,23 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
+        scannedPdfUri = savedInstanceState?.getString("pdfUri")?.let(Uri::parse)
+        if (scannedPdfUri != null) binding.scanStatus.text = "スキャン済みPDFがあります"
+        pending = preferences.getString("pending", null)?.let { JSONObject(it) }
 
         setupStaticSpinners()
         setupListeners()
         loadSchools()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("pdfUri", scannedPdfUri?.toString())
+        super.onSaveInstanceState(outState)
     }
 
     private fun setupStaticSpinners() {
@@ -81,7 +106,7 @@ class MainActivity : AppCompatActivity() {
         setSpinner(binding.subject, listOf("英語", "数学", "国語", "理科", "社会"))
 
         val current = currentNendo()
-        setSpinner(binding.year, listOf(current.toString(), (current - 1).toString(), (current - 2).toString()))
+        setSpinner(binding.year, (current downTo 2000).map(Int::toString))
 
         setSpinner(
             binding.kind,
@@ -101,24 +126,26 @@ class MainActivity : AppCompatActivity() {
         listOf(binding.school, binding.grade, binding.subject, binding.year, binding.exam, binding.kind)
             .forEach { it.onItemSelectedListener = updateListener }
 
-        binding.teacher.setOnFocusChangeListener { _, _ -> updateFileNamePreview() }
+        binding.teacher.doAfterTextChanged { updateFileNamePreview() }
+        binding.retrySchools.setOnClickListener { loadSchools() }
 
         binding.scanButton.setOnClickListener {
             if (!validateMetadata()) return@setOnClickListener
-            binding.progress.visibility = View.VISIBLE
-            showMessage("文書スキャナーを起動しています…")
+            setBusy(true, "文書スキャナーを起動しています…")
             scanner.getStartScanIntent(this)
                 .addOnSuccessListener { sender ->
-                    binding.progress.visibility = View.GONE
                     scannerLauncher.launch(IntentSenderRequest.Builder(sender).build())
                 }
                 .addOnFailureListener { e ->
-                    binding.progress.visibility = View.GONE
-                    showMessage("文書スキャナーを起動できませんでした：${e.message ?: "不明なエラー"}")
+                    setBusy(false, "文書スキャナーを起動できませんでした：${e.message ?: "不明なエラー"}")
                 }
         }
 
         binding.uploadButton.setOnClickListener {
+            if (pending != null) {
+                uploadAndRegister(null)
+                return@setOnClickListener
+            }
             if (!validateMetadata()) return@setOnClickListener
             val uri = scannedPdfUri
             if (uri == null) {
@@ -135,23 +162,27 @@ class MainActivity : AppCompatActivity() {
             try {
                 val payload = withContext(Dispatchers.IO) { gasGet("load") }
                 if (!payload.optBoolean("ok")) error(payload.optString("error", "学校一覧を読み込めませんでした"))
-                val data = payload.optJSONObject("data") ?: JSONObject()
-                val schoolArray = data.optJSONArray("schools") ?: JSONArray()
+                val data = RegistrationData.requireData(payload)
+                val schoolArray = data.getJSONArray("schools")
                 val loaded = mutableListOf<School>()
                 for (i in 0 until schoolArray.length()) {
                     val s = schoolArray.getJSONObject(i)
                     loaded += School(
                         s.optString("id"),
                         s.optString("name"),
-                        s.optInt("examCount", 5)
+                        s.optInt("examCount", 5).coerceIn(1, 20)
                     )
                 }
-                schools = loaded
-                db = data.optJSONObject("db") ?: JSONObject()
+                schools = loaded.filter { it.id.isNotBlank() && it.name.isNotBlank() }
+                check(schools.isNotEmpty()) { "学校一覧が空です。接続先の設定を確認してください" }
                 setSpinner(binding.school, schools.map { "${it.name}（年${it.examCount}回）" })
                 updateExamSpinner()
-                setBusy(false, "学校一覧を読み込みました。")
+                binding.retrySchools.visibility = View.GONE
+                setBusy(false, pending?.let { "未完了のDB登録があります：${it.getString("fileName")}" }
+                    ?: "学校一覧を読み込みました。")
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                binding.retrySchools.visibility = View.VISIBLE
                 setBusy(false, "学校一覧の読み込みに失敗しました：${e.message}")
             }
         }
@@ -163,19 +194,30 @@ class MainActivity : AppCompatActivity() {
         updateFileNamePreview()
     }
 
-    private fun uploadAndRegister(uri: Uri) {
+    private fun uploadAndRegister(uri: Uri?) {
         lifecycleScope.launch {
             binding.uploadButton.isEnabled = false
             setBusy(true, "PDFをアップロードしています…")
             try {
-                val context = captureContext()
-                val fileName = buildFileName(context)
-                val upload = withContext(Dispatchers.IO) { uploadPdf(uri, fileName) }
-                if (!upload.optBoolean("ok")) error(upload.optString("error", "PDF保存に失敗しました"))
-
-                val fileId = upload.optString("fileId")
-                val url = upload.optString("url")
-                if (fileId.isBlank()) error("保存したファイルIDを取得できませんでした")
+                val registration = pending ?: run {
+                    val context = captureContext()
+                    val fileName = buildFileName(context)
+                    withContext(Dispatchers.IO) {
+                        val upload = uploadPdf(requireNotNull(uri), fileName)
+                        if (!upload.optBoolean("ok")) error(upload.optString("error", "PDF保存に失敗しました"))
+                        if (upload.optString("fileId").isBlank()) error("保存したファイルIDを取得できませんでした")
+                        upload.put("fileName", fileName).put("context", context.toJson()).also {
+                            pending = it
+                            check(preferences.edit().putString("pending", it.toString()).commit()) {
+                                "再試行用の登録情報を端末へ保存できませんでした"
+                            }
+                        }
+                    }
+                }
+                val context = contextFromJson(registration.getJSONObject("context"))
+                val fileName = registration.getString("fileName")
+                val fileId = registration.getString("fileId")
+                val url = registration.optString("url")
 
                 setBusy(true, "過去問DBへ登録しています…")
                 withContext(Dispatchers.IO) {
@@ -186,14 +228,19 @@ class MainActivity : AppCompatActivity() {
                 val verified = withContext(Dispatchers.IO) { verifyRegistration(context, fileId) }
                 if (!verified) error("PDFは保存されましたが、DBへの反映を確認できませんでした")
 
-                setBusy(false, "✓ 過去問DBへの登録を確認しました。\n$fileName")
+                check(withContext(Dispatchers.IO) { preferences.edit().remove("pending").commit() }) {
+                    "登録済みですが端末の再試行情報を消去できませんでした"
+                }
+                pending = null
                 scannedPdfUri = null
+                setBusy(false, "登録完了：過去問DBへの反映を確認しました。\n$fileName")
                 binding.scanStatus.text = "まだスキャンしていません"
                 binding.scanStatus.setTextColor(0xFF475569.toInt())
                 binding.uploadButton.isEnabled = false
             } catch (e: Exception) {
-                setBusy(false, "登録できませんでした：${e.message}")
-                binding.uploadButton.isEnabled = scannedPdfUri != null
+                if (e is CancellationException) throw e
+                setBusy(false, "登録できませんでした：${e.message}" +
+                    if (pending != null) "\nアップロード済みPDFのDB登録を再試行できます。" else "")
             }
         }
     }
@@ -206,6 +253,23 @@ class MainActivity : AppCompatActivity() {
         val exam: String,
         val kind: String,
         val teacher: String
+    )
+
+    private fun ExamContext.toJson() = JSONObject().apply {
+        put("schoolId", school.id)
+        put("schoolName", school.name)
+        put("year", year)
+        put("grade", grade)
+        put("subject", subject)
+        put("exam", exam)
+        put("kind", kind)
+        put("teacher", teacher)
+    }
+
+    private fun contextFromJson(c: JSONObject) = ExamContext(
+        School(c.getString("schoolId"), c.getString("schoolName"), 5),
+        c.getString("year"), c.getString("grade"), c.getString("subject"),
+        c.getString("exam"), c.getString("kind"), c.getString("teacher")
     )
 
     private fun captureContext(): ExamContext = ExamContext(
@@ -270,34 +334,23 @@ class MainActivity : AppCompatActivity() {
     private fun mergeIntoLatestDb(c: ExamContext, fileName: String, fileId: String, url: String) {
         val fresh = gasGet("load")
         if (!fresh.optBoolean("ok")) error(fresh.optString("error", "DB読み込み失敗"))
-        val data = fresh.optJSONObject("data") ?: JSONObject()
-        val freshSchools = data.optJSONArray("schools") ?: JSONArray()
-        val freshDb = data.optJSONObject("db") ?: JSONObject()
+        val data = RegistrationData.requireData(fresh)
+        val freshSchools = data.getJSONArray("schools")
+        val freshDb = data.getJSONObject("db")
+        check((0 until freshSchools.length()).any { freshSchools.getJSONObject(it).optString("id") == c.school.id }) {
+            "登録先の学校が最新DBにありません"
+        }
 
         val key = dbKey(c.school.id, c.year, c.grade, c.exam, c.subject)
-        val item = freshDb.optJSONObject(key) ?: JSONObject().apply {
-            put("files", JSONArray())
-            put("noan", false)
-            put("stu", false)
-        }
-        val files = item.optJSONArray("files") ?: JSONArray()
-        var exists = false
-        for (i in 0 until files.length()) {
-            if (files.optJSONObject(i)?.optString("fileId") == fileId) exists = true
-        }
-        if (!exists) {
-            files.put(JSONObject().apply {
+        if (RegistrationData.contains(freshDb, key, fileId)) return
+        RegistrationData.merge(freshDb, key, JSONObject().apply {
                 put("name", fileName)
                 put("url", url)
                 put("fileId", fileId)
                 put("date", LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd")))
                 put("kind", c.kind)
                 put("isNew", true)
-            })
-        }
-        item.put("files", files)
-        item.put("hasNew", true)
-        freshDb.put(key, item)
+        })
 
         val body = FormBody.Builder()
             .add("action", "saveFull")
@@ -310,8 +363,7 @@ class MainActivity : AppCompatActivity() {
 
         val req = Request.Builder().url(gasUrl).post(body).build()
         client.newCall(req).execute().use { response ->
-            val text = response.body?.string().orEmpty()
-            val json = JSONObject(text)
+            val json = readResponse(response)
             if (!json.optBoolean("ok")) error(json.optString("error", "DB保存失敗"))
         }
     }
@@ -320,13 +372,8 @@ class MainActivity : AppCompatActivity() {
         repeat(4) { attempt ->
             val fresh = gasGet("load")
             if (fresh.optBoolean("ok")) {
-                val data = fresh.optJSONObject("data") ?: JSONObject()
-                val freshDb = data.optJSONObject("db") ?: JSONObject()
-                val item = freshDb.optJSONObject(dbKey(c.school.id, c.year, c.grade, c.exam, c.subject))
-                val files = item?.optJSONArray("files") ?: JSONArray()
-                for (i in 0 until files.length()) {
-                    if (files.optJSONObject(i)?.optString("fileId") == fileId) return true
-                }
+                val freshDb = RegistrationData.requireData(fresh).getJSONObject("db")
+                if (RegistrationData.contains(freshDb, dbKey(c.school.id, c.year, c.grade, c.exam, c.subject), fileId)) return true
             }
             if (attempt < 3) Thread.sleep(800L * (attempt + 1))
         }
@@ -336,6 +383,9 @@ class MainActivity : AppCompatActivity() {
     private fun uploadPdf(uri: Uri, fileName: String): JSONObject {
         val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
             ?: error("スキャンPDFを読み込めませんでした")
+        check(bytes.size >= 5 && bytes.take(5).toByteArray().toString(Charsets.US_ASCII) == "%PDF-") {
+            "スキャン結果が有効なPDFではありません"
+        }
         val encoded = Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
 
         val body = FormBody.Builder()
@@ -348,7 +398,7 @@ class MainActivity : AppCompatActivity() {
 
         val req = Request.Builder().url(gasUrl).post(body).build()
         client.newCall(req).execute().use { response ->
-            return JSONObject(response.body?.string().orEmpty())
+            return readResponse(response)
         }
     }
 
@@ -356,7 +406,16 @@ class MainActivity : AppCompatActivity() {
         val url = "$gasUrl?action=$action&pass=$pass&_ts=${System.currentTimeMillis()}"
         val req = Request.Builder().url(url).get().build()
         client.newCall(req).execute().use { response ->
-            return JSONObject(response.body?.string().orEmpty())
+            return readResponse(response)
+        }
+    }
+
+    private fun readResponse(response: okhttp3.Response): JSONObject {
+        check(response.isSuccessful) { "通信に失敗しました（HTTP ${response.code}）" }
+        return try {
+            JSONObject(response.body?.string().orEmpty())
+        } catch (e: org.json.JSONException) {
+            error("サーバーからJSON以外の応答が返りました。接続先と公開設定を確認してください")
         }
     }
 
@@ -376,7 +435,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun setBusy(busy: Boolean, message: String) {
         binding.progress.visibility = if (busy) View.VISIBLE else View.GONE
-        binding.scanButton.isEnabled = !busy
+        binding.scanButton.isEnabled = !busy && schools.isNotEmpty() && pending == null
+        binding.uploadButton.isEnabled = !busy && (pending != null || (scannedPdfUri != null && schools.isNotEmpty()))
+        binding.uploadButton.text = if (pending != null) "DB登録を再試行" else "② 過去問DBへ登録"
+        binding.retrySchools.isEnabled = !busy
+        listOf(binding.teacher, binding.school, binding.grade, binding.subject, binding.year, binding.exam, binding.kind)
+            .forEach { it.isEnabled = !busy && pending == null }
         binding.message.text = message
     }
 

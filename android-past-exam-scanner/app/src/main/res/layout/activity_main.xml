@@ -40,6 +40,13 @@
 
         <TextView style="@style/FieldLabel" android:text="学校" />
         <Spinner android:id="@+id/school" style="@style/FieldSpinner" />
+        <Button
+            android:id="@+id/retrySchools"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="学校一覧を再取得"
+            android:visibility="gone" />
 
         <TextView style="@style/FieldLabel" android:text="学年" />
         <Spinner android:id="@+id/grade" style="@style/FieldSpinner" />

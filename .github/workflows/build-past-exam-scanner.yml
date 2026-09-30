@@ -2,14 +2,22 @@ name: Build STEP Past Exam Scanner APK
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - "android-past-exam-scanner/**"
+      - ".github/workflows/build-past-exam-scanner.yml"
   push:
     paths:
       - "android-past-exam-scanner/**"
       - ".github/workflows/build-past-exam-scanner.yml"
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: android-past-exam-scanner
@@ -25,11 +33,17 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
+          log-accepted-android-sdk-licenses: false
+
       - name: Build debug APK
-        run: gradle :app:assembleDebug --stacktrace
+        run: gradle :app:testDebugUnitTest :app:assembleDebug :app:lintDebug --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: STEP-PastExam-Scanner-debug
           path: android-past-exam-scanner/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
