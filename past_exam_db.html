@@ -328,6 +328,10 @@ function currentNendo() {
 const THIS_YEAR = currentNendo();
 const YEARS = Array.from({length:3}, (_,i) => String(THIS_YEAR - i));
 const ARCHIVE_YEARS = Array.from({length:5}, (_,i) => String(THIS_YEAR - 3 - i));
+const URL_PARAMS = new URLSearchParams(location.search);
+const FORCE_FRESH = URL_PARAMS.get('fresh') === '1';
+const TARGET_SID = URL_PARAMS.get('sid') || '';
+const TARGET_YEAR = URL_PARAMS.get('year') || '';
 
 function setSyncStatus(state, msg) {
   const el = document.getElementById('syncStatus');
@@ -434,9 +438,11 @@ async function loadFromGAS(pass) {
       setSyncStatus('ok','✓ 同期済み');
       setTimeout(() => setSyncStatus('idle','● オンライン'), 3000);
 
-      if (prevSid && prevYear) {
-        const school = schools.find(s => s.id === prevSid);
-        if (school) { goDetail(school, String(prevYear)); return; }
+      const targetSid = TARGET_SID || prevSid;
+      const targetYear = TARGET_YEAR || prevYear;
+      if (targetSid && targetYear) {
+        const school = schools.find(s => String(s.id) === String(targetSid));
+        if (school) { goDetail(school, String(targetYear)); return; }
       }
       curSchool = null;
       renderTop();
@@ -468,10 +474,12 @@ window.addEventListener('load', () => {
   }
   document.getElementById('pageLogin').style.display = 'none';
   document.getElementById('pageMain').style.display  = '';
-  if (!showCachedSnapshot()) {
+  if (!FORCE_FRESH && showCachedSnapshot()) {
+    // キャッシュを先に表示してから最新データを取得
+  } else {
     schools = JSON.parse(JSON.stringify(DEFAULT_SCHOOLS));
     db = {};
-    curYear = YEARS[0];
+    curYear = TARGET_YEAR || YEARS[0];
     isViewOnly = true;
     liveReady = false;
     renderTop();
