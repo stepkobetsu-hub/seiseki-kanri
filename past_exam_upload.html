@@ -24,12 +24,6 @@ input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:
 .msg{margin-top:12px;white-space:pre-wrap;font-weight:800;line-height:1.7}.ok{color:#047857}.err{color:#dc2626}
 .small{font-size:.86rem;color:#64748b;line-height:1.7}.result{border-top:1px solid #e2eaf3;margin-top:14px;padding-top:12px}
 .result a{color:#145da0;font-weight:900;word-break:break-all}.hidden{display:none!important}
-.cameraOverlay{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:none;align-items:center;justify-content:center;padding:12px}
-.cameraOverlay.open{display:flex}
-.cameraBox{width:min(720px,100%);background:#111827;border-radius:16px;padding:12px;color:#fff}
-.cameraBox video{width:100%;max-height:68vh;background:#000;border-radius:12px;object-fit:contain}
-.cameraActions{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
-.cameraActions .btn{flex:1;min-width:130px}
 @media(max-width:640px){main{padding:14px 10px 34px}.hero{border-radius:0;margin:-14px -10px 0}.grid{grid-template-columns:1fr}.btn{width:100%}.card{border-radius:12px}}
 </style>
 </head>
@@ -52,15 +46,17 @@ input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:
     </div>
 
     <div style="margin-top:12px">
-      <label>ファイル</label>
-      <div style="display:flex;gap:10px;align-items:stretch;flex-wrap:wrap">
-        <input id="file" type="file" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" multiple style="flex:1;min-width:260px">
-        <button id="cameraBtn" type="button" class="btn ghost" style="white-space:nowrap" onclick="openCamera()">📷 カメラで取り込み</button>
-        <input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden">
+      <label>取り込み方法</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button id="cameraBtn" type="button" class="btn primary" onclick="openNativeCamera()">📷 撮影してPDF</button>
+        <button type="button" class="btn ghost" onclick="$('file').click()">📄 PDF・ファイルを選ぶ</button>
       </div>
-      <div id="cameraStatus" class="small" style="margin-top:7px;font-weight:800;color:#145da0"></div>
-      <div class="fieldErr" data-for="file">ファイルを選択するか、カメラで撮影してください</div>
-      <p class="small">PDF、写真、Word、Excelをアップロードできます。写真（JPEG/PNG）は自動でPDF化します。複数の写真は1つのPDFにまとめます。カメラは繰り返し撮影できます。</p>
+      <input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden">
+      <input id="file" type="file" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" multiple class="hidden">
+      <div id="cameraStatus" class="small" style="margin-top:9px;font-weight:800;color:#145da0"></div>
+      <div id="fileStatus" class="small" style="margin-top:4px;font-weight:800;color:#475569"></div>
+      <div class="fieldErr" data-for="file">撮影するか、PDF・ファイルを選択してください</div>
+      <p class="small">写真で取り込んだ場合は自動でPDFに変換します。複数ページは「撮影してPDF」を繰り返すと、1つのPDFにまとめます。Google Driveでスキャン済みのPDFは「PDF・ファイルを選ぶ」から選べます。</p>
     </div>
 
     <button id="submitBtn" class="btn primary submit" onclick="uploadFiles()">アップロードする</button>
@@ -77,18 +73,6 @@ input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:
     </div>
   </section>
 </main>
-<div id="cameraOverlay" class="cameraOverlay">
-  <div class="cameraBox">
-    <div style="font-weight:900;margin:2px 0 10px">カメラで取り込み</div>
-    <video id="cameraVideo" autoplay playsinline muted></video>
-    <canvas id="cameraCanvas" class="hidden"></canvas>
-    <div class="cameraActions">
-      <button type="button" class="btn primary" onclick="takeCameraPhoto()">📷 撮影する</button>
-      <button type="button" class="btn ghost" onclick="closeCamera()">閉じる</button>
-    </div>
-    <div id="cameraHelp" class="small" style="color:#cbd5e1;margin-top:8px"></div>
-  </div>
-</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 const GAS_URL='https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec';
@@ -107,7 +91,6 @@ let schools=[];
 let db={};
 let dbReady=false;
 let cameraFiles=[];
-let cameraStream=null;
 function value(id){return ($(id)?.value||'').trim()}
 function setMsg(text,ok){$('msg').className='msg '+(ok?'ok':'err');$('msg').textContent=text}
 function cleanName(s){return String(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'').trim()}
@@ -123,91 +106,26 @@ function buildFileName(file, forceExt, forceBase){
 function isImageFile(file){
   return !!file && (String(file.type||'').startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name||''));
 }
-async function openCamera(){
-  closeCamera();
-  $('cameraHelp').textContent='カメラを準備しています...';
-  $('cameraOverlay').classList.add('open');
-
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-    $('cameraHelp').innerHTML='このブラウザではページ内カメラを使えません。<br><button type="button" class="btn ghost" style="margin-top:8px" onclick="openNativeCamera()">📷 端末のカメラを開く</button>';
-    return;
-  }
-
-  let lastErr=null;
-  const tries=[
-    {video:{facingMode:{exact:'environment'}},audio:false},
-    {video:{facingMode:{ideal:'environment'}},audio:false},
-    {video:true,audio:false}
-  ];
-  for(const constraints of tries){
-    try{
-      cameraStream=await navigator.mediaDevices.getUserMedia(constraints);
-      $('cameraVideo').srcObject=cameraStream;
-      try{await $('cameraVideo').play()}catch(e){}
-      $('cameraHelp').textContent='撮影後も続けて何枚でも取り込めます。';
-      return;
-    }catch(e){ lastErr=e; }
-  }
-
-  const name=(lastErr&&lastErr.name)||'';
-  let reason='この端末ではページ内カメラを開始できませんでした。';
-  if(name==='NotAllowedError' || name==='PermissionDeniedError'){
-    reason='カメラの使用が許可されていません。Chromeのサイト設定で「カメラ」を許可してから再試行してください。';
-  }else if(name==='NotFoundError' || name==='DevicesNotFoundError'){
-    reason='利用できるカメラが見つかりませんでした。';
-  }else if(name==='NotReadableError' || name==='TrackStartError'){
-    reason='ほかのアプリがカメラを使用中の可能性があります。カメラアプリ等を閉じて再試行してください。';
-  }
-  $('cameraHelp').innerHTML=reason+
-    '<div class="cameraActions" style="margin-top:10px">'+
-    '<button type="button" class="btn primary" onclick="openCamera()">もう一度試す</button>'+
-    '<button type="button" class="btn ghost" onclick="openNativeCamera()">📷 端末のカメラを開く</button>'+
-    '</div>';
-}
 function openNativeCamera(){
-  closeCamera();
   $('cameraInput').click();
 }
-function closeCamera(){
-  $('cameraOverlay').classList.remove('open');
-  if(cameraStream){
-    cameraStream.getTracks().forEach(t=>t.stop());
-    cameraStream=null;
-  }
-  $('cameraVideo').srcObject=null;
-}
-async function takeCameraPhoto(){
-  const video=$('cameraVideo');
-  if(!video.videoWidth || !video.videoHeight){
-    setMsg('カメラ映像の準備中です。少し待ってからもう一度押してください。',false);
-    return;
-  }
-  const canvas=$('cameraCanvas');
-  const maxPx=2200;
-  const scale=Math.min(1,maxPx/Math.max(video.videoWidth,video.videoHeight));
-  canvas.width=Math.max(1,Math.round(video.videoWidth*scale));
-  canvas.height=Math.max(1,Math.round(video.videoHeight*scale));
-  const ctx=canvas.getContext('2d');
-  ctx.drawImage(video,0,0,canvas.width,canvas.height);
-  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.9));
-  if(!blob){
-    setMsg('撮影画像を作成できませんでした。',false);
-    return;
-  }
-  const name='camera_'+new Date().toISOString().replace(/[:.]/g,'-')+'.jpg';
-  cameraFiles.push(new File([blob],name,{type:'image/jpeg',lastModified:Date.now()}));
-  updateCameraStatus();
-  clearInvalid('file');
-  $('cameraHelp').textContent='撮影しました。続けて撮るか、「閉じる」を押してください。';
-}
 function updateCameraStatus(){
-  $('cameraStatus').textContent = cameraFiles.length ? `📷 撮影済み：${cameraFiles.length}枚（続けて撮影できます）` : '';
+  $('cameraStatus').textContent = cameraFiles.length
+    ? `📷 撮影済み：${cameraFiles.length}枚 → アップロード時に1つのPDFへ変換します`
+    : '';
+}
+function updateFileStatus(){
+  const files=[...($('file').files||[])];
+  $('fileStatus').textContent = files.length
+    ? `📄 選択済み：${files.map(f=>f.name).join('、')}`
+    : '';
 }
 function clearSelectedFiles(){
   $('file').value='';
   $('cameraInput').value='';
   cameraFiles=[];
   updateCameraStatus();
+  updateFileStatus();
 }
 function currentNendo(){
   const now=new Date();
@@ -267,7 +185,7 @@ async function loadDb(){
   dbReady=false;
   $('submitBtn').disabled=false;
   renderSchoolOptions(loadCachedSchools());
-  setMsg('学校一覧を表示しました。最新情報を確認中です...',true);
+  setMsg('学校一覧を表示しました。',true);
 
   let lastErr=null;
   for(let attempt=1;attempt<=5;attempt++){
@@ -285,7 +203,7 @@ async function loadDb(){
     }catch(e){
       lastErr=e;
       if(attempt<5){
-        if(attempt===1) setMsg('学校一覧を表示中です。最新情報を再確認しています...',true);
+        if(attempt===1) setMsg('学校一覧を表示しました。',true);
         await new Promise(r=>setTimeout(r,700*attempt));
       }
     }
@@ -293,7 +211,7 @@ async function loadDb(){
 
   renderSchoolOptions(loadCachedSchools());
   $('submitBtn').disabled=false;
-  setMsg('学校一覧は前回の情報を表示しています。アップロード時に最新DBへ再接続します。',true);
+  setMsg('学校一覧を表示しました。',true);
 }
 function clearInvalid(id){
   const el=$(id);
@@ -522,28 +440,6 @@ async function retryPendingRegistration(){
     $('submitBtn').disabled=false;
   }
 }
-async function ensureDbReady(){
-  if(dbReady) return true;
-  setMsg('最新DBへ接続しています...',true);
-  let lastErr=null;
-  for(let attempt=1;attempt<=5;attempt++){
-    try{
-      const r=await gasGet({action:'load',pass:PASS},attempt+10);
-      if(!r.ok) throw new Error(r.error||'読み込みに失敗しました');
-      const remoteSchools=(r.data&&r.data.schools)||[];
-      db=(r.data&&r.data.db)||{};
-      renderSchoolOptions(remoteSchools);
-      try{localStorage.setItem('pastExamSchools',JSON.stringify(schools))}catch(e){}
-      dbReady=true;
-      return true;
-    }catch(e){
-      lastErr=e;
-      if(attempt<5) await new Promise(r=>setTimeout(r,1000*attempt));
-    }
-  }
-  setMsg('最新DBへ接続できませんでした。誤った上書きを防ぐため今回はアップロードを停止しました。通信状態を確認して、もう一度「アップロードする」を押してください。'+((lastErr&&lastErr.message)?'\n'+lastErr.message:''),false);
-  return false;
-}
 async function uploadFiles(){
   if(!validateRequired()) return;
   const ctx=captureUploadContext();
@@ -594,16 +490,19 @@ $('cameraInput').addEventListener('change',()=>{
     cameraFiles.push(f);
     updateCameraStatus();
     clearInvalid('file');
+    setMsg('撮影画像を取り込みました。複数ページなら、もう一度「撮影してPDF」を押してください。終わったら「アップロードする」を押してください。',true);
   }
-  // 同じ端末で続けて撮影できるように毎回リセット
   $('cameraInput').value='';
 });
+$('file').addEventListener('change',()=>{
+  updateFileStatus();
+  clearInvalid('file');
+});
 $('school').addEventListener('change',updateExamOptions);
-['teacher','school','grade','subject','year','testNo','kind','file'].forEach(id=>{
+['teacher','school','grade','subject','year','testNo','kind'].forEach(id=>{
   $(id).addEventListener('input',()=>clearInvalid(id));
   $(id).addEventListener('change',()=>clearInvalid(id));
 });
-window.addEventListener('pagehide',closeCamera);
 window.addEventListener('load',()=>{
   const savedTeacher=localStorage.getItem('pastExamTeacher');
   if(savedTeacher) $('teacher').value=savedTeacher;
