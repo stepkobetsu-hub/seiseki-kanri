@@ -1,5 +1,6 @@
 package jp.stepkobetsu.pastexamscanner
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.widget.TextView
 import android.widget.Toast
@@ -135,6 +136,14 @@ class MainActivity : AppCompatActivity() {
 
         binding.teacher.doAfterTextChanged { updateFileNamePreview() }
         binding.addHomeIcon.setOnClickListener { addHomeIcon() }
+        binding.openPastExamDb.setOnClickListener {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW,
+                    Uri.parse("https://stepkobetsu-hub.github.io/seiseki-kanri/past_exam_db.html")))
+            } catch (_: ActivityNotFoundException) {
+                Toast.makeText(this, "リンクを開くブラウザが見つかりません。", Toast.LENGTH_LONG).show()
+            }
+        }
         binding.retrySchools.setOnClickListener { loadSchools() }
 
         binding.scanButton.setOnClickListener {
