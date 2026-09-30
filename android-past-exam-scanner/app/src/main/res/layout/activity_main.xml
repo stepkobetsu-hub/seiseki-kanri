@@ -159,5 +159,17 @@
             android:textSize="14sp"
             android:textStyle="bold"
             android:textColor="#334155" />
+        <Button
+            android:id="@+id/openPastExamDb"
+            style="?attr/borderlessButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="18dp"
+            android:minHeight="48dp"
+            android:text="過去問DBへ"
+            android:textAllCaps="false"
+            android:textSize="14sp"
+            android:textColor="#64748B" />
     </LinearLayout>
 </ScrollView>
