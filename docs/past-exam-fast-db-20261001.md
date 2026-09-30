@@ -1,12 +1,13 @@
-# 過去問DB高速化 — 2026-10-01（準備済み・本番切替前）
+# 過去問DB高速化 — 2026-10-01（本番反映済み）
 
 ## 状態
-Supabaseへの初回コピーと互換APIのデプロイを完了。Google Apps Scriptの外部通信権限承認待ち。既存WebアプリのデプロイとGitHub Pagesは未変更なので、現在の正本はGoogle Sheetのまま。
-初回確認：学校7校、登録セル56件、PDF／画像55件。稼働データのコピーはコードに含めない。
+本番反映済み。登録情報の正本はSupabase。PDF／画像は既存Google Driveに置いたまま。
+切替時の確認：学校7校、登録セル56件、PDF／画像55件。稼働データのコピーはコードに含めない。
+既存GASのデプロイID／URLを維持してv130に更新。Pagesの直接読込・差分保存は[PR #38](https://github.com/stepkobetsu-hub/seiseki-kanri/pull/38)で反映。Pages公開処理は成功、新画面のオンライン表示を確認。
 
 ## 遅さの原因
 現行バインドApps Scriptの `normalizeDriveFilesInData_` が、一覧取得ごとに全登録ファイルに対してDrive実在・ゴミ箱・名称・MIME確認を個別に実行する。
-55ファイル分の往復が登録アプリの事前・事後再読込でも発生。新APIはこれを実行しない。実測速度は承認後に測定する。
+55ファイル分の往復が登録アプリの事前・事後再読込でも発生。新APIはこれを実行しない。旧版との同条件の速度比較は未実施。
 
 ## 新基盤
 - プロジェクト：[learning-progress](https://supabase.com/dashboard/project/wisedgcgwaebtkprdhth)
@@ -20,15 +21,17 @@ Supabaseへの初回コピーと互換APIのデプロイを完了。Google Apps 
 - `saveFull`：旧アプリ互換。revisionを渡した場合は競合を拒否。旧APKはrevisionを渡さないため、同時の全体保存の上書き対策は新APKへの改修が必要。
 - 更新前データを履歴保存する。
 
-## 本番切替手順
-1. Google Apps Scriptの外部通信権限を承認し `verifyPastExamFastConnection` で接続・件数を確認。
-2. Google Sheetから最新データを再コピーする。切替前の新DBは読取本番ではないため、コピー時点以降の増加を再照合。
-3. 既存Apps Scriptのload／getSchools／saveAllData／upsertRowを新APIへ接続。getSubmitInfoも新DBの登録済みIDを使用。アップロード・Drive削除・学生提出は維持する。
-4. 既存デプロイIDを維持して新版公開。現行APKからの読み込み・登録・再試行を検証。
-5. Pagesは直接新APIから読取、差分保存へ変更。保存失敗を成功扱いしない。未送信変更がある間は背景再読込で上書きしない。
-6. Google Sheetは移行前バックアップとし、必要時に `exportPastExamBackupToSheet` で出力。正本が変更されたことを台帳に明記。
-7. 新旧件数・データ一致、匿名書込拒否、Driveリンク、初回／再読込時間、競合検出を確認後に台帳の本番状態を更新。
+## 運用とバックアップ
+- 登録情報の読込／保存先はSupabase。既存GASは旧アプリ互換とDrive操作を担当。
+- Google Sheetは移行前のバックアップ。通常の保存では自動同期しない。Sheetの直接編集は本番へ反映されない。
+- 最新データをSheetへ出力する場合は、バインドApps Scriptで `exportPastExamBackupToSheet` を実行する。
+- 現行GASの追加部分と接続箇所は `gas/past-exam-fast-adapter.gs`、DB定義は `supabase/past_exam_fast_metadata.sql` を参照。
+- 旧APKのrevisionなし全体保存は互換性のため残す。同時保存の上書き対策はAPK側の差分保存またはrevision対応が必要。
+- 実機APKでのアップロード操作は今回未検証。PDFアップロード／削除／学生提出の既存処理は変更していない。
 
 ## 検証済み
-SQLの追加・冪等再試行・競合拒否・削除・anon直接アクセス拒否・RPC実行権限をトランザクション内で検証、ロールバック済み。
-Edge Function v1デプロイ済み。HTTPS経由の実動作はGoogle承認後に確認する。
+- SQLの追加・冪等再試行・競合拒否・削除・anon直接アクセス拒否・RPC実行権限をトランザクション内で検証、ロールバック済み。
+- GASから新APIへ実接続し、学校7校・登録セル56件・ファイル55件を確認。
+- 旧 `saveFull` の同一データ保存、空 `savePatch`、公開閲覧、無権限の保存拒否を実APIで確認。テスト用登録は残していない。
+- Nodeの3テスト：保存中の追加変更、競合時のローカル変更保持、応答喪失時の同一差分のGAS再送。全て成功。
+- 本番Pagesで新コードとオンライン表示、学校一覧を確認。端末ごとの体感速度は未測定。
