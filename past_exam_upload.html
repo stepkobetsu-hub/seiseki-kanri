@@ -47,9 +47,14 @@ input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:
 
     <div style="margin-top:12px">
       <label>ファイル</label>
-      <input id="file" type="file" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" multiple>
-      <div class="fieldErr" data-for="file">ファイルを選択してください</div>
-      <p class="small">PDF、写真、Word、Excelをアップロードできます。複数選択した場合は1つずつ保存します。</p>
+      <div style="display:flex;gap:10px;align-items:stretch;flex-wrap:wrap">
+        <input id="file" type="file" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" multiple style="flex:1;min-width:260px">
+        <button id="cameraBtn" type="button" class="btn ghost" style="white-space:nowrap" onclick="openCamera()">📷 カメラで取り込み</button>
+        <input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden">
+      </div>
+      <div id="cameraStatus" class="small" style="margin-top:7px;font-weight:800;color:#145da0"></div>
+      <div class="fieldErr" data-for="file">ファイルを選択するか、カメラで撮影してください</div>
+      <p class="small">PDF、写真、Word、Excelをアップロードできます。写真（JPEG/PNG）は自動でPDF化します。複数の写真は1つのPDFにまとめます。カメラは繰り返し撮影できます。</p>
     </div>
 
     <button id="submitBtn" class="btn primary submit" onclick="uploadFiles()">アップロードする</button>
@@ -61,6 +66,7 @@ input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:
     <div id="results" class="result hidden"></div>
   </section>
 </main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 const GAS_URL='https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec';
 const PASS='step123';
@@ -77,17 +83,33 @@ const $=id=>document.getElementById(id);
 let schools=[];
 let db={};
 let dbReady=false;
+let cameraFiles=[];
 function value(id){return ($(id)?.value||'').trim()}
 function setMsg(text,ok){$('msg').className='msg '+(ok?'ok':'err');$('msg').textContent=text}
 function cleanName(s){return String(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'').trim()}
 function extOf(name){const m=String(name||'').match(/(\.[^.]+)$/);return m?m[1]:''}
 function baseName(name){return String(name||'file').replace(/\.[^.]+$/,'')}
-function buildFileName(file){
+function buildFileName(file, forceExt, forceBase){
   const school=schools.find(s=>String(s.id)===value('school'));
   const parts=[value('teacher'),school?.name||'',value('grade'),value('subject'),value('year'),value('testNo'),value('kind')].map(cleanName).filter(Boolean);
-  const original=cleanName(baseName(file.name))||'file';
+  const original=cleanName(forceBase || baseName(file.name))||'file';
   const prefix=parts.length?parts.join('_')+'_':'';
-  return prefix+original+extOf(file.name);
+  return prefix+original+(forceExt || extOf(file.name));
+}
+function isImageFile(file){
+  return !!file && (String(file.type||'').startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name||''));
+}
+function openCamera(){
+  $('cameraInput').click();
+}
+function updateCameraStatus(){
+  $('cameraStatus').textContent = cameraFiles.length ? `📷 撮影済み：${cameraFiles.length}枚（続けて撮影できます）` : '';
+}
+function clearSelectedFiles(){
+  $('file').value='';
+  $('cameraInput').value='';
+  cameraFiles=[];
+  updateCameraStatus();
 }
 function currentNendo(){
   const now=new Date();
@@ -193,7 +215,7 @@ function validateRequired(){
     if(!value(id)){markInvalid(id); ok=false;}
   });
   clearInvalid('file');
-  if(!($('file').files||[]).length){markInvalid('file'); ok=false;}
+  if(!($('file').files||[]).length && !cameraFiles.length){markInvalid('file'); ok=false;}
   if(!ok) setMsg('赤枠の項目を入力してください。',false);
   return ok;
 }
@@ -209,8 +231,78 @@ function toBase64Url(file){
     reader.readAsDataURL(file);
   });
 }
+function readAsDataURL(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result||''));
+    reader.onerror=()=>reject(new Error('画像を読み込めませんでした'));
+    reader.readAsDataURL(file);
+  });
+}
+function loadImage(dataUrl){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>resolve(img);
+    img.onerror=()=>reject(new Error('画像をPDFへ変換できませんでした'));
+    img.src=dataUrl;
+  });
+}
+async function imagesToPdfFile(imageFiles){
+  if(!window.jspdf || !window.jspdf.jsPDF) throw new Error('PDF変換機能を読み込めませんでした。通信状態を確認して再読み込みしてください。');
+  const {jsPDF}=window.jspdf;
+  let pdf=null;
+  for(let i=0;i<imageFiles.length;i++){
+    setMsg(`写真をPDFに変換中です... ${i+1}/${imageFiles.length}`,true);
+    const dataUrl=await readAsDataURL(imageFiles[i]);
+    const img=await loadImage(dataUrl);
+    const landscape=img.naturalWidth>img.naturalHeight;
+    const orientation=landscape?'landscape':'portrait';
+    if(!pdf) pdf=new jsPDF({orientation,unit:'mm',format:'a4',compress:true});
+    else pdf.addPage('a4',orientation);
+    const pageW=landscape?297:210;
+    const pageH=landscape?210:297;
+    const margin=8;
+    const maxW=pageW-margin*2;
+    const maxH=pageH-margin*2;
+    const ratio=Math.min(maxW/img.naturalWidth,maxH/img.naturalHeight);
+    const w=img.naturalWidth*ratio;
+    const h=img.naturalHeight*ratio;
+    const x=(pageW-w)/2;
+    const y=(pageH-h)/2;
+    let format='JPEG';
+    let outData=dataUrl;
+    if(!/^data:image\/jpe?g/i.test(dataUrl)){
+      const canvas=document.createElement('canvas');
+      const maxPx=2200;
+      const scale=Math.min(1,maxPx/Math.max(img.naturalWidth,img.naturalHeight));
+      canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));
+      canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+      const ctx=canvas.getContext('2d');
+      ctx.fillStyle='#fff';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      outData=canvas.toDataURL('image/jpeg',0.88);
+    }
+    pdf.addImage(outData,format,x,y,w,h,undefined,'FAST');
+  }
+  const blob=pdf.output('blob');
+  return new File([blob],'写真まとめ.pdf',{type:'application/pdf',lastModified:Date.now()});
+}
+async function prepareUploadFiles(){
+  const picked=[...($('file').files||[])];
+  const all=[...picked,...cameraFiles];
+  const images=all.filter(isImageFile);
+  const others=all.filter(f=>!isImageFile(f));
+  const prepared=[...others];
+  if(images.length){
+    const pdfFile=await imagesToPdfFile(images);
+    pdfFile._stepPdfFromImages=true;
+    prepared.unshift(pdfFile);
+  }
+  return prepared;
+}
 async function uploadOne(file){
-  const storedName=buildFileName(file);
+  const storedName=buildFileName(file, file._stepPdfFromImages?'.pdf':undefined, file._stepPdfFromImages?'写真まとめ':undefined);
   const body=new URLSearchParams();
   body.set('action','uploadAll');
   body.set('pass',PASS);
@@ -259,7 +351,6 @@ function registerFile(file,result){
   db[key].hasNew=true;
 }
 async function uploadFiles(){
-  const files=[...($('file').files||[])];
   if(!dbReady){
     setMsg('DBとの接続が完了していません。画面を再読み込みして「学校一覧を読み込みました。」と表示されてからアップロードしてください。',false);
     return;
@@ -270,6 +361,7 @@ async function uploadFiles(){
   $('results').classList.add('hidden');
   $('results').innerHTML='';
   try{
+    const files=await prepareUploadFiles();
     const saved=[];
     for(let i=0;i<files.length;i++){
       setMsg(`アップロード中です... ${i+1}/${files.length}`,true);
@@ -283,13 +375,23 @@ async function uploadFiles(){
     setMsg('アップロードして過去問DBへ登録しました。',true);
     $('results').innerHTML='<strong>保存したファイル</strong><br>'+saved.map(x=>`<a href="${x.url}" target="_blank" rel="noopener">${x.name}</a>`).join('<br>');
     $('results').classList.remove('hidden');
-    $('file').value='';
+    clearSelectedFiles();
   }catch(e){
     setMsg(e.message||'アップロードに失敗しました。',false);
   }finally{
     $('submitBtn').disabled=false;
   }
 }
+$('cameraInput').addEventListener('change',()=>{
+  const f=$('cameraInput').files&&$('cameraInput').files[0];
+  if(f){
+    cameraFiles.push(f);
+    updateCameraStatus();
+    clearInvalid('file');
+  }
+  // 同じ端末で続けて撮影できるように毎回リセット
+  $('cameraInput').value='';
+});
 $('school').addEventListener('change',updateExamOptions);
 ['teacher','school','grade','subject','year','testNo','kind','file'].forEach(id=>{
   $(id).addEventListener('input',()=>clearInvalid(id));
