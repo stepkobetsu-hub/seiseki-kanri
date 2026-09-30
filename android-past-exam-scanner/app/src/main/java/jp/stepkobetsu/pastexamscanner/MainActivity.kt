@@ -357,7 +357,7 @@ class MainActivity : AppCompatActivity() {
 
         val key = dbKey(c.school.id, c.year, c.grade, c.exam, c.subject)
         if (RegistrationData.contains(freshDb, key, fileId)) return
-        RegistrationData.merge(freshDb, key, JSONObject().apply {
+        val patch = RegistrationData.patch(freshDb, key, JSONObject().apply {
                 put("name", fileName)
                 put("url", url)
                 put("fileId", fileId)
@@ -367,12 +367,9 @@ class MainActivity : AppCompatActivity() {
         })
 
         val body = FormBody.Builder()
-            .add("action", "saveFull")
+            .add("action", "savePatch")
             .add("pass", pass)
-            .add("payload", JSONObject().apply {
-                put("schools", freshSchools)
-                put("db", freshDb)
-            }.toString())
+            .add("payload", patch.toString())
             .build()
 
         val req = Request.Builder().url(gasUrl).post(body).build()
