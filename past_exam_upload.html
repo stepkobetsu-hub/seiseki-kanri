@@ -24,6 +24,12 @@ input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:
 .msg{margin-top:12px;white-space:pre-wrap;font-weight:800;line-height:1.7}.ok{color:#047857}.err{color:#dc2626}
 .small{font-size:.86rem;color:#64748b;line-height:1.7}.result{border-top:1px solid #e2eaf3;margin-top:14px;padding-top:12px}
 .result a{color:#145da0;font-weight:900;word-break:break-all}.hidden{display:none!important}
+.cameraOverlay{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9999;display:none;align-items:center;justify-content:center;padding:12px}
+.cameraOverlay.open{display:flex}
+.cameraBox{width:min(720px,100%);background:#111827;border-radius:16px;padding:12px;color:#fff}
+.cameraBox video{width:100%;max-height:68vh;background:#000;border-radius:12px;object-fit:contain}
+.cameraActions{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+.cameraActions .btn{flex:1;min-width:130px}
 @media(max-width:640px){main{padding:14px 10px 34px}.hero{border-radius:0;margin:-14px -10px 0}.grid{grid-template-columns:1fr}.btn{width:100%}.card{border-radius:12px}}
 </style>
 </head>
@@ -66,6 +72,18 @@ input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:
     <div id="results" class="result hidden"></div>
   </section>
 </main>
+<div id="cameraOverlay" class="cameraOverlay">
+  <div class="cameraBox">
+    <div style="font-weight:900;margin:2px 0 10px">カメラで取り込み</div>
+    <video id="cameraVideo" autoplay playsinline muted></video>
+    <canvas id="cameraCanvas" class="hidden"></canvas>
+    <div class="cameraActions">
+      <button type="button" class="btn primary" onclick="takeCameraPhoto()">📷 撮影する</button>
+      <button type="button" class="btn ghost" onclick="closeCamera()">閉じる</button>
+    </div>
+    <div id="cameraHelp" class="small" style="color:#cbd5e1;margin-top:8px"></div>
+  </div>
+</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 const GAS_URL='https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec';
@@ -84,6 +102,7 @@ let schools=[];
 let db={};
 let dbReady=false;
 let cameraFiles=[];
+let cameraStream=null;
 function value(id){return ($(id)?.value||'').trim()}
 function setMsg(text,ok){$('msg').className='msg '+(ok?'ok':'err');$('msg').textContent=text}
 function cleanName(s){return String(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'').trim()}
@@ -99,8 +118,55 @@ function buildFileName(file, forceExt, forceBase){
 function isImageFile(file){
   return !!file && (String(file.type||'').startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name||''));
 }
-function openCamera(){
-  $('cameraInput').click();
+async function openCamera(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    $('cameraInput').click();
+    return;
+  }
+  try{
+    cameraStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'environment'}},
+      audio:false
+    });
+    $('cameraVideo').srcObject=cameraStream;
+    $('cameraHelp').textContent='撮影後も続けて何枚でも取り込めます。';
+    $('cameraOverlay').classList.add('open');
+  }catch(e){
+    $('cameraHelp').textContent='';
+    $('cameraInput').click();
+  }
+}
+function closeCamera(){
+  $('cameraOverlay').classList.remove('open');
+  if(cameraStream){
+    cameraStream.getTracks().forEach(t=>t.stop());
+    cameraStream=null;
+  }
+  $('cameraVideo').srcObject=null;
+}
+async function takeCameraPhoto(){
+  const video=$('cameraVideo');
+  if(!video.videoWidth || !video.videoHeight){
+    setMsg('カメラ映像の準備中です。少し待ってからもう一度押してください。',false);
+    return;
+  }
+  const canvas=$('cameraCanvas');
+  const maxPx=2200;
+  const scale=Math.min(1,maxPx/Math.max(video.videoWidth,video.videoHeight));
+  canvas.width=Math.max(1,Math.round(video.videoWidth*scale));
+  canvas.height=Math.max(1,Math.round(video.videoHeight*scale));
+  const ctx=canvas.getContext('2d');
+  ctx.drawImage(video,0,0,canvas.width,canvas.height);
+  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.9));
+  if(!blob){
+    setMsg('撮影画像を作成できませんでした。',false);
+    return;
+  }
+  const name='camera_'+new Date().toISOString().replace(/[:.]/g,'-')+'.jpg';
+  cameraFiles.push(new File([blob],name,{type:'image/jpeg',lastModified:Date.now()}));
+  updateCameraStatus();
+  clearInvalid('file');
+  $('cameraHelp').textContent='撮影しました。続けて撮るか、「閉じる」を押してください。';
 }
 function updateCameraStatus(){
   $('cameraStatus').textContent = cameraFiles.length ? `📷 撮影済み：${cameraFiles.length}枚（続けて撮影できます）` : '';
@@ -397,6 +463,7 @@ $('school').addEventListener('change',updateExamOptions);
   $(id).addEventListener('input',()=>clearInvalid(id));
   $(id).addEventListener('change',()=>clearInvalid(id));
 });
+window.addEventListener('pagehide',closeCamera);
 window.addEventListener('load',()=>{
   const savedTeacher=localStorage.getItem('pastExamTeacher');
   if(savedTeacher) $('teacher').value=savedTeacher;
