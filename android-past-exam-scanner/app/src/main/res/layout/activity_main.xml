@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:id="@+id/mainScroll"
@@ -28,13 +29,6 @@
             android:textSize="14sp"
             android:textColor="#475569"
             android:paddingBottom="16dp" />
-
-        <Button
-            android:id="@+id/addHomeIcon"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="48dp"
-            android:text="ホーム画面にアイコンを追加" />
 
         <LinearLayout
             android:id="@+id/completionCard"
@@ -159,9 +153,9 @@
             android:textSize="14sp"
             android:textStyle="bold"
             android:textColor="#334155" />
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/openPastExamDb"
-            style="?attr/borderlessButtonStyle"
+            style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
@@ -170,6 +164,10 @@
             android:text="過去問DBへ"
             android:textAllCaps="false"
             android:textSize="14sp"
-            android:textColor="#64748B" />
+            android:textColor="#475569"
+            app:backgroundTint="#FFFFFF"
+            app:strokeColor="#94A3B8"
+            app:strokeWidth="1dp"
+            app:cornerRadius="8dp" />
     </LinearLayout>
 </ScrollView>
