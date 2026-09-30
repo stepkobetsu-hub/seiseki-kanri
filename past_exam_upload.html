@@ -80,7 +80,6 @@ input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:
     </div>
   </section>
 </main>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 const GAS_URL='https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec';
 const PASS='step123';
@@ -254,143 +253,6 @@ function toBase64Url(file){
     reader.readAsDataURL(file);
   });
 }
-function readAsDataURL(file){
-  return new Promise((resolve,reject)=>{
-    const reader=new FileReader();
-    reader.onload=()=>resolve(String(reader.result||''));
-    reader.onerror=()=>reject(new Error('画像を読み込めませんでした'));
-    reader.readAsDataURL(file);
-  });
-}
-function loadImage(dataUrl){
-  return new Promise((resolve,reject)=>{
-    const img=new Image();
-    img.onload=()=>resolve(img);
-    img.onerror=()=>reject(new Error('画像をPDFへ変換できませんでした'));
-    img.src=dataUrl;
-  });
-}
-
-
-function rotateCanvas90(canvas){
-  const out=document.createElement('canvas');
-  out.width=canvas.height;
-  out.height=canvas.width;
-  const ctx=out.getContext('2d');
-  ctx.translate(out.width/2,out.height/2);
-  ctx.rotate(Math.PI/2);
-  ctx.drawImage(canvas,-canvas.width/2,-canvas.height/2);
-  return out;
-}
-function detectDocumentBounds(canvas){
-  const ctx=canvas.getContext('2d',{willReadFrequently:true});
-  const {width:w,height:h}=canvas;
-  const img=ctx.getImageData(0,0,w,h);
-  const d=img.data;
-  const step=Math.max(2,Math.floor(Math.max(w,h)/700));
-  let minX=w,minY=h,maxX=0,maxY=0,count=0;
-
-  // 背景（机）と紙をざっくり分離。明るく彩度の低い領域を紙候補とする。
-  for(let y=0;y<h;y+=step){
-    for(let x=0;x<w;x+=step){
-      const i=(y*w+x)*4;
-      const r=d[i],g=d[i+1],b=d[i+2];
-      const mx=Math.max(r,g,b), mn=Math.min(r,g,b);
-      const bright=(r+g+b)/3;
-      const sat=mx-mn;
-      if(bright>145 && sat<55){
-        if(x<minX)minX=x;if(x>maxX)maxX=x;
-        if(y<minY)minY=y;if(y>maxY)maxY=y;
-        count++;
-      }
-    }
-  }
-  if(!count || maxX<=minX || maxY<=minY) return {x:0,y:0,w,h};
-
-  // 少し内側に寄せて、机の明るい部分を拾いにくくする
-  const padX=Math.round((maxX-minX)*0.015);
-  const padY=Math.round((maxY-minY)*0.015);
-  minX=Math.max(0,minX+padX); minY=Math.max(0,minY+padY);
-  maxX=Math.min(w-1,maxX-padX); maxY=Math.min(h-1,maxY-padY);
-
-  const bw=maxX-minX, bh=maxY-minY;
-  const areaRatio=(bw*bh)/(w*h);
-  if(areaRatio<0.18) return {x:0,y:0,w,h};
-  return {x:minX,y:minY,w:bw,h:bh};
-}
-function enhanceScannedCanvas(canvas){
-  const ctx=canvas.getContext('2d',{willReadFrequently:true});
-  const img=ctx.getImageData(0,0,canvas.width,canvas.height);
-  const d=img.data;
-  for(let i=0;i<d.length;i+=4){
-    let r=d[i],g=d[i+1],b=d[i+2];
-    let gray=0.299*r+0.587*g+0.114*b;
-    // 文書向けコントラスト強調
-    gray=(gray-128)*1.38+138;
-    gray=Math.max(0,Math.min(255,gray));
-    // 紙面を白く、文字を黒く見せる軽いしきい値補正
-    if(gray>210) gray=255;
-    else if(gray<70) gray=0;
-    d[i]=d[i+1]=d[i+2]=gray;
-  }
-  ctx.putImageData(img,0,0);
-  return canvas;
-}
-async function scanDocumentImage(file){
-  const dataUrl=await readAsDataURL(file);
-  const img=await loadImage(dataUrl);
-
-  const maxPx=2200;
-  const scale=Math.min(1,maxPx/Math.max(img.naturalWidth,img.naturalHeight));
-  const src=document.createElement('canvas');
-  src.width=Math.max(1,Math.round(img.naturalWidth*scale));
-  src.height=Math.max(1,Math.round(img.naturalHeight*scale));
-  const sctx=src.getContext('2d');
-  sctx.fillStyle='#fff';
-  sctx.fillRect(0,0,src.width,src.height);
-  sctx.drawImage(img,0,0,src.width,src.height);
-
-  const b=detectDocumentBounds(src);
-  const out=document.createElement('canvas');
-  out.width=Math.max(1,b.w);
-  out.height=Math.max(1,b.h);
-  const octx=out.getContext('2d');
-  octx.fillStyle='#fff';
-  octx.fillRect(0,0,out.width,out.height);
-  octx.drawImage(src,b.x,b.y,b.w,b.h,0,0,out.width,out.height);
-
-  enhanceScannedCanvas(out);
-
-  // 用紙が横長になった場合は縦向きへ
-  if(out.width>out.height*1.08) return rotateCanvas90(out);
-  return out;
-}
-async function imagesToPdfFile(imageFiles){
-  if(!window.jspdf || !window.jspdf.jsPDF) throw new Error('PDF作成機能を読み込めませんでした。通信状態を確認して再読み込みしてください。');
-  const {jsPDF}=window.jspdf;
-  let pdf=null;
-
-  for(let i=0;i<imageFiles.length;i++){
-    setMsg(`文書をスキャン処理中です... ${i+1}/${imageFiles.length}（切り抜き・傾き補正・白黒補正）`,true);
-    const scanCanvas=await scanDocumentImage(imageFiles[i]);
-
-    if(!pdf) pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
-    else pdf.addPage('a4','portrait');
-
-    const pageW=210, pageH=297, margin=6;
-    const maxW=pageW-margin*2, maxH=pageH-margin*2;
-    const ratio=Math.min(maxW/scanCanvas.width,maxH/scanCanvas.height);
-    const w=scanCanvas.width*ratio, h=scanCanvas.height*ratio;
-    const x=(pageW-w)/2, y=(pageH-h)/2;
-    const data=scanCanvas.toDataURL('image/jpeg',0.92);
-    pdf.addImage(data,'JPEG',x,y,w,h,undefined,'FAST');
-  }
-
-  const blob=pdf.output('blob');
-  const out=new File([blob],'スキャン.pdf',{type:'application/pdf',lastModified:Date.now()});
-  out._stepPdfFromImages=true;
-  return out;
-}
 async function prepareUploadFiles(){
   const picked=[...($('file').files||[])];
   const bad=picked.find(f=>String(f.type||'').toLowerCase()!=='application/pdf' && !/\.pdf$/i.test(f.name||''));
@@ -524,8 +386,7 @@ async function uploadFiles(){
   $('results').innerHTML='';
   try{
     const files=await prepareUploadFiles();
-    if(files.some(isImageFile)) throw new Error('PDF変換前の画像が残っています。安全のためアップロードを中止しました。');
-    setMsg('PDF変換を確認しました。アップロードを開始します...',true);
+    setMsg('PDFを確認しました。アップロードを開始します...',true);
     const saved=[];
     for(let i=0;i<files.length;i++){
       setMsg(`ファイルを保存中です... ${i+1}/${files.length}`,true);
