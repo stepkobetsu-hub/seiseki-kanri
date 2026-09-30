@@ -22,7 +22,7 @@ export function makePatch(data,pending){
   return [{key,before:before===null?null:JSON.parse(JSON.stringify(before)),after}];
 }
 export class ExamApi{
-  constructor(config,fetcher=globalThis.fetch.bind(globalThis)){this.config=config;this.fetcher=globalThis.fetch.bind(globalThis)er;}
+  constructor(config,fetcher=globalThis.fetch.bind(globalThis)){this.config=config;this.fetcher=fetcher;}
   async request(url,options={},timeout=20000){
     const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),timeout);
     try{const r=await this.fetcher(url,{...options,cache:'no-store',signal:ctrl.signal});if(!r.ok)throw Error('HTTP '+r.status);return await r.json();}
