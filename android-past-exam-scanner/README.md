@@ -56,3 +56,28 @@ not establish completion of the device requirements.
 
 Unit tests cover archive keys, duplicate prevention, preservation of existing
 files/flags/other records and rejection of failed or malformed DB loads.
+
+## Permanent APK signing
+
+Public APKs must use a dedicated release key, never a newly generated debug key.
+Before merging the permanent-signing change, configure these repository Actions
+secrets (never put key bytes or passwords in source or logs):
+
+- `SCANNER_KEYSTORE_BASE64`: Base64 of the permanent keystore.
+- `SCANNER_KEYSTORE_PASSWORD`: Keystore and key password; alias `step-scanner`.
+
+Replace `signing-certificate.sha256` with the key certificate's lowercase SHA-256
+fingerprint (64 hex characters, without colons). This is a public certificate
+fingerprint, not a private key. Back up the private key securely and do not
+regenerate it for an update.
+
+Main pushes and manual main runs assemble a signed release, run release lint,
+verify the pinned certificate, and replace the fixed APK asset. Missing secrets
+or a different certificate stop publication before replacing the current APK.
+PR builds run debug unit tests, build and lint without access to signing secrets.
+The debug artifact is for development only and must not be publicly distributed.
+
+The package ID stays `jp.stepkobetsu.pastexamscanner`; increment `versionCode`
+for each update. Older debug-key installs require one final reinstall when
+switching to the permanent release key. Subsequent releases retain the key and
+can update in place. Real-device installation/update acceptance is still required.

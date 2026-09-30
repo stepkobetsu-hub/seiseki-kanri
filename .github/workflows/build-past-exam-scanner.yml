@@ -14,6 +14,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: scanner-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -49,18 +53,71 @@ jobs:
           if-no-files-found: error
 
 
-      - name: Prepare public APK name
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/STEP-PastExam-Scanner.apk
+      - name: Restore fixed release signing key
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        env:
+          SCANNER_KEYSTORE_BASE64: ${{ secrets.SCANNER_KEYSTORE_BASE64 }}
+          SCANNER_KEYSTORE_PASSWORD: ${{ secrets.SCANNER_KEYSTORE_PASSWORD }}
+        run: |
+          python3 - <<'PYKEY'
+          import base64, os
+          from pathlib import Path
+          encoded = os.environ.get("SCANNER_KEYSTORE_BASE64", "")
+          password = os.environ.get("SCANNER_KEYSTORE_PASSWORD", "")
+          if not encoded or not password:
+              raise SystemExit("Fixed signing secrets are missing. Public APK publication stopped; no debug key fallback.")
+          target = Path(os.environ["RUNNER_TEMP"]) / "scanner-signing.jks"
+          target.write_bytes(base64.b64decode(encoded, validate=True))
+          target.chmod(0o600)
+          with open(os.environ["GITHUB_ENV"], "a") as output:
+              output.write(f"SCANNER_KEYSTORE_PATH={target}\n")
+          PYKEY
+
+      - name: Build signed release APK
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        env:
+          SCANNER_KEYSTORE_PASSWORD: ${{ secrets.SCANNER_KEYSTORE_PASSWORD }}
+        run: gradle :app:assembleRelease :app:lintRelease --stacktrace
+
+      - name: Verify pinned signing certificate
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs \
+            app/build/outputs/apk/release/app-release.apk > "$RUNNER_TEMP/scanner-certificate.txt"
+          python3 - <<'PYCERT'
+          import os, re
+          from pathlib import Path
+          expected = Path("signing-certificate.sha256").read_text().strip().lower()
+          if not re.fullmatch(r"[0-9a-f]{64}", expected):
+              raise SystemExit("A fixed signing certificate fingerprint must be configured before publication.")
+          report = (Path(os.environ["RUNNER_TEMP"]) / "scanner-certificate.txt").read_text()
+          actual = re.search(r"Signer #1 certificate SHA-256 digest: ([0-9a-fA-F]+)", report)
+          if not actual or actual.group(1).lower() != expected:
+              raise SystemExit("Signing certificate mismatch. Public APK publication stopped.")
+          print("Pinned release signing certificate verified.")
+          PYCERT
+          cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/STEP-PastExam-Scanner.apk
+
+      - name: Upload signed release APK artifact
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        uses: actions/upload-artifact@v4
+        with:
+          name: STEP-PastExam-Scanner-release
+          path: android-past-exam-scanner/app/build/outputs/apk/release/STEP-PastExam-Scanner.apk
+          if-no-files-found: error
 
       - name: Publish fixed public APK release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete past-exam-scanner-latest --repo "${{ github.repository }}" --yes --cleanup-tag || true
-          gh release create past-exam-scanner-latest \
-            app/build/outputs/apk/debug/STEP-PastExam-Scanner.apk \
-            --repo "${{ github.repository }}" \
-            --title "STEP Past Exam Scanner" \
-            --notes "Latest Android APK for STEP Past Exam Scanner."
+          gh release view past-exam-scanner-latest --repo "${{ github.repository }}" > /dev/null 2>&1 || \
+            gh release create past-exam-scanner-latest --repo "${{ github.repository }}" \
+              --title "STEP Past Exam Scanner" --notes "APK signed with the permanent STEP scanner key."
+          gh release upload past-exam-scanner-latest \
+            app/build/outputs/apk/release/STEP-PastExam-Scanner.apk \
+            --repo "${{ github.repository }}" --clobber
+
+      - name: Remove temporary signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/scanner-signing.jks"

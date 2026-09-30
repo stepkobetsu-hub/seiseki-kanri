@@ -3,6 +3,13 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val scannerKeystorePath = System.getenv("SCANNER_KEYSTORE_PATH")
+val scannerKeystorePassword = System.getenv("SCANNER_KEYSTORE_PASSWORD")
+val scannerSigningConfigured = !scannerKeystorePath.isNullOrBlank() && !scannerKeystorePassword.isNullOrBlank()
+if (gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }) {
+    check(scannerSigningConfigured) { "Release builds require the fixed scanner signing keystore; never publish a debug-signed APK." }
+}
+
 android {
     namespace = "jp.stepkobetsu.pastexamscanner"
     compileSdk = 35
@@ -11,8 +18,26 @@ android {
         applicationId = "jp.stepkobetsu.pastexamscanner"
         minSdk = 23
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.2.0"
+    }
+
+    signingConfigs {
+        if (scannerSigningConfigured) {
+            create("scannerRelease") {
+                storeFile = file(requireNotNull(scannerKeystorePath))
+                storePassword = scannerKeystorePassword
+                keyAlias = "step-scanner"
+                keyPassword = scannerKeystorePassword
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+            if (scannerSigningConfigured) signingConfig = signingConfigs.getByName("scannerRelease")
+        }
     }
 
     compileOptions {
