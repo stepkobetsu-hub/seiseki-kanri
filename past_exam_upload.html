@@ -352,12 +352,45 @@ async function loadLatestDbForRegistration(){
   }
   return false;
 }
+async function verifyPendingRegistration(pending){
+  for(let attempt=1;attempt<=4;attempt++){
+    try{
+      const r=await gasGet({action:'load',pass:PASS},80+attempt);
+      if(!r.ok) throw new Error(r.error||'DB確認失敗');
+      const freshSchools=(r.data&&r.data.schools)||[];
+      const freshDb=(r.data&&r.data.db)||{};
+      const school=freshSchools.find(s=>String(s.id)===String(pending.ctx.schoolId))
+        || freshSchools.find(s=>String(s.name)===String(pending.ctx.schoolName));
+      if(!school) throw new Error('学校情報が見つかりません');
+      const key=dbKey(school.id,pending.ctx.year,pending.ctx.grade,pending.ctx.exam,pending.ctx.subject);
+      const item=freshDb[key];
+      const ids=new Set(((item&&item.files)||[]).map(x=>String(x.fileId)));
+      const ok=pending.files.every(f=>ids.has(String(f.fileId)));
+      if(ok){
+        schools=freshSchools;
+        db=freshDb;
+        try{localStorage.setItem('pastExamSchools',JSON.stringify(schools))}catch(e){}
+        return true;
+      }
+    }catch(e){}
+    if(attempt<4) await new Promise(r=>setTimeout(r,900*attempt));
+  }
+  return false;
+}
 async function completePendingRegistration(pending){
-  setMsg('ファイルは保存済みです。DB登録だけ行っています...',true);
+  setMsg('ファイルは保存済みです。DB登録と確認を行っています...',true);
   if(!(await loadLatestDbForRegistration())) return false;
   pending.files.forEach(meta=>registerStoredFile(meta,pending.ctx));
   await saveDb();
-  return true;
+
+  // 「保存成功」の応答だけでは完了扱いにせず、実際に再読込して対象セルを確認する
+  if(await verifyPendingRegistration(pending)) return true;
+
+  // 反映遅延や競合に備え、最新DBへもう一度マージして保存してから再確認
+  if(!(await loadLatestDbForRegistration())) return false;
+  pending.files.forEach(meta=>registerStoredFile(meta,pending.ctx));
+  await saveDb();
+  return await verifyPendingRegistration(pending);
 }
 async function retryPendingRegistration(){
   const pending=getPendingRegistration();
@@ -370,7 +403,15 @@ async function retryPendingRegistration(){
       return;
     }
     clearPendingRegistration();
-    setMsg('保存済みファイルを過去問DBへ登録しました。',true);
+    try{
+      sessionStorage.setItem('pastExamLastSchool',pending.ctx.schoolId);
+      sessionStorage.setItem('pastExamLastYear',String(pending.ctx.year));
+    }catch(e){}
+    const dbLink=document.querySelector('a[href^="past_exam_db.html"]');
+    if(dbLink){
+      dbLink.href='past_exam_db.html?fresh=1&sid='+encodeURIComponent(pending.ctx.schoolId)+'&year='+encodeURIComponent(pending.ctx.year)+'&_='+Date.now();
+    }
+    setMsg('保存済みファイルのDB登録を再読込で確認しました。',true);
   }catch(e){
     setMsg('ファイルは保存済みです。DB登録だけ完了していません。再アップロードは不要です。\n'+(e.message||e),false);
   }finally{
@@ -412,7 +453,15 @@ async function uploadFiles(){
     }
 
     clearPendingRegistration();
-    setMsg('アップロードして過去問DBへ登録しました。',true);
+    try{
+      sessionStorage.setItem('pastExamLastSchool',pending.ctx.schoolId);
+      sessionStorage.setItem('pastExamLastYear',String(pending.ctx.year));
+    }catch(e){}
+    const dbLink=document.querySelector('a[href="past_exam_db.html"]');
+    if(dbLink){
+      dbLink.href='past_exam_db.html?fresh=1&sid='+encodeURIComponent(pending.ctx.schoolId)+'&year='+encodeURIComponent(pending.ctx.year)+'&_='+Date.now();
+    }
+    setMsg('過去問DBへの登録を再読込で確認しました。',true);
     $('results').innerHTML='<strong>保存したファイル</strong><br>'+saved.map(x=>`<a href="${x.url}" target="_blank" rel="noopener">${x.name}</a>`).join('<br>');
     $('results').classList.remove('hidden');
     clearSelectedFiles();
