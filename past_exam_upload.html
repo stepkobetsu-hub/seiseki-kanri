@@ -54,7 +54,8 @@ input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:
         <div style="margin-top:12px;background:#fff;border:2px solid #93c5fd;border-radius:10px;padding:10px">
           <div style="font-weight:900;color:#1d4ed8;margin-bottom:4px">スキャン保存時のファイル名</div>
           <div id="suggestedFileName" style="font-weight:900;font-size:1rem;word-break:break-all">項目を選択すると自動作成します</div>
-          <button type="button" class="btn ghost" style="margin-top:8px" onclick="copySuggestedFileName()">📋 名前をコピー</button>
+          <button type="button" class="btn ghost" style="margin-top:8px" onclick="copySuggestedFileName()">✏️ 名前をコピー</button>
+          <div class="small" style="margin-top:7px;font-weight:900;color:#b45309">スキャン保存時にこの名前に変更してください。</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">
           <button type="button" class="btn primary" onclick="openDriveScanFolder()">① Google Driveでスキャン</button>
@@ -63,7 +64,7 @@ input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:
       </div>
 
       <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button type="button" class="btn ghost" onclick="$('file').click()">② Google Drive / ファイルからPDFを選ぶ</button>
+        <button type="button" class="btn primary" onclick="$('file').click()">② Google Drive / ファイルからPDFを選ぶ</button>
       </div>
       <input id="file" type="file" accept=".pdf,application/pdf" multiple class="hidden">
       <div id="fileStatus" class="small" style="margin-top:8px;font-weight:900;color:#145da0"></div>
