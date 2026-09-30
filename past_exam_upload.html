@@ -56,7 +56,7 @@ input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:
       <div id="cameraStatus" class="small" style="margin-top:9px;font-weight:800;color:#145da0"></div>
       <div id="fileStatus" class="small" style="margin-top:4px;font-weight:800;color:#475569"></div>
       <div class="fieldErr" data-for="file">撮影するか、PDF・ファイルを選択してください</div>
-      <p class="small">写真で取り込んだ場合は自動でPDFに変換します。複数ページは「撮影してPDF」を繰り返すと、1つのPDFにまとめます。Google Driveでスキャン済みのPDFは「PDF・ファイルを選ぶ」から選べます。</p>
+      <p class="small"><strong>写真（JPEG/PNG）は必ずPDFに変換してから保存します。</strong> 複数ページは「撮影してPDF」を繰り返すと、1つのPDFにまとめます。Google Driveでスキャン済みのPDFは「PDF・ファイルを選ぶ」から選べます。</p>
     </div>
 
     <button id="submitBtn" class="btn primary submit" onclick="uploadFiles()">アップロードする</button>
@@ -323,12 +323,31 @@ async function prepareUploadFiles(){
   return prepared;
 }
 async function uploadOne(file){
-  const storedName=buildFileName(file, file._stepPdfFromImages?'.pdf':undefined, file._stepPdfFromImages?'写真まとめ':undefined);
+  // 安全網: 画像は絶対にJPEG/PNGのまま送らず、ここでもPDFへ変換する
+  if(isImageFile(file)){
+    setMsg('画像をPDFに変換しています...',true);
+    const pdfFile=await imagesToPdfFile([file]);
+    pdfFile._stepPdfFromImages=true;
+    file=pdfFile;
+  }
+  const forcePdf = file._stepPdfFromImages || String(file.type||'').toLowerCase()==='application/pdf';
+  const storedName=buildFileName(
+    file,
+    forcePdf?'.pdf':undefined,
+    file._stepPdfFromImages?'写真まとめ':undefined
+  );
+  const mimeType=forcePdf?'application/pdf':(file.type||'application/octet-stream');
+
+  // 画像拡張子・画像MIMEが残っていたら送信しない
+  if(/^image\//i.test(mimeType) || /\.(jpe?g|png|webp|heic|heif)$/i.test(storedName)){
+    throw new Error('画像のPDF変換を確認できなかったため、アップロードを中止しました。');
+  }
+
   const body=new URLSearchParams();
   body.set('action','uploadAll');
   body.set('pass',PASS);
   body.set('fileName',storedName);
-  body.set('mimeType',file.type||'application/octet-stream');
+  body.set('mimeType',mimeType);
   body.set('fileData',await toBase64Url(file));
   const res=await fetch(GAS_URL,{method:'POST',body});
   const text=await res.text();
@@ -449,6 +468,8 @@ async function uploadFiles(){
   $('results').innerHTML='';
   try{
     const files=await prepareUploadFiles();
+    if(files.some(isImageFile)) throw new Error('PDF変換前の画像が残っています。安全のためアップロードを中止しました。');
+    setMsg('PDF変換を確認しました。アップロードを開始します...',true);
     const saved=[];
     for(let i=0;i<files.length;i++){
       setMsg(`ファイルを保存中です... ${i+1}/${files.length}`,true);
