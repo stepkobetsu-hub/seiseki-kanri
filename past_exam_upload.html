@@ -51,6 +51,11 @@ input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:
         <div style="font-weight:900;color:#145da0;margin-bottom:5px">保存先フォルダー</div>
         <div id="driveFolderName" style="font-weight:800">過去問スキャン</div>
         <div class="small" style="margin-top:4px">Google DriveでスキャンしたPDFは、このフォルダーに保存してください。</div>
+        <div style="margin-top:12px;background:#fff;border:2px solid #93c5fd;border-radius:10px;padding:10px">
+          <div style="font-weight:900;color:#1d4ed8;margin-bottom:4px">スキャン保存時のファイル名</div>
+          <div id="suggestedFileName" style="font-weight:900;font-size:1rem;word-break:break-all">項目を選択すると自動作成します</div>
+          <button type="button" class="btn ghost" style="margin-top:8px" onclick="copySuggestedFileName()">📋 名前をコピー</button>
+        </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">
           <button type="button" class="btn primary" onclick="openDriveScanFolder()">① Google Driveでスキャン</button>
           <button type="button" class="btn ghost" onclick="openDriveFolder()">保存先フォルダーを開く</button>
@@ -109,6 +114,45 @@ function buildFileName(file, forceExt, forceBase){
   const prefix=parts.length?parts.join('_')+'_':'';
   return prefix+original+(forceExt || extOf(file.name));
 }
+function buildSuggestedScanName(){
+  const school=selectedSchool();
+  const year=value('year');
+  const grade=value('grade');
+  const subject=value('subject');
+  const kind=value('kind');
+  const parts=[];
+  if(year) parts.push(year+'年');
+  if(school&&school.name) parts.push(school.name);
+  if(grade) parts.push(grade);
+  if(subject) parts.push(subject);
+  if(kind) parts.push(kind);
+  return parts.length?parts.join('_')+'.pdf':'';
+}
+function updateSuggestedFileName(){
+  const el=$('suggestedFileName');
+  if(!el) return;
+  const name=buildSuggestedScanName();
+  el.textContent=name||'項目を選択すると自動作成します';
+}
+async function copySuggestedFileName(){
+  const name=buildSuggestedScanName();
+  if(!name){
+    setMsg('先に年度・学校・学年・科目・種類を選択してください。',false);
+    return;
+  }
+  try{
+    await navigator.clipboard.writeText(name);
+    setMsg('ファイル名をコピーしました。Google Driveの保存画面でファイル名欄に貼り付けてください。',true);
+  }catch(e){
+    const ta=document.createElement('textarea');
+    ta.value=name;
+    ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    setMsg('ファイル名をコピーしました。Google Driveの保存画面で貼り付けてください。',true);
+  }
+}
 function openDriveFolder(){
   window.open(DRIVE_SCAN_FOLDER_URL,'_blank','noopener');
 }
@@ -116,7 +160,7 @@ function openDriveScanFolder(){
   // WebページからDriveのスキャンカメラを直接指定起動はできないため、
   // 保存先フォルダーを開き、Driveアプリ側で「スキャン」を使う流れにする。
   window.open(DRIVE_SCAN_FOLDER_URL,'_blank','noopener');
-  setMsg('Google Driveが開いたら、Driveアプリの「スキャン」で撮影し、「過去問スキャン」フォルダーへPDF保存してください。保存後、この画面へ戻って「Google Drive / ファイルからPDFを選ぶ」を押してください。',true);
+  setMsg('Google Driveでスキャン後、保存画面のファイル名欄に、上の「名前をコピー」でコピーした名称を貼り付けて保存してください。保存後、この画面へ戻ってPDFを選びます。',true);
 }
 function updateFileStatus(){
   const files=[...($('file').files||[])];
@@ -173,6 +217,7 @@ function renderSchoolOptions(list){
   if(prevSchool && schools.some(s=>String(s.id)===prevSchool)) $('school').value=prevSchool;
   updateExamOptions();
   if(prevTest && [...$('testNo').options].some(o=>o.value===prevTest)) $('testNo').value=prevTest;
+  updateSuggestedFileName();
 }
 function loadCachedSchools(){
   try{
@@ -475,16 +520,26 @@ $('file').addEventListener('change',()=>{
   updateFileStatus();
   clearInvalid('file');
 });
-$('school').addEventListener('change',updateExamOptions);
+$('school').addEventListener('change',()=>{
+  updateExamOptions();
+  updateSuggestedFileName();
+});
 ['teacher','school','grade','subject','year','testNo','kind'].forEach(id=>{
-  $(id).addEventListener('input',()=>clearInvalid(id));
-  $(id).addEventListener('change',()=>clearInvalid(id));
+  $(id).addEventListener('input',()=>{
+    clearInvalid(id);
+    updateSuggestedFileName();
+  });
+  $(id).addEventListener('change',()=>{
+    clearInvalid(id);
+    updateSuggestedFileName();
+  });
 });
 window.addEventListener('load',()=>{
   const savedTeacher=localStorage.getItem('pastExamTeacher');
   if(savedTeacher) $('teacher').value=savedTeacher;
   updatePendingBox();
-    loadDb();
+  updateSuggestedFileName();
+  loadDb();
 });
 </script>
 </body>
