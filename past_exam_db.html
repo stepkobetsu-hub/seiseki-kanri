@@ -249,6 +249,7 @@ input[type=file] { display:none; }
 
 <script>
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec';
+const FAST_API_URL = 'https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/past-exam-runtime-v1';
 const LOGIN_REQUIRED = false; // trueにすると入口のパスワード画面を使います
 const DEFAULT_PASS = 'step123';
 const UPLOAD_FOLDER_URL = 'https://drive.google.com/drive/folders/1201W051sgBNe3t7sVEcfKA3stXjXhdeR';
@@ -267,6 +268,7 @@ const DEFAULT_SCHOOLS = [
 ];
 
 let schools=[], db={}, curSchool=null, curYear=null, curCell=null, editSid=null, curPass='', isAdmin=false, isViewOnly=false, liveReady=false;
+let persistedState = null, saveInFlight = false, saveRequested = false;
 let undoStack = [], redoStack = [];
 function pushUndo() {
   try {
@@ -341,19 +343,53 @@ function setSyncStatus(state, msg) {
 
 async function gasGet(params, attempt=1) {
   const query = {...params, _ts:Date.now(), _try:attempt};
-  const url = GAS_URL + '?' + Object.entries(query)
-    .map(([k,v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))
-    .join('&');
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 15000);
+  const suffix = '?' + Object.entries(query).map(([k,v]) => encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');
+  async function request(endpoint) {
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),15000);
+    try {
+      const res=await fetch(endpoint+suffix,{cache:'no-store',redirect:'follow',signal:ctrl.signal});
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      return await res.json();
+    } finally {clearTimeout(timer);}
+  }
+  if(params.action==='load'||params.action==='getSchools') {
+    try{return await request(FAST_API_URL);}
+    catch(error){return request(GAS_URL);}
+  }
+  return request(GAS_URL);
+}
+
+function captureState() {
+  return JSON.parse(JSON.stringify({schools,db}));
+}
+function makeSavePatch(before,after) {
+  const ops=[];
+  if(JSON.stringify(before.schools)!==JSON.stringify(after.schools))
+    ops.push({key:'__schools__',before:before.schools,after:after.schools});
+  const keys=new Set([...Object.keys(before.db),...Object.keys(after.db)]);
+  keys.forEach(key=>{
+    const prev=before.db[key]??null, next=after.db[key]??null;
+    if(JSON.stringify(prev)!==JSON.stringify(next))ops.push({key,before:prev,after:next});
+  });
+  return ops;
+}
+async function fetchWithTimeout(url,options,timeoutMs) {
+  const ctrl=new AbortController(), timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+  try {return await fetch(url,{...options,signal:ctrl.signal});}
+  finally {clearTimeout(timer);}
+}
+async function postSavePatch(patch) {
+  const body=JSON.stringify({action:'savePatch',pass:curPass,payload:patch});
+  let res;
   try {
-    const res = await fetch(url, {cache:'no-store', redirect:'follow', signal:ctrl.signal});
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const text = await res.text();
-    try { return JSON.parse(text); }
-    catch(e) { throw new Error('応答形式エラー'); }
-  } finally {
-    clearTimeout(timer);
+    res=await fetchWithTimeout(FAST_API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body},15000);
+    return await res.json();
+  } catch(error) {
+    // 再送しても変更前／変更後比較により同じ操作を重複適用しない。
+    res=await fetchWithTimeout(GAS_URL,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'action=savePatch&pass='+encodeURIComponent(curPass)+'&payload='+encodeURIComponent(JSON.stringify(patch))},30000);
+    return await res.json();
   }
 }
 
@@ -413,6 +449,7 @@ async function loadFromGAS(pass) {
       liveReady = true;
       schools = (json.data && json.data.schools) ? json.data.schools : JSON.parse(JSON.stringify(DEFAULT_SCHOOLS));
       db      = (json.data && json.data.db)      ? json.data.db      : {};
+      persistedState = captureState();
       curYear = YEARS[0];
 
       document.getElementById('pageLogin').style.display = 'none';
@@ -492,38 +529,49 @@ let saveTimer = null;
 
 
 async function saveNow() {
-  if (!liveReady) {
+  clearTimeout(saveTimer);
+  saveTimer=null;
+  if(!liveReady || !persistedState) {
     showToast('⚠ 最新データとの同期完了後に操作してください');
     return;
   }
+  if(saveInFlight){saveRequested=true;return;}
+  const snapshot=captureState();
+  const patch=makeSavePatch(persistedState,snapshot);
+  if(!patch.length)return;
+  saveInFlight=true;
+  saveRequested=false;
   setSyncStatus('saving','● 保存中...');
+  let success=false;
   try {
-    const payload = JSON.stringify({schools, db});
-    const res = await fetch(GAS_URL, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      body: 'action=saveFull'
-        + '&pass=' + encodeURIComponent(curPass)
-        + '&payload=' + encodeURIComponent(payload)
-    });
-    const json = await res.json();
-    if (json.ok) {
-      setSyncStatus('ok','✓ 保存済み');
-        setTimeout(() => setSyncStatus('idle','● オンライン'), 2000);
-      showToast('💾 保存しました');
-    } else {
-      throw new Error(json.error || '保存失敗');
+    const json=await postSavePatch(patch);
+    if(!json.ok) {
+      if(json.conflict)liveReady=false;
+      throw new Error(json.error||'保存失敗');
     }
+    persistedState=snapshot;
+    saveLocalSnapshot();
+    success=true;
+    setSyncStatus('ok','✓ 保存済み');
+    showToast('💾 保存しました');
+    setTimeout(()=>{if(!saveInFlight&&!saveTimer&&document.getElementById('syncStatus').className.includes('sync-ok'))setSyncStatus('idle','● オンライン');},2000);
   } catch(e) {
-    setSyncStatus('error','⚠ 保存失敗: ' + e.message);
-    showToast('⚠ 保存失敗: ' + e.message);
+    setSyncStatus('error','⚠ 保存失敗: '+e.message);
+    showToast('⚠ 保存失敗: '+e.message);
+  } finally {
+    saveInFlight=false;
+    const changed=makeSavePatch(persistedState,captureState()).length>0;
+    if(success&&(saveRequested||changed)) {
+      saveRequested=false;
+      saveTimer=setTimeout(()=>{saveTimer=null;saveNow();},0);
+    }
   }
 }
 
 function save() {
   clearTimeout(saveTimer);
   setSyncStatus('saving','● 保存中...');
-  saveTimer = setTimeout(() => saveNow(), 1000);
+  saveTimer = setTimeout(() => {saveTimer=null;saveNow();}, 400);
 }
 
 
@@ -1224,3 +1272,4 @@ function showToast(msg) {
 </script>
 </body>
 </html>
+
