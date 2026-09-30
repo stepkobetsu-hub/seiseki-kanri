@@ -24,16 +24,6 @@ input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:
 .msg{margin-top:12px;white-space:pre-wrap;font-weight:800;line-height:1.7}.ok{color:#047857}.err{color:#dc2626}
 .small{font-size:.86rem;color:#64748b;line-height:1.7}.result{border-top:1px solid #e2eaf3;margin-top:14px;padding-top:12px}
 .result a{color:#145da0;font-weight:900;word-break:break-all}.hidden{display:none!important}
-.cropOverlay{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:10000;display:none;align-items:center;justify-content:center;padding:10px}
-.cropOverlay.open{display:flex}
-.cropBox{width:min(760px,100%);max-height:96vh;overflow:auto;background:#111827;color:#fff;border-radius:14px;padding:12px}
-.cropStage{position:relative;width:100%;background:#000;border-radius:10px;overflow:hidden;touch-action:none}
-.cropStage img{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none}
-.cropCanvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-.cropHandle{position:absolute;width:34px;height:34px;border-radius:50%;background:#fff;border:4px solid #f97316;transform:translate(-50%,-50%);touch-action:none;z-index:3;box-shadow:0 2px 8px rgba(0,0,0,.4)}
-.cropHint{font-size:.9rem;color:#e5e7eb;line-height:1.6;margin:8px 2px}
-.cropActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.cropActions .btn{flex:1;min-width:140px}
 @media(max-width:640px){main{padding:14px 10px 34px}.hero{border-radius:0;margin:-14px -10px 0}.grid{grid-template-columns:1fr}.btn{width:100%}.card{border-radius:12px}}
 </style>
 </head>
@@ -56,20 +46,27 @@ input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:
     </div>
 
     <div style="margin-top:12px">
-      <label>取り込み方法</label>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button id="cameraBtn" type="button" class="btn primary" onclick="openNativeCamera()">📷 撮影して取り込む</button>
-        <button type="button" class="btn ghost" onclick="$('file').click()">📄 PDF・ファイルを選ぶ</button>
+      <label>Google Drive スキャン</label>
+      <div style="background:#f8fafc;border:1px solid #dbe7f2;border-radius:12px;padding:12px;margin-bottom:12px">
+        <div style="font-weight:900;color:#145da0;margin-bottom:5px">保存先フォルダー</div>
+        <div id="driveFolderName" style="font-weight:800">過去問スキャン</div>
+        <div class="small" style="margin-top:4px">Google DriveでスキャンしたPDFは、このフォルダーに保存してください。</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px">
+          <button type="button" class="btn primary" onclick="openDriveScanFolder()">① Google Driveでスキャン</button>
+          <button type="button" class="btn ghost" onclick="openDriveFolder()">保存先フォルダーを開く</button>
+        </div>
       </div>
-      <input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden">
-      <input id="file" type="file" accept=".pdf,image/*,.doc,.docx,.xls,.xlsx" multiple class="hidden">
-      <div id="cameraStatus" style="margin-top:10px;font-weight:900;color:#9a3412;background:#fff7ed;border:2px solid #fb923c;border-radius:10px;padding:10px 12px;font-size:1rem;display:none"></div>
-      <div id="fileStatus" class="small" style="margin-top:4px;font-weight:800;color:#475569"></div>
-      <div class="fieldErr" data-for="file">撮影するか、PDF・ファイルを選択してください</div>
-      <p class="small"><strong>写真は「文書スキャン」処理をしてからPDFにします。</strong> 用紙を自動認識して切り抜き、台形補正・傾き補正・白黒補正を行い、印刷しやすいA4 PDFにします。複数ページは1つのPDFにまとめます。Google DriveやCamScannerで作成済みのPDFは「PDF・ファイルを選ぶ」からそのまま選べます。</p>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button type="button" class="btn ghost" onclick="$('file').click()">② Google Drive / ファイルからPDFを選ぶ</button>
+      </div>
+      <input id="file" type="file" accept=".pdf,application/pdf" multiple class="hidden">
+      <div id="fileStatus" class="small" style="margin-top:8px;font-weight:900;color:#145da0"></div>
+      <div class="fieldErr" data-for="file">PDFを選択してください</div>
+      <p class="small">Google Driveアプリでスキャンして「過去問スキャン」フォルダーへPDF保存後、この画面へ戻り「Google Drive / ファイルからPDFを選ぶ」から選択してください。</p>
     </div>
 
-    <button id="submitBtn" class="btn primary submit" onclick="uploadFiles()">アップロードする</button>
+    <button id="submitBtn" class="btn primary submit" onclick="uploadFiles()">③ アップロードする</button>
     <div id="msg" class="msg"></div>
     <div id="results" class="result hidden"></div>
     <div class="btns">
@@ -83,28 +80,11 @@ input.invalid,select.invalid{border-color:#dc2626;background:#fff5f5;box-shadow:
     </div>
   </section>
 </main>
-<div id="cropOverlay" class="cropOverlay">
-  <div class="cropBox">
-    <div style="font-weight:900;font-size:1.05rem;margin-bottom:8px">紙の範囲を合わせてください</div>
-    <div class="cropHint">オレンジの4点を紙の四隅に合わせます。机や周囲の物は枠の外にしてください。</div>
-    <div id="cropStage" class="cropStage">
-      <img id="cropImage" alt="">
-      <canvas id="cropCanvas" class="cropCanvas"></canvas>
-      <div class="cropHandle" data-i="0"></div>
-      <div class="cropHandle" data-i="1"></div>
-      <div class="cropHandle" data-i="2"></div>
-      <div class="cropHandle" data-i="3"></div>
-    </div>
-    <div class="cropActions">
-      <button type="button" class="btn primary" onclick="acceptCrop()">この範囲で取り込む</button>
-      <button type="button" class="btn ghost" onclick="cancelCrop()">撮り直す</button>
-    </div>
-  </div>
-</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 const GAS_URL='https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec';
 const PASS='step123';
+const DRIVE_SCAN_FOLDER_URL='https://drive.google.com/drive/folders/1qqyIiVejcP5YdXZSC7Kvcht_95D7prug';
 const DEFAULT_SCHOOLS = [
   {id:'s1',name:'南城中学',examCount:5},
   {id:'s2',name:'高蔵寺中学',examCount:5},
@@ -118,9 +98,6 @@ const $=id=>document.getElementById(id);
 let schools=[];
 let db={};
 let dbReady=false;
-let cameraFiles=[];
-let croppedPages=[];
-let cropState={file:null,dataUrl:'',imgW:0,imgH:0,pts:[]};
 function value(id){return ($(id)?.value||'').trim()}
 function setMsg(text,ok){$('msg').className='msg '+(ok?'ok':'err');$('msg').textContent=text}
 function cleanName(s){return String(s||'').replace(/[\\/:*?"<>|]/g,'').replace(/\s+/g,'').trim()}
@@ -133,165 +110,25 @@ function buildFileName(file, forceExt, forceBase){
   const prefix=parts.length?parts.join('_')+'_':'';
   return prefix+original+(forceExt || extOf(file.name));
 }
-function isImageFile(file){
-  return !!file && (String(file.type||'').startsWith('image/') || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name||''));
+function openDriveFolder(){
+  window.open(DRIVE_SCAN_FOLDER_URL,'_blank','noopener');
 }
-function openNativeCamera(){
-  $('cameraInput').click();
-}
-function updateCameraStatus(){
-  const el=$('cameraStatus');
-  const n=croppedPages.length;
-  if(n){
-    el.style.display='block';
-    el.textContent=`📷 取り込み済み：${n}枚　→　紙だけを切り抜いて1つのPDFにします`;
-  }else{
-    el.style.display='none';
-    el.textContent='';
-  }
+function openDriveScanFolder(){
+  // WebページからDriveのスキャンカメラを直接指定起動はできないため、
+  // 保存先フォルダーを開き、Driveアプリ側で「スキャン」を使う流れにする。
+  window.open(DRIVE_SCAN_FOLDER_URL,'_blank','noopener');
+  setMsg('Google Driveが開いたら、Driveアプリの「スキャン」で撮影し、「過去問スキャン」フォルダーへPDF保存してください。保存後、この画面へ戻って「Google Drive / ファイルからPDFを選ぶ」を押してください。',true);
 }
 function updateFileStatus(){
   const files=[...($('file').files||[])];
-  $('fileStatus').textContent = files.length
+  $('fileStatus').textContent=files.length
     ? `📄 選択済み：${files.map(f=>f.name).join('、')}`
     : '';
 }
 function clearSelectedFiles(){
   $('file').value='';
-  $('cameraInput').value='';
-  cameraFiles=[];
-  croppedPages=[];
-  updateCameraStatus();
   updateFileStatus();
 }
-
-function initCropForFile(file){
-  readAsDataURL(file).then(dataUrl=>{
-    cropState.file=file;
-    cropState.dataUrl=dataUrl;
-    const img=$('cropImage');
-    img.onload=()=>{
-      cropState.imgW=img.naturalWidth;
-      cropState.imgH=img.naturalHeight;
-      // 初期値は四辺5%内側
-      cropState.pts=[
-        {x:.05,y:.05},
-        {x:.95,y:.05},
-        {x:.95,y:.95},
-        {x:.05,y:.95}
-      ];
-      $('cropOverlay').classList.add('open');
-      requestAnimationFrame(()=>{layoutCrop();});
-    };
-    img.src=dataUrl;
-  }).catch(e=>setMsg('撮影画像を読み込めませんでした。',false));
-}
-function layoutCrop(){
-  const stage=$('cropStage');
-  const img=$('cropImage');
-  const w=img.clientWidth,h=img.clientHeight;
-  stage.style.height=h+'px';
-  const canvas=$('cropCanvas');
-  canvas.width=Math.max(1,Math.round(w*devicePixelRatio));
-  canvas.height=Math.max(1,Math.round(h*devicePixelRatio));
-  canvas.style.width=w+'px';canvas.style.height=h+'px';
-  const handles=[...stage.querySelectorAll('.cropHandle')];
-  cropState.pts.forEach((p,i)=>{
-    handles[i].style.left=(p.x*w)+'px';
-    handles[i].style.top=(p.y*h)+'px';
-  });
-  drawCropPolygon();
-}
-function drawCropPolygon(){
-  const stage=$('cropStage'),img=$('cropImage'),canvas=$('cropCanvas');
-  const w=img.clientWidth,h=img.clientHeight;
-  const ctx=canvas.getContext('2d');
-  const s=devicePixelRatio;
-  ctx.setTransform(s,0,0,s,0,0);
-  ctx.clearRect(0,0,w,h);
-  // 暗幕
-  ctx.fillStyle='rgba(0,0,0,.42)';
-  ctx.fillRect(0,0,w,h);
-  // 選択範囲だけ抜く
-  ctx.globalCompositeOperation='destination-out';
-  ctx.beginPath();
-  cropState.pts.forEach((p,i)=>{
-    const x=p.x*w,y=p.y*h;
-    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
-  });
-  ctx.closePath();ctx.fill();
-  ctx.globalCompositeOperation='source-over';
-  ctx.strokeStyle='#fb923c';ctx.lineWidth=3;
-  ctx.beginPath();
-  cropState.pts.forEach((p,i)=>{
-    const x=p.x*w,y=p.y*h;
-    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
-  });
-  ctx.closePath();ctx.stroke();
-}
-function bindCropHandles(){
-  const stage=$('cropStage');
-  [...stage.querySelectorAll('.cropHandle')].forEach(h=>{
-    const idx=Number(h.dataset.i);
-    const move=e=>{
-      e.preventDefault();
-      const rect=$('cropImage').getBoundingClientRect();
-      const pt=e.touches?e.touches[0]:e;
-      let x=(pt.clientX-rect.left)/rect.width;
-      let y=(pt.clientY-rect.top)/rect.height;
-      x=Math.max(0,Math.min(1,x));y=Math.max(0,Math.min(1,y));
-      cropState.pts[idx]={x,y};
-      layoutCrop();
-    };
-    h.addEventListener('pointerdown',e=>{
-      h.setPointerCapture(e.pointerId);
-      const onMove=ev=>move(ev);
-      const onUp=ev=>{
-        h.releasePointerCapture(ev.pointerId);
-        h.removeEventListener('pointermove',onMove);
-        h.removeEventListener('pointerup',onUp);
-        h.removeEventListener('pointercancel',onUp);
-      };
-      h.addEventListener('pointermove',onMove);
-      h.addEventListener('pointerup',onUp);
-      h.addEventListener('pointercancel',onUp);
-    });
-  });
-}
-function cancelCrop(){
-  $('cropOverlay').classList.remove('open');
-  cropState={file:null,dataUrl:'',imgW:0,imgH:0,pts:[]};
-}
-function acceptCrop(){
-  try{
-    const img=$('cropImage');
-    const pts=cropState.pts.map(p=>({x:p.x*cropState.imgW,y:p.y*cropState.imgH}));
-    // 四角形の外接矩形で切り出し。撮影時に四隅を合わせることで机を除外。
-    const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y);
-    const minX=Math.max(0,Math.floor(Math.min(...xs)));
-    const maxX=Math.min(cropState.imgW,Math.ceil(Math.max(...xs)));
-    const minY=Math.max(0,Math.floor(Math.min(...ys)));
-    const maxY=Math.min(cropState.imgH,Math.ceil(Math.max(...ys)));
-    const src=document.createElement('canvas');
-    src.width=cropState.imgW;src.height=cropState.imgH;
-    src.getContext('2d').drawImage(img,0,0,cropState.imgW,cropState.imgH);
-    const out=document.createElement('canvas');
-    out.width=Math.max(1,maxX-minX);out.height=Math.max(1,maxY-minY);
-    const octx=out.getContext('2d');
-    octx.fillStyle='#fff';octx.fillRect(0,0,out.width,out.height);
-    octx.drawImage(src,minX,minY,out.width,out.height,0,0,out.width,out.height);
-    enhanceScannedCanvas(out);
-    croppedPages.push(out.toDataURL('image/jpeg',0.94));
-    $('cropOverlay').classList.remove('open');
-    cropState={file:null,dataUrl:'',imgW:0,imgH:0,pts:[]};
-    updateCameraStatus();
-    clearInvalid('file');
-    setMsg('紙の範囲を取り込みました。複数ページなら、もう一度「撮影して取り込む」を押してください。',true);
-  }catch(e){
-    setMsg('トリミング処理に失敗しました。'+(e.message||e),false);
-  }
-}
-window.addEventListener('resize',()=>{if($('cropOverlay').classList.contains('open')) layoutCrop();});
 function currentNendo(){
   const now=new Date();
   return now.getMonth()<3?now.getFullYear()-1:now.getFullYear();
@@ -401,7 +238,7 @@ function validateRequired(){
     if(!value(id)){markInvalid(id); ok=false;}
   });
   clearInvalid('file');
-  if(!($('file').files||[]).length && !croppedPages.length){markInvalid('file'); ok=false;}
+  if(!($('file').files||[]).length){markInvalid('file'); ok=false;}
   if(!ok) setMsg('赤枠の項目を入力してください。',false);
   return ok;
 }
@@ -556,63 +393,17 @@ async function imagesToPdfFile(imageFiles){
 }
 async function prepareUploadFiles(){
   const picked=[...($('file').files||[])];
-  const images=picked.filter(isImageFile);
-  const others=picked.filter(f=>!isImageFile(f));
-  const prepared=[...others];
-
-  const pageData=[...croppedPages];
-  for(const f of images){
-    const scan=await scanDocumentImage(f);
-    pageData.push(scan.toDataURL('image/jpeg',0.94));
-  }
-
-  if(pageData.length){
-    const {jsPDF}=window.jspdf;
-    let pdf=null;
-    for(let i=0;i<pageData.length;i++){
-      setMsg(`PDFを作成中です... ${i+1}/${pageData.length}`,true);
-      const img=await loadImage(pageData[i]);
-      if(!pdf) pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4',compress:true});
-      else pdf.addPage('a4','portrait');
-      const pageW=210,pageH=297,margin=5;
-      const maxW=pageW-margin*2,maxH=pageH-margin*2;
-      const ratio=Math.min(maxW/img.naturalWidth,maxH/img.naturalHeight);
-      const w=img.naturalWidth*ratio,h=img.naturalHeight*ratio;
-      pdf.addImage(pageData[i],'JPEG',(pageW-w)/2,(pageH-h)/2,w,h,undefined,'FAST');
-    }
-    const blob=pdf.output('blob');
-    const out=new File([blob],'スキャン.pdf',{type:'application/pdf',lastModified:Date.now()});
-    out._stepPdfFromImages=true;
-    prepared.unshift(out);
-  }
-  return prepared;
+  const bad=picked.find(f=>String(f.type||'').toLowerCase()!=='application/pdf' && !/\.pdf$/i.test(f.name||''));
+  if(bad) throw new Error('PDFファイルを選択してください。');
+  return picked;
 }
 async function uploadOne(file){
-  // 安全網: 画像は絶対にJPEG/PNGのまま送らず、ここでもPDFへ変換する
-  if(isImageFile(file)){
-    setMsg('画像をPDFに変換しています...',true);
-    const pdfFile=await imagesToPdfFile([file]);
-    pdfFile._stepPdfFromImages=true;
-    file=pdfFile;
-  }
-  const forcePdf = file._stepPdfFromImages || String(file.type||'').toLowerCase()==='application/pdf';
-  const storedName=buildFileName(
-    file,
-    forcePdf?'.pdf':undefined,
-    file._stepPdfFromImages?'スキャン':undefined
-  );
-  const mimeType=forcePdf?'application/pdf':(file.type||'application/octet-stream');
-
-  // 画像拡張子・画像MIMEが残っていたら送信しない
-  if(/^image\//i.test(mimeType) || /\.(jpe?g|png|webp|heic|heif)$/i.test(storedName)){
-    throw new Error('画像のPDF変換を確認できなかったため、アップロードを中止しました。');
-  }
-
+  const storedName=buildFileName(file,'.pdf');
   const body=new URLSearchParams();
   body.set('action','uploadAll');
   body.set('pass',PASS);
   body.set('fileName',storedName);
-  body.set('mimeType',mimeType);
+  body.set('mimeType','application/pdf');
   body.set('fileData',await toBase64Url(file));
   const res=await fetch(GAS_URL,{method:'POST',body});
   const text=await res.text();
@@ -770,11 +561,6 @@ async function uploadFiles(){
     $('submitBtn').disabled=false;
   }
 }
-$('cameraInput').addEventListener('change',()=>{
-  const f=$('cameraInput').files&&$('cameraInput').files[0];
-  if(f) initCropForFile(f);
-  $('cameraInput').value='';
-});
 $('file').addEventListener('change',()=>{
   updateFileStatus();
   clearInvalid('file');
@@ -788,8 +574,7 @@ window.addEventListener('load',()=>{
   const savedTeacher=localStorage.getItem('pastExamTeacher');
   if(savedTeacher) $('teacher').value=savedTeacher;
   updatePendingBox();
-  bindCropHandles();
-  loadDb();
+    loadDb();
 });
 </script>
 </body>
