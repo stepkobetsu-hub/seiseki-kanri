@@ -38,4 +38,4 @@
 - 本番Pagesで新コードとオンライン表示、学校一覧を確認。端末ごとの体感速度は未測定。
 
 ## Android 0.2.1の検証
-PR #40のGitHub Actionsで単体テスト、debug APK生成、Lintが成功。変更前セルの不変性、別セルを送信しないこと、初回nullと重複防止のテストを追加。mainの配布用ビルドで固定署名を照合して既存APK URLを更新する。実機操作は未検証。
+PR #40のGitHub Actionsで単体テスト、debug APK生成、Lintが成功。変更前セルの不変性、別セルを送信しないこと、初回nullと重複防止のテストを追加。mainの[配布用ビルド](https://github.com/stepkobetsu-hub/seiseki-kanri/actions/runs/36785532157)でrelease APK生成・Lint・固定署名照合が成功し、[既存APK URL](https://github.com/stepkobetsu-hub/seiseki-kanri/releases/download/past-exam-scanner-latest/STEP-PastExam-Scanner.apk)を0.2.1へ更新済み。公開APKのSHA-256：`16469eb2e27e434df55ae59b2665ce84aded48be78010294794e901403a2465d`。実機操作は未検証。
