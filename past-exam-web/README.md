@@ -1,4 +1,4 @@
-# STEP過去問スキャナー Web版 1.0.0
+# STEP過去問スキャナー Web版 1.0.1
 
 本番： https://stepkobetsu-hub.github.io/seiseki-kanri/past-exam-web/
 
@@ -26,7 +26,7 @@ Service Workerは登録しない。ネット接続必須で、PDF/API応答を�
 
 ## 検証・制限
 
-node --test past-exam-web/registration.test.mjs past-exam-fast-save.test.mjs：9件成功。アーカイブ年度、既存ファイル・flags・他セル維持、不正応答拒否、null新規セル、重複防止、保存後の再試行、競合停止、同一patch再送と再読込確認を検証。構文・差分・QRデコードを確認。
+node --test past-exam-web/registration.test.mjs past-exam-fast-save.test.mjs：10件成功。アーカイブ年度、既存ファイル・flags・他セル維持、不正応答拒否、null新規セル、重複防止、保存後の再試行、競合停止、同一patch再送と再読込確認を検証。構文・差分・QRデコードを確認。
 
 公開画面と学校一覧読取は公開後に確認。iPhone/Androidの実機ホーム画面追加・標準スキャン・PDF選択・実PDFのDriveアップロードとDB登録は未確認。既存Drive側の権限エラーはこのWeb画面の追加では解決しない。uploadAll成功の応答が失われfileIdが不明となった場合は自動復旧できない。利用端末の保存領域を消す/アプリを削除する前に、登録待ちを解消する。
 
