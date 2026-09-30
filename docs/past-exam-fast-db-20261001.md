@@ -26,7 +26,8 @@
 - Google Sheetは移行前のバックアップ。通常の保存では自動同期しない。Sheetの直接編集は本番へ反映されない。
 - 最新データをSheetへ出力する場合は、バインドApps Scriptで `exportPastExamBackupToSheet` を実行する。
 - 現行GASの追加部分と接続箇所は `gas/past-exam-fast-adapter.gs`、DB定義は `supabase/past_exam_fast_metadata.sql` を参照。
-- 旧APKのrevisionなし全体保存は互換性のため残す。同時保存の上書き対策はAPK側の差分保存またはrevision対応が必要。
+- Androidアプリ0.2.1（versionCode 6）は [PR #40](https://github.com/stepkobetsu-hub/seiseki-kanri/pull/40) でsavePatchへ対応。変更前・変更後の1セルだけ送信し、競合時はアップロード済みfileIdを保持して再試行する。全体保存へフォールバックしない。
+- 0.2.0以前の旧APKのrevisionなし全体保存は互換性のため残す。古いアプリが同時保存すると上書きリスクが残るため、0.2.1以降への更新が必要。
 - 実機APKでのアップロード操作は今回未検証。PDFアップロード／削除／学生提出の既存処理は変更していない。
 
 ## 検証済み
@@ -35,3 +36,6 @@
 - 旧 `saveFull` の同一データ保存、空 `savePatch`、公開閲覧、無権限の保存拒否を実APIで確認。テスト用登録は残していない。
 - Nodeの3テスト：保存中の追加変更、競合時のローカル変更保持、応答喪失時の同一差分のGAS再送。全て成功。
 - 本番Pagesで新コードとオンライン表示、学校一覧を確認。端末ごとの体感速度は未測定。
+
+## Android 0.2.1の検証
+PR #40のGitHub Actionsで単体テスト、debug APK生成、Lintが成功。変更前セルの不変性、別セルを送信しないこと、初回nullと重複防止のテストを追加。mainの配布用ビルドで固定署名を照合して既存APK URLを更新する。実機操作は未検証。
