@@ -12,7 +12,7 @@ on:
       - ".github/workflows/build-past-exam-scanner.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -47,3 +47,20 @@ jobs:
           name: STEP-PastExam-Scanner-debug
           path: android-past-exam-scanner/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+
+      - name: Prepare public APK name
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/STEP-PastExam-Scanner.apk
+
+      - name: Publish fixed public APK release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete past-exam-scanner-latest --repo "${{ github.repository }}" --yes --cleanup-tag || true
+          gh release create past-exam-scanner-latest \
+            app/build/outputs/apk/debug/STEP-PastExam-Scanner.apk \
+            --repo "${{ github.repository }}" \
+            --title "STEP Past Exam Scanner" \
+            --notes "Latest Android APK for STEP Past Exam Scanner."
