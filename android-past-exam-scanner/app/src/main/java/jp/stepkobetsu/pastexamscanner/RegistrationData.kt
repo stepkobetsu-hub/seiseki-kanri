@@ -7,10 +7,21 @@ internal object RegistrationData {
     fun requireData(response: JSONObject): JSONObject {
         check(response.optBoolean("ok")) { response.optString("error", "DB読み込み失敗") }
         val data = response.getJSONObject("data")
-        // A malformed load must never become an empty saveFull payload.
+        // Never register against a failed or malformed snapshot.
         data.getJSONArray("schools")
         data.getJSONObject("db")
         return data
+    }
+
+    // Snapshot the original cell before merging. Only this cell is sent to the server.
+    fun patch(db: JSONObject, key: String, file: JSONObject): JSONArray {
+        val before = db.optJSONObject(key)?.let { JSONObject(it.toString()) } ?: JSONObject.NULL
+        val copy = JSONObject(db.toString())
+        merge(copy, key, file)
+        return JSONArray().put(JSONObject()
+            .put("key", key)
+            .put("before", before)
+            .put("after", copy.getJSONObject(key)))
     }
 
     fun contains(db: JSONObject, key: String, fileId: String): Boolean {

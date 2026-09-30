@@ -22,7 +22,7 @@ The scanner module can require a download on first use.
 1. Enter the staff surname and select school, grade, subject, year, exam and kind.
 2. Scan and finish the PDF in the ML Kit scanner.
 3. Register the PDF. The app calls `uploadAll`, reloads the latest DB, adds the
-   file to `schoolId||year||grade||exam||subject`, calls `saveFull`, and reloads
+   file to `schoolId||year||grade||exam||subject`, calls `savePatch`, and reloads
    again to verify the exact fileId before displaying completion.
 
 Years from the current school year back to 2000 are available, including 2024.
@@ -30,11 +30,13 @@ An uploaded fileId and its original metadata are retained in app preferences
 until verification succeeds. A retry resumes DB registration using that fileId;
 it does not upload another PDF. Existing entries and flags are retained, and
 the same fileId is not appended twice. A malformed DB response is rejected
-before any `saveFull` request.
+before any save request.
 
-The existing GAS API has no revision or compare-and-swap parameter for
-`saveFull`. Reloading immediately before saving reduces stale writes, but
-simultaneous writes by other clients require server-side concurrency support.
+The v130 GAS API forwards cell patches to the Supabase compare-and-swap API.
+Each patch contains the original cell and the merged cell; other cells and school
+settings are never replaced. Concurrent changes to that cell are rejected instead
+of overwritten. Retry reloads the latest cell and merges the retained fileId.
+The app does not fall back to saveFull. Identical patches are safe to resend.
 If an upload succeeds on the server but the response is lost, its fileId is
 unknown to the app and cannot be recovered automatically with this API.
 
