@@ -696,7 +696,7 @@ tr:hover td{background:#f8fafc}
         <div class="cardHead">🗒️ 面談・メモ 登録</div>
         <div style="display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:18px;align-items:start">
           <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
-            <div class="fld"><label>日付</label><input id="meetDate" type="date"></div>
+            <div class="fld"><label for="meetDate">日付</label><input id="meetDate" type="date" onchange="updateMeetingDateDisplay()" oninput="updateMeetingDateDisplay()"><div id="meetDateDisplay" aria-live="polite" style="margin-top:6px;font-size:1rem;font-weight:700;color:var(--primary)"></div></div>
             <div class="fld">
               <label>校舎</label>
               <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -5141,9 +5141,24 @@ function todayStr() {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
+function formatMeetingDateWithWeekday(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '';
+  const [, year, month, day] = match;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  if (date.getFullYear() !== Number(year) || date.getMonth() !== Number(month) - 1 || date.getDate() !== Number(day)) return '';
+  return `${year}/${month}/${day}（${'日月火水木金土'[date.getDay()]}）`;
+}
+
+function updateMeetingDateDisplay() {
+  const label = document.getElementById('meetDateDisplay');
+  if (label) label.textContent = formatMeetingDateWithWeekday(document.getElementById('meetDate')?.value);
+}
+
 async function initMeetings() {
   const dateEl = document.getElementById('meetDate');
   if (dateEl && !dateEl.value) dateEl.value = todayStr();
+  updateMeetingDateDisplay();
 
   // 先に在籍情報を1回だけ確定し、その後で担当者と面談一覧を安全に同時取得する
   await ensureEnrollmentIndex();
@@ -5379,6 +5394,7 @@ function clearMeetingForm() {
   updateMeetingSelectedStudent();
   const dateEl = document.getElementById('meetDate');
   if (dateEl) dateEl.value = todayStr();
+  updateMeetingDateDisplay();
   const cp = document.getElementById('meetCounterpart');
   if (cp) cp.value = '母';
   const btn = document.getElementById('meetSaveBtn');
@@ -5607,6 +5623,7 @@ function editMeetingMemo(id) {
   currentMeetingMemoId = m.id;
   const dateEl = document.getElementById('meetDate');
   if (dateEl) dateEl.value = formatEntryValue(m.date).replace(/\//g, '-').slice(0, 10);
+  updateMeetingDateDisplay();
   clearMeetingStudentFilters();
   selectedMeetingGradeGroup = '';
   const gradeGroupEl = document.getElementById('meetGradeGroup');
