@@ -975,15 +975,39 @@ function profileToStudent(profile) {
 // ===================================================
 // API
 // ===================================================
+let personalSessionRenewal = null;
+async function renewPersonalStudentSession() {
+  if ((studentDeviceMode || getSavedStudentDevice()) !== 'personal') return null;
+  if (!personalSessionRenewal) {
+    personalSessionRenewal = (async () => {
+      const id = localStorage.getItem(STUDENT_ID_KEY) || '';
+      const password = localStorage.getItem(STUDENT_PASSWORD_KEY) || '';
+      if (!id || !password || (me && String(me.id) !== id)) return null;
+      const result = await commonApi({action:'studentLogin',studentId:id,password});
+      if (!result.success || result.role !== 'STUDENT' || !result.token || !result.expiresAt || String(result.profile?.studentId) !== id) return null;
+      saveCommonSession(result.token,result.expiresAt);
+      return readCommonSession();
+    })().catch(()=>null).finally(()=>{personalSessionRenewal=null;});
+  }
+  return personalSessionRenewal;
+}
 async function api(params) {
   if (studentCommonMode && STUDENT_GRADE_ACTIONS.has(String(params.action || ''))) {
-    const session = readCommonSession();
-    if (!session) return { success: false, code: 'UNAUTHENTICATED', error: 'ログインが必要です' };
-    if (SEISEKI_SUPABASE_AUTOSAVE && SEISEKI_RUNTIME_ACTIONS.has(params.action)) {
-      return supabaseStudentGradeRequest(params, session);
+    let session = readCommonSession();
+    if (!session) session = await renewPersonalStudentSession();
+    if (!session) return { success:false,code:'UNAUTHENTICATED',error:'認証を更新できませんでした。通信状態を確認して再試行してください。' };
+    const request = async current => {
+      if (SEISEKI_SUPABASE_AUTOSAVE && SEISEKI_RUNTIME_ACTIONS.has(params.action)) return supabaseStudentGradeRequest(params,current);
+      return legacyStudentGradeRequest(params,current);
+    };
+    // 再試行でも同じ保存IDを使用する。
+    if (SEISEKI_WRITE_ACTIONS.has(params.action) && !params.mutationId) params = {...params,mutationId:newMutationId()};
+    let result = await request(session);
+    if (result.code === 'UNAUTHENTICATED') {
+      const renewed = await renewPersonalStudentSession();
+      if (renewed) result = await request(renewed);
     }
-    if (params.action === 'getStudentScores') return {success:false,error:'成績の読み込みに失敗しました。再試行してください。'};
-    return legacyStudentGradeRequest(params, session);
+    return result;
   }
   if (!GAS) { toast('⚠️ GAS URLを入力してください'); throw new Error('No GAS URL'); }
   const res = await fetch(GAS, {
@@ -1067,7 +1091,8 @@ async function resumeStudentSession() {
     await finishStudentLogin(verified.profile);
     return true;
   } catch(e) {
-    clearCommonSession();
+    // 一時的な通信エラーで個人端末のセッション情報を消さない。
+    if ((studentDeviceMode || getSavedStudentDevice()) !== 'personal') clearCommonSession();
     studentCommonMode = false;
     me = null;
     return false;
