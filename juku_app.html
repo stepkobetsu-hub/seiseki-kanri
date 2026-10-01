@@ -1232,6 +1232,10 @@ function changeAdminPass() {
 // STUDENT INIT
 // ===================================================
 async function initStudent() {
+  studentScoresLoaded = false;
+  clearTimeout(scoreAutosaveTimer);
+  scoreAutosaveTimer = null;
+  document.querySelectorAll('#sTab_input input, #sTab_input .saveRow button').forEach(el => { el.disabled = true; });
   // ① セレクタを先に生成（GAS通信前に確実に表示）
   const ysel = document.getElementById('selYear');
   const tsel = document.getElementById('selTerm');
