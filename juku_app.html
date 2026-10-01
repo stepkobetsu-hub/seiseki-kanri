@@ -1406,6 +1406,10 @@ function confirmScoreTarget() {
   document.getElementById('scoreConfirmNote').textContent = '確認できました。下の点数欄に入力してください。入力内容は自動保存されます。';
   document.getElementById('scoreConfirmButton').disabled = true;
   document.getElementById('scoreConfirmButton').textContent = '確認済み：下の点数欄に入力してください';
+  setSaveStatus('inputStatus', '入力できます。点数を入れると自動保存されます。', 'ok');
+  const scoreInputs = ['jpn','soc','math','sci','eng'].map(k=>document.getElementById('f_' + k));
+  const nextInput = scoreInputs.find(el=>el && el.value === '') || scoreInputs[0];
+  if (nextInput) { nextInput.scrollIntoView({behavior:'smooth',block:'center'}); nextInput.focus({preventScroll:true}); }
 }
 
 let loadedScoreYear = '';
