@@ -730,7 +730,7 @@ tr:hover td{background:#f8fafc}
               </div>
             </div>
             <div class="fld"><label for="meetStudent">生徒名 <span id="meetStudentCount" style="color:var(--sub);font-weight:normal"></span></label>
-              <select id="meetStudent" size="5" style="width:100%;min-height:150px"><option value="">生徒を選択</option></select>
+              <select id="meetStudent" onchange="updateMeetingSelectedStudent()" size="5" style="width:100%;min-height:150px"><option value="">生徒を選択</option></select>
             </div>
             <div class="fld"><label>相手</label>
               <select id="meetCounterpart" onchange="toggleMeetingOther()">
@@ -742,6 +742,7 @@ tr:hover td{background:#f8fafc}
             <div class="fld" id="meetStaffOtherWrap" style="display:none"><label>担当（その他）</label><input id="meetStaffOther" placeholder="担当者名を入力"></div>
           </div>
           <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+            <div id="meetSelectedStudent" aria-live="polite" style="margin-bottom:12px;padding:10px 12px;background:var(--primary-lt);border-radius:8px;color:var(--primary);font-size:1.1rem;font-weight:700">生徒を選択してください</div>
             <div class="fld"><label>内容</label><textarea id="meetContent" placeholder="面談・電話・相談内容など" style="min-height:170px"></textarea></div>
             <button id="meetSaveBtn" class="btn btn-primary btn-sm" onclick="saveMeetingMemo(false)">保存する</button>
             <button id="meetMailSaveBtn" class="btn btn-success btn-sm" onclick="saveMeetingMemo(true)">メール送信して保存</button>
@@ -5167,9 +5168,10 @@ function populateMeetingStudents() {
   if (selectedMeetingGradeGroup) list = list.filter(s => /^[小中高][1-6]$/.test(selectedMeetingGradeGroup)
     ? normalizeGrade(s.grade) === selectedMeetingGradeGroup : gradeMatchesGroup(s.grade, selectedMeetingGradeGroup));
   sel.innerHTML = '<option value="">生徒を選択</option>' + list.map(s =>
-    `<option value="${htmlEsc(s.id)}">${htmlEsc(s.name)}（${htmlEsc(s.campus || '')} / ${htmlEsc(s.grade || '')} / No.${htmlEsc(s.id)}）</option>`
+    `<option value="${htmlEsc(s.id)}">${htmlEsc(s.name)}（${htmlEsc(s.campus || '')} / ${htmlEsc(s.grade || '')} / No.${htmlEsc(s.id)}${meetingStudentStatusSuffix(s)}）</option>`
   ).join('');
   sel.value = list.some(s => String(s.id) === prev) ? prev : '';
+  updateMeetingSelectedStudent();
   const count = document.getElementById('meetStudentCount');
   if (count) count.textContent = list.length ? `（候補 ${list.length}名）` : '（該当する生徒がいません）';
   document.querySelectorAll('[data-meet-grade]').forEach(btn => {
@@ -5178,6 +5180,21 @@ function populateMeetingStudents() {
     btn.classList.toggle('btn-ghost', !on);
     btn.setAttribute('aria-pressed', String(on));
   });
+}
+
+function meetingStudentStatusSuffix(student) {
+  const status = studentListEnrollmentStatus(student);
+  return status === 'withdrawalScheduled' ? ' / 退塾予定' : status === 'withdrawn' ? ' / 退塾' : '';
+}
+
+function updateMeetingSelectedStudent() {
+  const label = document.getElementById('meetSelectedStudent');
+  if (!label) return;
+  const id = document.getElementById('meetStudent')?.value || '';
+  const student = students.find(s => String(s.id) === id);
+  label.textContent = student
+    ? `${student.name}（No.${student.id}${meetingStudentStatusSuffix(student)}）`
+    : '生徒を選択してください';
 }
 
 function clearMeetingStudentFilters() {
@@ -5359,6 +5376,7 @@ async function deleteStaffMember(name) {
 function clearMeetingForm() {
   currentMeetingMemoId = '';
   ['meetStudent','meetContent','meetOther','meetStaffOther'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  updateMeetingSelectedStudent();
   const dateEl = document.getElementById('meetDate');
   if (dateEl) dateEl.value = todayStr();
   const cp = document.getElementById('meetCounterpart');
@@ -5596,6 +5614,7 @@ function editMeetingMemo(id) {
   if (m.campus) selectMeetingCampus(m.campus);
   const studentEl = document.getElementById('meetStudent');
   if (studentEl) studentEl.value = m.studentId;
+  updateMeetingSelectedStudent();
   const cpEl = document.getElementById('meetCounterpart');
   const otherEl = document.getElementById('meetOther');
   const cp = String(m.counterpart || '');
@@ -5675,6 +5694,7 @@ async function openMeetingForCurrentStudent() {
   clearMeetingStudentFilters();
   const sel = document.getElementById('meetStudent');
   if (sel) sel.value = sid;
+  updateMeetingSelectedStudent();
   const content = document.getElementById('meetContent');
   if (content) content.focus();
 }
