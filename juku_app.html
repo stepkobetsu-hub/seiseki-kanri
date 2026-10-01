@@ -202,6 +202,11 @@ tr:hover td{background:var(--primary-lt)}
 .chip-blue{background:var(--primary-lt);color:var(--primary)}
 .chip-green{background:var(--success-lt);color:var(--success)}
 /* 年度・回の確認を促すボタン */
+.scoreStartBox{padding:16px;background:#fff7ed;border:2px solid #f59e0b;border-radius:10px}
+.scoreStartBox .termRow{gap:14px}
+.scoreStartBox label{font-weight:700}
+.scoreStartBox select{font-weight:400}
+
 #scoreConfirmButton{font-size:1.275rem;padding:13.5px 27px;max-width:100%;white-space:normal;line-height:1.4}
 #scoreConfirmButton:not(:disabled){animation:scoreConfirmPulse 1.8s ease-in-out infinite}
 #scoreConfirmButton:disabled{animation:none;opacity:.65;cursor:default}
@@ -269,16 +274,21 @@ tr:hover td{background:var(--primary-lt)}
       <div id="wishSummaryBody" style="font-size:.78rem;color:#475569;line-height:1.8"></div>
     </div>
     <div class="card">
-      <div class="cardHead">🗓️ テスト選択</div>
-      <div class="termRow">
-        <select id="selYear" onchange="changeScoreSelection()"></select>
-        <select id="selTerm" onchange="changeScoreSelection()"></select>
-        <button class="btn btn-outline btn-sm" onclick="refreshStudentScores()">読み込む</button>
+      <div class="cardHead">📝 テストの点数を入力・修正</div>
+      <div class="scoreStartBox">
+        <div style="font-weight:800;margin-bottom:10px">① 入力するテストを確認してください</div>
+        <div class="termRow" style="margin-bottom:10px">
+          <label style="display:flex;align-items:center;gap:6px">年度 <select id="selYear" onchange="changeScoreSelection()"></select></label>
+          <label style="display:flex;align-items:center;gap:6px">テスト <select id="selTerm" onchange="changeScoreSelection()"></select></label>
+        </div>
+        <div id="scoreConfirmNote" style="margin-bottom:8px">年度と回が合っていたら、下の青いボタンを押してください。</div>
+        <button id="scoreConfirmButton" class="btn btn-primary" onclick="confirmScoreTarget()">このテストの点数を入力・修正する</button>
       </div>
-    </div>
-    <div class="card">
-      <div class="cardHead">📝 得点入力 <strong id="scoreTarget" style="color:#b45309;font-size:1.1rem"></strong> <span id="inputStatus" class="saveMsg pending"></span></div>
-      <div style="margin:12px 0;padding:12px;background:#fff7ed;border:2px solid #f59e0b;border-radius:8px"><div id="scoreConfirmNote">年度とテストの回を確認してから入力してください。</div><button id="scoreConfirmButton" class="btn btn-primary" style="margin-top:8px" onclick="confirmScoreTarget()">この年度・回に入力する</button></div>
+      <div class="cardHead" style="margin-top:18px">② 点数を入力・修正 <strong id="scoreTarget" style="color:#b45309;font-size:1.1rem"></strong></div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <span id="inputStatus" class="saveMsg pending"></span>
+        <button class="btn btn-ghost btn-sm" onclick="refreshStudentScores()" style="margin-left:auto">保存済みの点数を再読み込み</button>
+      </div>
       <div style="background:#fff8e1;border-left:4px solid #f59e0b;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:.78rem;color:#92400e">
         ⚠️ 50点満点のテストは100点満点に換算（得点を2倍）して入力してください。
       </div>
@@ -1393,8 +1403,9 @@ function confirmScoreTarget() {
   if (past && !confirm(loadedScoreYear + '年度・第' + loadedScoreTerm + '回の過去の結果を変更します。よろしいですか？')) return;
   confirmedScoreTarget = scoreTargetKey(loadedScoreYear, loadedScoreTerm);
   document.querySelectorAll('#sTab_input input, #sTab_input .saveRow button').forEach(el=>{el.disabled=false;});
-  document.getElementById('scoreConfirmNote').textContent = loadedScoreYear + '年度・第' + loadedScoreTerm + '回への入力を確認済みです。';
+  document.getElementById('scoreConfirmNote').textContent = '確認できました。下の点数欄に入力してください。入力内容は自動保存されます。';
   document.getElementById('scoreConfirmButton').disabled = true;
+  document.getElementById('scoreConfirmButton').textContent = '確認済み：下の点数欄に入力してください';
 }
 
 let loadedScoreYear = '';
@@ -1422,8 +1433,8 @@ function loadScore() {
   document.querySelectorAll('#sTab_input input, #sTab_input .saveRow button').forEach(el => { el.disabled = true; });
   const confirmButton = document.getElementById('scoreConfirmButton');
   confirmButton.disabled = !tm;
-  confirmButton.textContent = tm ? target + ' に入力する' : 'テストの回を選択してください';
-  document.getElementById('scoreConfirmNote').textContent = tm ? target + 'で間違いないか確認してください。保存済みの点数は下に表示しています。' : '年度とテストの回を選択してください。';
+  confirmButton.textContent = tm ? target + ' の点数を入力・修正する' : 'テストの回を選択してください';
+  document.getElementById('scoreConfirmNote').textContent = tm ? '年度と回が合っていたら、下の青いボタンを押してください。' : '年度とテストの回を選択してください。';
   const sc = myScores.find(s => String(s.year) === yr && String(s.term) === tm);
   const flds = ['jpn','soc','math','sci','eng','total5','rank5','mus','art','pe','tech','total9','rank9',
                 'avg_jpn','avg_soc','avg_math','avg_sci','avg_eng','avg_total5'];
