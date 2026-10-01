@@ -201,6 +201,12 @@ tr:hover td{background:var(--primary-lt)}
 .chip{padding:6px 14px;border-radius:20px;font-size:.8rem;font-weight:600}
 .chip-blue{background:var(--primary-lt);color:var(--primary)}
 .chip-green{background:var(--success-lt);color:var(--success)}
+/* 年度・回の確認を促すボタン */
+#scoreConfirmButton{font-size:1.275rem;padding:13.5px 27px;max-width:100%;white-space:normal;line-height:1.4}
+#scoreConfirmButton:not(:disabled){animation:scoreConfirmPulse 1.8s ease-in-out infinite}
+#scoreConfirmButton:disabled{animation:none;opacity:.65;cursor:default}
+@keyframes scoreConfirmPulse{0%,100%{background:#1a56a0;box-shadow:0 0 0 0 rgba(26,86,160,.15)}50%{background:#3684d8;box-shadow:0 0 0 6px rgba(26,86,160,.22)}}
+@media(prefers-reduced-motion:reduce){#scoreConfirmButton:not(:disabled){animation:none;box-shadow:0 0 0 4px rgba(26,86,160,.22)}}
 </style>
 </head>
 <body>
