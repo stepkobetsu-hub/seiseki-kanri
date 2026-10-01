@@ -232,8 +232,14 @@ Deno.serve(async (req) => {
     const profile = await validateStudent(clean(body.token));
     const requestedStudent = clean(body.studentId || profile.studentId);
     if (requestedStudent !== profile.studentId) throw new Error("FORBIDDEN");
-    const student = await ensureStudent(profile);
     const action = clean(body.action);
+    if (action === "getStudentSession") return json({success:true,role:"STUDENT",profile,source:"supabase"});
+    if (action === "getSchools") {
+      const {data,error} = await db.from("schools").select("name,term_count,semester_type,schedule,schedule_url,memo").order("name");
+      if(error)throw error;
+      return json({success:true,schools:(data||[]).map(r=>({name:r.name,termCount:r.term_count,semType:r.semester_type,testSchedule:r.schedule,scheduleUrl:r.schedule_url,scheduleMemo:r.memo})),source:"supabase"});
+    }
+    const student = await ensureStudent(profile);
     background(processRetryQueue());
 
     if (action === "getStudentScores") {
