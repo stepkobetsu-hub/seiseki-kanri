@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const COMMON_API_URL = "https://step-progress-api.stepkobetsu.workers.dev/api";
+const COMMON_API_URL = "https://script.google.com/macros/s/AKfycbwu8lfhiH3_7m4ogHNtbgeo3ehx_VBMnt1mPXsvIlL_kMSpxFdrRD4rO_I6q_JUXIWHmg/exec";
 const GRADE_GAS_URL = "https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec";
 const db = createClient(SUPABASE_URL, SERVICE_ROLE, { auth: { persistSession: false } });
 
@@ -56,6 +56,19 @@ async function postJson(url: string, body: Record<string, unknown>, timeoutMs = 
   } finally { clearTimeout(timer); }
 }
 
+async function verifyCommonStudentSession(token: string): Promise<Record<string, unknown>> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000);
+  try {
+    const response = await fetch(COMMON_API_URL, {
+      method:"POST",headers:{"content-type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({action:"getCommonStudentSession",token}),signal:controller.signal,redirect:"follow",
+    });
+    if (!response.ok) throw new Error("AUTH_UNAVAILABLE");
+    return await response.json();
+  } finally { clearTimeout(timeout); }
+}
+
 async function validateStudent(token: string) {
   if (!token) throw new Error("AUTH_REQUIRED");
   const tokenHash = await hash(token);
@@ -67,9 +80,9 @@ async function validateStudent(token: string) {
   if (!profile) {
     let verified: Record<string, unknown>;
     try {
-      verified = await postJson(COMMON_API_URL, { action: "getCommonStudentSession", token }, 5000) as Record<string, unknown>;
+      verified = await verifyCommonStudentSession(token);
     } catch (_) {
-      throw new Error("AUTH_REQUIRED");
+      throw new Error("AUTH_UNAVAILABLE");
     }
     if (verified.success !== true || clean(verified.role).toUpperCase() !== "STUDENT" || !verified.profile || typeof verified.profile !== "object" || Array.isArray(verified.profile)) {
       throw new Error("AUTH_REQUIRED");
@@ -290,7 +303,7 @@ Deno.serve(async (req) => {
   } catch (e) {
     const m = msg(e);
     console.error("seiseki request failed", m);
-    const status = m === "AUTH_REQUIRED" ? 401 : m === "FORBIDDEN" ? 403 : m === "INVALID_ACTION" ? 400 : 500;
+    const status = m === "AUTH_UNAVAILABLE" ? 503 : m === "AUTH_REQUIRED" ? 401 : m === "FORBIDDEN" ? 403 : m === "INVALID_ACTION" ? 400 : 500;
     return json({ success:false, error:m }, status);
   }
 });
