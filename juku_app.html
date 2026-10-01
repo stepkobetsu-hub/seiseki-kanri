@@ -282,7 +282,7 @@ tr:hover td{background:var(--primary-lt)}
           <label style="display:flex;align-items:center;gap:6px">テスト <select id="selTerm" onchange="changeScoreSelection()"></select></label>
         </div>
         <div id="scoreConfirmNote" style="margin-bottom:8px">年度と回が合っていたら、下の青いボタンを押してください。</div>
-        <button id="scoreConfirmButton" class="btn btn-primary" onclick="confirmScoreTarget()">このテストの点数を入力・修正する</button>
+        <button id="scoreConfirmButton" class="btn btn-primary" disabled onclick="confirmScoreTarget()">点数を読み込み中…</button>
       </div>
       <div class="cardHead" style="margin-top:18px">② 点数を入力・修正 <strong id="scoreTarget" style="color:#b45309;font-size:1.1rem"></strong></div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
@@ -1250,6 +1250,10 @@ function changeAdminPass() {
 // ===================================================
 async function initStudent() {
   studentScoresLoaded = false;
+  document.getElementById('scoreConfirmButton').disabled = true;
+  document.getElementById('scoreConfirmButton').textContent = '点数を読み込み中…';
+  document.getElementById('scoreConfirmNote').textContent = '保存済みの点数を確認しています。読み込み後に入力できます。';
+  const scoreLoadPromise = refreshStudentScores(false);
   clearTimeout(scoreAutosaveTimer);
   scoreAutosaveTimer = null;
   document.querySelectorAll('#sTab_input input, #sTab_input .saveRow button').forEach(el => { el.disabled = true; });
@@ -1277,18 +1281,15 @@ async function initStudent() {
     for (let t = 1; t <= terms; t++) tsel.innerHTML += `<option value="${t}">第${t}回</option>`;
   }
 
-  await refreshStudentScores(false);
-  // 志望校サマリーを読み込む
-  try {
-    const wr = await api({ action: 'getWish', studentId: me.id });
-    if (wr.wish) renderWishSummary(wr.wish);
-  } catch(e) {}
+  await scoreLoadPromise;
   const suggested = latestCompletedTest(sc, me?.grade);
   ysel.value = String(suggested?.year || NOW_YEAR);
   tsel.value = suggested ? String(suggested.term) : '';
   sTabs('input', 0);
   loadScore(); // 自動的に読み込む
   setupStudentAutosave();
+  // 志望校の取得を待たずに点数入力を開始できる。
+  api({action:'getWish',studentId:me.id}).then(wr=>{if(wr.wish)renderWishSummary(wr.wish);}).catch(()=>{});
 }
 
 // ===================================================
@@ -1367,6 +1368,9 @@ async function refreshStudentScores(render = true) {
     if (render) loadScore();
   } catch (error) {
     setSaveStatus('inputStatus', '読み込み失敗：' + error.message, 'err');
+    document.getElementById('scoreConfirmButton').disabled = true;
+    document.getElementById('scoreConfirmButton').textContent = '読み込み失敗';
+    document.getElementById('scoreConfirmNote').textContent = '「保存済みの点数を再読み込み」を押してください。';
   }
 }
 
@@ -1396,7 +1400,8 @@ function latestCompletedTest(school, grade, now = new Date()) {
 let confirmedScoreTarget = '';
 function scoreTargetKey(year, term) { return String(year) + ':' + String(term); }
 function confirmScoreTarget() {
-  if (!studentScoresLoaded || !loadedScoreTerm) return;
+  if (!studentScoresLoaded) { setSaveStatus('inputStatus','点数の読み込み中です。少しお待ちください。','pending'); return; }
+  if (!loadedScoreTerm) { toast('年度とテストの回を選択してください'); return; }
   const school = schools.find(s=>s.name === me?.school);
   const latest = latestCompletedTest(school, me?.grade);
   const past = latest && (Number(loadedScoreYear) < latest.year || (Number(loadedScoreYear) === latest.year && Number(loadedScoreTerm) < latest.term));
@@ -1409,7 +1414,7 @@ function confirmScoreTarget() {
   setSaveStatus('inputStatus', '入力できます。点数を入れると自動保存されます。', 'ok');
   const scoreInputs = ['jpn','soc','math','sci','eng'].map(k=>document.getElementById('f_' + k));
   const nextInput = scoreInputs.find(el=>el && el.value === '') || scoreInputs[0];
-  if (nextInput) { nextInput.scrollIntoView({behavior:'smooth',block:'center'}); nextInput.focus({preventScroll:true}); }
+  if (nextInput) { nextInput.scrollIntoView({behavior:'instant',block:'center'}); nextInput.focus({preventScroll:true}); }
 }
 
 let loadedScoreYear = '';
