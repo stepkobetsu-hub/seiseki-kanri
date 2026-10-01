@@ -265,13 +265,13 @@ tr:hover td{background:var(--primary-lt)}
     <div class="card">
       <div class="cardHead">🗓️ テスト選択</div>
       <div class="termRow">
-        <select id="selYear"></select>
-        <select id="selTerm"></select>
+        <select id="selYear" onchange="changeScoreSelection()"></select>
+        <select id="selTerm" onchange="changeScoreSelection()"></select>
         <button class="btn btn-outline btn-sm" onclick="loadScore()">読み込む</button>
       </div>
     </div>
     <div class="card">
-      <div class="cardHead">📝 得点入力 <span id="inputStatus" class="saveMsg pending"></span></div>
+      <div class="cardHead">📝 得点入力 <strong id="scoreTarget" style="color:#b45309"></strong> <span id="inputStatus" class="saveMsg pending"></span></div>
       <div style="background:#fff8e1;border-left:4px solid #f59e0b;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:.78rem;color:#92400e">
         ⚠️ 50点満点のテストは100点満点に換算（得点を2倍）して入力してください。
       </div>
@@ -1237,7 +1237,7 @@ async function initStudent() {
     for (let y = NOW_YEAR; y >= NOW_YEAR - 2; y--) ysel.innerHTML += `<option value="${y}">${y}年度</option>`;
   }
   if (tsel) {
-    tsel.innerHTML = '';
+    tsel.innerHTML = '<option value="">テストの回を選択してください</option>';
     for (let t = 1; t <= 5; t++) tsel.innerHTML += `<option value="${t}">第${t}回</option>`; // 仮：5回
   }
 
@@ -1249,7 +1249,7 @@ async function initStudent() {
   const sc = schools.find(s => s.name === (me && me.school));
   const terms = (sc && sc.termCount) ? Number(sc.termCount) : 5;
   if (tsel) {
-    tsel.innerHTML = '';
+    tsel.innerHTML = '<option value="">テストの回を選択してください</option>';
     for (let t = 1; t <= terms; t++) tsel.innerHTML += `<option value="${t}">第${t}回</option>`;
   }
 
@@ -1263,16 +1263,7 @@ async function initStudent() {
     const wr = await api({ action: 'getWish', studentId: me.id });
     if (wr.wish) renderWishSummary(wr.wish);
   } catch(e) {}
-  // 最新のデータがある回次を自動選択して読み込む
-  if (myScores.length > 0) {
-    const latest = myScores.reduce((a, b) =>
-      (Number(b.year) > Number(a.year) || (Number(b.year) === Number(a.year) && Number(b.term) > Number(a.term))) ? b : a
-    );
-    const ysel2 = document.getElementById('selYear');
-    const tsel2 = document.getElementById('selTerm');
-    if (ysel2) ysel2.value = latest.year;
-    if (tsel2) tsel2.value = latest.term;
-  }
+  // 入力先の取り違えを防ぐため、回次は毎回本人が明示的に選択する。
   sTabs('input', 0);
   loadScore(); // 自動的に読み込む
   setupStudentAutosave();
@@ -1339,23 +1330,43 @@ function calcTotal() {
   document.getElementById('f_total9').value = all.length ? all.reduce((a,b)=>a+b,0) : '';
 }
 
+let loadedScoreYear = '';
+let loadedScoreTerm = '';
+
+function changeScoreSelection() {
+  // 選択変更前の未送信入力は、表示していた回へ保存する。
+  if (scoreAutosaveTimer && loadedScoreTerm) {
+    saveScore({ year: loadedScoreYear, term: loadedScoreTerm, automatic: true });
+  }
+  loadScore();
+}
+
 function loadScore() {
+  clearTimeout(scoreAutosaveTimer);
+  scoreAutosaveTimer = null;
   const yr = document.getElementById('selYear').value;
   const tm = document.getElementById('selTerm').value;
+  loadedScoreYear = yr;
+  loadedScoreTerm = tm;
+  const target = tm ? yr + '年度・第' + tm + '回' : 'テストの回を選択してください';
+  document.getElementById('scoreTarget').textContent = target;
+  document.querySelectorAll('#sTab_input input, #sTab_input .saveRow button').forEach(el => { el.disabled = !tm; });
   const sc = myScores.find(s => String(s.year) === yr && String(s.term) === tm);
   const flds = ['jpn','soc','math','sci','eng','total5','rank5','mus','art','pe','tech','total9','rank9',
                 'avg_jpn','avg_soc','avg_math','avg_sci','avg_eng','avg_total5'];
   flds.forEach(f => { const el = document.getElementById('f_' + f); if(el) el.value = (sc && sc[f] !== '') ? sc[f] : ''; });
   const st = document.getElementById('inputStatus');
-  st.textContent = sc ? '✅ 保存済みデータを表示中' : '（まだデータがありません）';
+  st.textContent = !tm ? '先にテストの回を選択してください' : sc ? '✅ 保存済みデータを表示中' : '（まだデータがありません）';
   st.className = 'saveMsg ' + (sc ? 'ok' : 'pending');
 }
 
 async function saveScore(options = {}) {
   const sequence = options.sequence || ++scoreSaveSequence;
   clearTimeout(scoreAutosaveTimer);
-  const yr = document.getElementById('selYear').value;
-  const tm = document.getElementById('selTerm').value;
+  scoreAutosaveTimer = null;
+  const yr = options.year || document.getElementById('selYear').value;
+  const tm = options.term || document.getElementById('selTerm').value;
+  if (!tm) { toast('テストの回を選択してください'); return; }
   const g = id => { const el = document.getElementById(id); if(!el) return ''; const v = el.value; return v === '' ? '' : Number(v); };
 
   // 全フィールドのエラー表示をリセット
@@ -1415,7 +1426,9 @@ async function saveScore(options = {}) {
       const index = myScores.findIndex(s => String(s.year) === String(yr) && String(s.term) === String(tm));
       if (index >= 0) myScores[index] = { ...myScores[index], ...payload };
       else myScores.push({ ...payload });
-      setSaveStatus('inputStatus', options.automatic ? '自動保存済み' : '保存しました', 'ok');
+      if (document.getElementById('selYear').value === yr && document.getElementById('selTerm').value === tm) {
+        setSaveStatus('inputStatus', yr + '年度・第' + tm + '回 ' + (options.automatic ? '自動保存済み' : '保存しました'), 'ok');
+      }
       if (!options.automatic) toast('✅ 保存しました');
     }
   } else if (sequence === scoreSaveSequence) {
