@@ -869,7 +869,7 @@ const STUDENT_ACTIVITY_EVENTS = ['pointerdown','keydown','touchstart','scroll'];
 const STUDENT_GRADE_ACTIONS = new Set(['getStudentScores','saveScore','deleteScore','getWish','saveWish','getReport','saveReport','deleteReport','getReports','getSchools']);
 const SEISEKI_SUPABASE_AUTOSAVE = true; // 緊急時は false にすると従来の共通 API・手動保存へ戻る
 const SEISEKI_RUNTIME_URL = 'https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-runtime-v1';
-const SEISEKI_RUNTIME_ACTIONS = new Set(['getStudentScores','saveScore','deleteScore','getReports','getReport','saveReport','deleteReport','getWish','saveWish']);
+const SEISEKI_RUNTIME_ACTIONS = new Set(['getSchools','getStudentScores','saveScore','deleteScore','getReports','getReport','saveReport','deleteReport','getWish','saveWish']);
 const SEISEKI_WRITE_ACTIONS = new Set(['saveScore','deleteScore','saveReport','deleteReport','saveWish']);
 let studentCommonMode = false;
 let commonApiUrlPromise;
@@ -1086,7 +1086,11 @@ async function resumeStudentSession() {
   const session = readCommonSession();
   if (!session) return false;
   try {
-    const verified = await commonApi({ action: 'getCommonStudentSession', token: session.token });
+    let verified = await supabaseStudentGradeRequest({action:'getStudentSession'},session);
+    if (verified.code === 'UNAUTHENTICATED') {
+      const renewed = await renewPersonalStudentSession();
+      if (renewed) verified = await supabaseStudentGradeRequest({action:'getStudentSession'},renewed);
+    }
     if (!verified.success || verified.role !== 'STUDENT' || !verified.profile) throw new Error('SESSION_EXPIRED');
     await finishStudentLogin(verified.profile);
     return true;
