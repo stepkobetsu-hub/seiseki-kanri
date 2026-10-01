@@ -69,12 +69,19 @@
 
         <TextView style="@style/FieldLabel" android:text="学校" />
         <Spinner android:id="@+id/school" style="@style/FieldSpinner" />
+        <TextView
+            android:id="@+id/schoolStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="保存した学校一覧を表示します。"
+            android:textSize="13sp"
+            android:textColor="#475569" />
         <Button
             android:id="@+id/retrySchools"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:minHeight="48dp"
-            android:text="学校一覧を再取得"
+            android:text="学校一覧を更新"
             android:visibility="gone" />
 
         <TextView style="@style/FieldLabel" android:text="学年" />

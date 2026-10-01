@@ -31,3 +31,9 @@ node --test past-exam-web/registration.test.mjs past-exam-fast-save.test.mjs：1
 公開画面と学校一覧読取は公開後に確認。iPhone/Androidの実機ホーム画面追加・標準スキャン・PDF選択・実PDFのDriveアップロードとDB登録は未確認。既存Drive側の権限エラーはこのWeb画面の追加では解決しない。uploadAll成功の応答が失われfileIdが不明となった場合は自動復旧できない。利用端末の保存領域を消す/アプリを削除する前に、登録待ちを解消する。
 
 参考：AppleのSafari Webアプリ案内 https://support.apple.com/ja-jp/guide/iphone/iphea86e5236/ios 、ファイルアプリのスキャン https://support.apple.com/ja-jp/guide/iphone/iphf2746307f/ios 、Google Driveのスキャン https://support.google.com/drive/answer/3145835?co=GENIE.Platform%3DAndroid&hl=ja 。
+
+## 2026-10-01 学校一覧の端末保存（Web 1.0.2 / Android 0.2.2）
+起動時にはサーバーを読み込まず、端末に保存した学校マスタを表示する。初回・保存不可・壊れた保存データでは、2026-10-01に正本と照合した7校の同梱一覧を使う。学校名・ID・年間テスト回数だけを保存し、DBの登録データはキャッシュしない。
+学校改定時は「学校一覧を更新」を押す。更新成功後は端末の一覧を置き換える。通信失敗・空一覧・不正形式では保存済み一覧を維持する。Webでは保存できない環境でも、その画面では更新一覧を使える。
+初回から学校選択・PDF作成を通信なしで開始できるが、PDF保存・DB登録には通信が必要。登録時の最新DB照合・差分保存・競合拒否・fileId再読込確認は維持する。実機の体感速度は未測定。
+Androidは同じ署名の0.2.2（versionCode 7）へ上書き更新。固定APK URL・QRは変更なし。

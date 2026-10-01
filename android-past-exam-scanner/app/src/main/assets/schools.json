@@ -1,0 +1,37 @@
+[
+  {
+    "id": "s1",
+    "name": "南城中学",
+    "examCount": 3
+  },
+  {
+    "id": "s2",
+    "name": "高蔵寺中学",
+    "examCount": 5
+  },
+  {
+    "id": "s3",
+    "name": "志段味中学",
+    "examCount": 5
+  },
+  {
+    "id": "s4",
+    "name": "坂下中学",
+    "examCount": 5
+  },
+  {
+    "id": "s5",
+    "name": "鷹来中学",
+    "examCount": 5
+  },
+  {
+    "id": "s6",
+    "name": "西部中学",
+    "examCount": 5
+  },
+  {
+    "id": "s7",
+    "name": "東部中学",
+    "examCount": 5
+  }
+]

@@ -48,7 +48,6 @@ class MainActivity : AppCompatActivity() {
     private val gasUrl = "https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec"
     private val pass = "step123"
 
-    private data class School(val id: String, val name: String, val examCount: Int)
 
     private var schools: List<School> = emptyList()
     private var scannedPdfUri: Uri? = null
@@ -98,7 +97,7 @@ class MainActivity : AppCompatActivity() {
 
         setupStaticSpinners()
         setupListeners()
-        loadSchools()
+        restoreSchools()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -169,34 +168,50 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun showSchools(loaded: List<School>) {
+        val selectedId = selectedSchool()?.id
+        val selectedExam = binding.exam.selectedItemPosition
+        schools = loaded
+        setSpinner(binding.school, schools.map { "${it.name}（年${it.examCount}回）" })
+        val index = schools.indexOfFirst { it.id == selectedId }
+        if (index >= 0) binding.school.setSelection(index)
+        updateExamSpinner()
+        if (selectedExam in 0 until (selectedSchool()?.examCount ?: 0)) binding.exam.setSelection(selectedExam)
+        binding.retrySchools.visibility = View.VISIBLE
+    }
+
+    private fun restoreSchools() {
+        try {
+            val bundled = assets.open("schools.json").bufferedReader().use { it.readText() }
+            showSchools(SchoolCatalog.restore(preferences.getString("schools_v1", null), bundled))
+            binding.schoolStatus.text = "保存済みの学校一覧（${schools.size}校）。学校が変わったときだけ更新してください。"
+            setBusy(false, pending?.let { "未完了のDB登録があります：${it.getString("fileName")}" } ?: "学校一覧を表示しました。")
+        } catch (e: Exception) {
+            binding.retrySchools.visibility = View.VISIBLE
+            setBusy(false, "学校一覧を更新してください：${e.message}")
+        }
+    }
+
     private fun loadSchools() {
         lifecycleScope.launch {
-            setBusy(true, "学校一覧を読み込んでいます…")
+            setBusy(true, "学校一覧を更新しています…")
             try {
-                val payload = withContext(Dispatchers.IO) { gasGet("load") }
-                if (!payload.optBoolean("ok")) error(payload.optString("error", "学校一覧を読み込めませんでした"))
-                val data = RegistrationData.requireData(payload)
-                val schoolArray = data.getJSONArray("schools")
-                val loaded = mutableListOf<School>()
-                for (i in 0 until schoolArray.length()) {
-                    val s = schoolArray.getJSONObject(i)
-                    loaded += School(
-                        s.optString("id"),
-                        s.optString("name"),
-                        s.optInt("examCount", 5).coerceIn(1, 20)
-                    )
+                val raw = withContext(Dispatchers.IO) {
+                    val request = Request.Builder().url("$gasUrl?action=load&pass=$pass&_ts=${System.currentTimeMillis()}").get().build()
+                    val schoolClient = client.newBuilder().callTimeout(25, TimeUnit.SECONDS).build()
+                    schoolClient.newCall(request).execute().use { response ->
+                        RegistrationData.requireData(readResponse(response)).getJSONArray("schools").toString()
+                    }
                 }
-                schools = loaded.filter { it.id.isNotBlank() && it.name.isNotBlank() }
-                check(schools.isNotEmpty()) { "学校一覧が空です。接続先の設定を確認してください" }
-                setSpinner(binding.school, schools.map { "${it.name}（年${it.examCount}回）" })
-                updateExamSpinner()
-                binding.retrySchools.visibility = View.GONE
-                setBusy(false, pending?.let { "未完了のDB登録があります：${it.getString("fileName")}" }
-                    ?: "学校一覧を読み込みました。")
+                val loaded = SchoolCatalog.parse(raw)
+                preferences.edit().putString("schools_v1", raw).apply()
+                showSchools(loaded)
+                binding.schoolStatus.text = "学校一覧を更新しました（${schools.size}校）。次回もこの一覧を使います。"
+                setBusy(false, pending?.let { "未完了のDB登録があります：${it.getString("fileName")}" } ?: "学校一覧を更新しました。")
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                binding.retrySchools.visibility = View.VISIBLE
-                setBusy(false, "学校一覧の読み込みに失敗しました：${e.message}")
+                setBusy(false, if (schools.isNotEmpty()) "更新できませんでした。保存済みの学校一覧で続けられます：${e.message}"
+                    else "学校一覧の読み込みに失敗しました：${e.message}")
             }
         }
     }

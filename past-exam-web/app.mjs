@@ -1,5 +1,7 @@
+import {normalizeSchools,restoreSchools} from './school-catalog.mjs?v=1.0.2';
 import {ExamApi,cellKey} from './registration.mjs?v=1.0.1-fetch2';
 const $=id=>document.getElementById(id),api=new ExamApi(window.PAST_EXAM_UPLOAD_CONFIG);
+const schoolKey='stepPastExamWebSchoolsV1';
 const pendingKey='stepPastExamWebPastExamPendingV1';
 let schools=[],ready=false,busy=false,pending=null;
 const getStorage=k=>{try{return localStorage.getItem(k);}catch{return null;}};
@@ -21,13 +23,20 @@ function name(){
   const value=parts.every(Boolean)?parts.map(s=>s.replace(/[\\/:*?"<>|\s]/g,'')).join('_')+'.pdf':'';
   $('fileName').textContent=value||'項目を選ぶと表示されます';return value;
 }
+function showSchools(loaded){
+  const selected=$('school').value,exam=$('exam').value;
+  schools=loaded;$('school').replaceChildren(new Option('選択',''),...schools.map(s=>new Option(s.name,s.id)));
+  if(schools.some(s=>s.id===selected))$('school').value=selected;
+  exams();if([...$('exam').options].some(o=>o.value===exam))$('exam').value=exam;
+  name();ready=true;
+}
 async function loadSchools(){
-  if(busy)return;lock(true);ready=false;$('schoolStatus').textContent='学校一覧を読み込み中…';
-  try{const data=await api.load();schools=data.schools;
-    const selected=$('school').value;$('school').replaceChildren(new Option('選択',''),...schools.map(s=>new Option(s.name,String(s.id))));
-    if(schools.some(s=>String(s.id)===selected))$('school').value=selected;
-    exams();ready=true;$('schoolStatus').textContent=`学校一覧を読み込みました（${schools.length}校）`;status('');
-  }catch(e){$('schoolStatus').textContent='学校一覧を取得できません。通信状態を確認して再読み込みしてください。';status(e.message,true);}
+  if(busy)return;lock(true);$('schoolStatus').textContent='学校一覧を更新中…';
+  try{
+    const data=await api.load(),loaded=normalizeSchools(data.schools);
+    let saved=true;try{localStorage.setItem(schoolKey,JSON.stringify(loaded));}catch{saved=false;}
+    showSchools(loaded);$('schoolStatus').textContent=`学校一覧を更新しました（${schools.length}校）。`+(saved?'次回もこの一覧を使います。':'端末には保存できませんでした。');status('');
+  }catch(e){$('schoolStatus').textContent='更新できませんでした。保存済みの学校一覧で続けられます。';status(e.message,true);}
   finally{lock(false);}
 }
 function base64(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onerror=()=>reject(Error('PDFを読み込めませんでした'));r.onload=()=>resolve(String(r.result).split(',')[1].replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''));r.readAsDataURL(file);});}
@@ -67,4 +76,8 @@ const year=new Date().getFullYear()-(new Date().getMonth()<3?1:0);
 $('year').replaceChildren(new Option('選択',''),...Array.from({length:year-1999},(_,i)=>new Option(`${year-i}年度`,String(year-i))));$('year').value=String(year);
 $('teacher').value=getStorage('stepPastExamWebPastExamTeacher')||'';
 if(navigator.standalone||matchMedia('(display-mode: standalone)').matches)$('install').hidden=true;
-paintPending();loadSchools();
+// Startup never depends on the network; only an explicit refresh loads the server.
+let schoolStorage;try{schoolStorage=localStorage;}catch{schoolStorage={getItem:()=>null};}
+showSchools(restoreSchools(schoolStorage,schoolKey));
+$('schoolStatus').textContent=`保存済みの学校一覧（${schools.length}校）。学校が変わったときだけ更新してください。`;
+paintPending();
