@@ -705,22 +705,33 @@ tr:hover td{background:#f8fafc}
                 <button id="meetCampusAll" class="btn btn-ghost btn-sm" type="button" onclick="selectMeetingCampus('')">全校舎</button>
               </div>
             </div>
-            <div class="fld">
-              <label>学年</label>
-              <select id="meetGradeGroup" onchange="selectMeetingGradeGroup(this.value)">
-                <option value="">全学年</option>
-                <option value="elementary">小学生</option>
-                <option value="junior">中学生</option>
-                <option value="high">高校生</option>
-                <option value="e13">小1〜小3</option>
-                <option value="e46">小4〜小6</option>
-                <option value="j1">中1</option>
-                <option value="j2">中2</option>
-                <option value="j3">中3</option>
-                <option value="h13">高1〜高3</option>
-              </select>
+            <div class="fld"><label for="meetStudentSearch">生徒検索</label>
+              <input id="meetStudentSearch" type="search" placeholder="氏名・かな・ローマ字・IDで検索" oninput="populateMeetingStudents()" autocomplete="off">
             </div>
-            <div class="fld"><label>生徒名</label><select id="meetStudent"><option value="">生徒を選択</option></select></div>
+            <div class="fld"><label>学年</label>
+              <div id="meetGradeButtons" style="display:flex;gap:6px;flex-wrap:wrap">
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="" onclick="selectMeetingGradeGroup('')">全員</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="elementary" onclick="selectMeetingGradeGroup('elementary')">小学生</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="junior" onclick="selectMeetingGradeGroup('junior')">中学生</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="high" onclick="selectMeetingGradeGroup('high')">高校生</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="小1" onclick="selectMeetingGradeGroup('小1')">小1</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="小2" onclick="selectMeetingGradeGroup('小2')">小2</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="小3" onclick="selectMeetingGradeGroup('小3')">小3</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="小4" onclick="selectMeetingGradeGroup('小4')">小4</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="小5" onclick="selectMeetingGradeGroup('小5')">小5</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="小6" onclick="selectMeetingGradeGroup('小6')">小6</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="中1" onclick="selectMeetingGradeGroup('中1')">中1</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="中2" onclick="selectMeetingGradeGroup('中2')">中2</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="中3" onclick="selectMeetingGradeGroup('中3')">中3</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="高1" onclick="selectMeetingGradeGroup('高1')">高1</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="高2" onclick="selectMeetingGradeGroup('高2')">高2</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="高3" onclick="selectMeetingGradeGroup('高3')">高3</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="clearMeetingStudentFilters()">クリア</button>
+              </div>
+            </div>
+            <div class="fld"><label for="meetStudent">生徒名 <span id="meetStudentCount" style="color:var(--sub);font-weight:normal"></span></label>
+              <select id="meetStudent" size="5" style="width:100%;min-height:150px"><option value="">生徒を選択</option></select>
+            </div>
             <div class="fld"><label>相手</label>
               <select id="meetCounterpart" onchange="toggleMeetingOther()">
                 <option>母</option><option>父</option><option>本人</option><option>他</option>
@@ -5149,13 +5160,31 @@ function populateMeetingStudents() {
   const sel = document.getElementById('meetStudent');
   if (!sel) return;
   const prev = sel.value;
+  const query = document.getElementById('meetStudentSearch')?.value || '';
   let list = students;
+  if (query) list = list.filter(s => matchesUnifiedStudentSearch_(s, query));
   if (selectedMeetingCampus) list = list.filter(s => s.campus === selectedMeetingCampus);
-  if (selectedMeetingGradeGroup) list = list.filter(s => gradeMatchesGroup(s.grade, selectedMeetingGradeGroup));
+  if (selectedMeetingGradeGroup) list = list.filter(s => /^[小中高][1-6]$/.test(selectedMeetingGradeGroup)
+    ? normalizeGrade(s.grade) === selectedMeetingGradeGroup : gradeMatchesGroup(s.grade, selectedMeetingGradeGroup));
   sel.innerHTML = '<option value="">生徒を選択</option>' + list.map(s =>
-    `<option value="${htmlEsc(s.id)}">${htmlEsc(s.name)}（${htmlEsc(s.grade || '')} / No.${htmlEsc(s.id)}）</option>`
+    `<option value="${htmlEsc(s.id)}">${htmlEsc(s.name)}（${htmlEsc(s.campus || '')} / ${htmlEsc(s.grade || '')} / No.${htmlEsc(s.id)}）</option>`
   ).join('');
-  if (prev) sel.value = prev;
+  sel.value = list.some(s => String(s.id) === prev) ? prev : '';
+  const count = document.getElementById('meetStudentCount');
+  if (count) count.textContent = list.length ? `（候補 ${list.length}名）` : '（該当する生徒がいません）';
+  document.querySelectorAll('[data-meet-grade]').forEach(btn => {
+    const on = btn.dataset.meetGrade === selectedMeetingGradeGroup;
+    btn.classList.toggle('btn-primary', on);
+    btn.classList.toggle('btn-ghost', !on);
+    btn.setAttribute('aria-pressed', String(on));
+  });
+}
+
+function clearMeetingStudentFilters() {
+  const search = document.getElementById('meetStudentSearch');
+  if (search) search.value = '';
+  selectedMeetingGradeGroup = '';
+  selectMeetingCampus('');
 }
 
 function selectMeetingGradeGroup(group) {
@@ -5560,6 +5589,7 @@ function editMeetingMemo(id) {
   currentMeetingMemoId = m.id;
   const dateEl = document.getElementById('meetDate');
   if (dateEl) dateEl.value = formatEntryValue(m.date).replace(/\//g, '-').slice(0, 10);
+  clearMeetingStudentFilters();
   selectedMeetingGradeGroup = '';
   const gradeGroupEl = document.getElementById('meetGradeGroup');
   if (gradeGroupEl) gradeGroupEl.value = '';
@@ -5642,6 +5672,7 @@ async function openMeetingForCurrentStudent() {
   const btn = [...document.querySelectorAll('.sideItem')].find(el => el.getAttribute('onclick')?.includes("'meetings'"));
   if (btn) aNav('meetings', btn);
   await initMeetings();
+  clearMeetingStudentFilters();
   const sel = document.getElementById('meetStudent');
   if (sel) sel.value = sid;
   const content = document.getElementById('meetContent');
