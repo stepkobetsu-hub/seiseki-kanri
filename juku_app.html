@@ -267,7 +267,7 @@ tr:hover td{background:var(--primary-lt)}
       <div class="termRow">
         <select id="selYear" onchange="changeScoreSelection()"></select>
         <select id="selTerm" onchange="changeScoreSelection()"></select>
-        <button class="btn btn-outline btn-sm" onclick="loadScore()">読み込む</button>
+        <button class="btn btn-outline btn-sm" onclick="refreshStudentScores()">読み込む</button>
       </div>
     </div>
     <div class="card">
@@ -909,6 +909,7 @@ async function supabaseStudentGradeRequest(params, session) {
     // A legacy write cannot prove that Supabase was updated. Reporting it as a
     // success would let a reload restore stale data, so only reads may fall back.
     if (isWrite) return { success: false, code: 'SUPABASE_UNAVAILABLE', error: '保存先に接続できません。再試行してください。' };
+    if (params.action === 'getStudentScores') return {success:false,error:'成績の読み込みに失敗しました。再試行してください。'};
     return legacyStudentGradeRequest(params, session);
   }
   if (response.status === 401 || response.status === 403) {
@@ -916,6 +917,7 @@ async function supabaseStudentGradeRequest(params, session) {
   }
   if (response.status >= 500) {
     if (isWrite) return { success: false, code: 'SUPABASE_UNAVAILABLE', error: '保存先で一時的なエラーが発生しました。再試行してください。' };
+    if (params.action === 'getStudentScores') return {success:false,error:'成績の読み込みに失敗しました。再試行してください。'};
     return legacyStudentGradeRequest(params, session);
   }
   if (!response.ok) return { success: false, error: `保存先でエラーが発生しました (${response.status})` };
@@ -963,6 +965,7 @@ async function api(params) {
     if (SEISEKI_SUPABASE_AUTOSAVE && SEISEKI_RUNTIME_ACTIONS.has(params.action)) {
       return supabaseStudentGradeRequest(params, session);
     }
+    if (params.action === 'getStudentScores') return {success:false,error:'成績の読み込みに失敗しました。再試行してください。'};
     return legacyStudentGradeRequest(params, session);
   }
   if (!GAS) { toast('⚠️ GAS URLを入力してください'); throw new Error('No GAS URL'); }
@@ -1253,17 +1256,17 @@ async function initStudent() {
     for (let t = 1; t <= terms; t++) tsel.innerHTML += `<option value="${t}">第${t}回</option>`;
   }
 
-  // ③ 成績データ取得
-  try {
-    const sr = await api({ action: 'getStudentScores', studentId: me.id });
-    myScores = sr.scores || [];
-  } catch(e) { myScores = []; }
+  await refreshStudentScores(false);
   // 志望校サマリーを読み込む
   try {
     const wr = await api({ action: 'getWish', studentId: me.id });
     if (wr.wish) renderWishSummary(wr.wish);
   } catch(e) {}
-  // 入力先の取り違えを防ぐため、回次は毎回本人が明示的に選択する。
+  if (studentScoresLoaded && myScores.length) {
+    const latest = [...myScores].sort((a,b) => Number(b.year)-Number(a.year) || Number(b.term)-Number(a.term))[0];
+    ysel.value = String(latest.year);
+    tsel.value = String(latest.term);
+  }
   sTabs('input', 0);
   loadScore(); // 自動的に読み込む
   setupStudentAutosave();
@@ -1330,6 +1333,22 @@ function calcTotal() {
   document.getElementById('f_total9').value = all.length ? all.reduce((a,b)=>a+b,0) : '';
 }
 
+let studentScoresLoaded = false;
+let studentScoreWriteQueue = Promise.resolve();
+async function refreshStudentScores(render = true) {
+  studentScoresLoaded = false;
+  document.querySelectorAll('#sTab_input input, #sTab_input .saveRow button').forEach(el => { el.disabled = true; });
+  setSaveStatus('inputStatus', '成績を読み込み中…', 'pending');
+  try {
+    const result = await api({action:'getStudentScores',studentId:me.id});
+    if (!result.success || !Array.isArray(result.scores)) throw new Error(result.error || '成績を読み込めませんでした');
+    myScores = result.scores;
+    studentScoresLoaded = true;
+    if (render) loadScore();
+  } catch (error) {
+    setSaveStatus('inputStatus', '読み込み失敗：' + error.message, 'err');
+  }
+}
 let loadedScoreYear = '';
 let loadedScoreTerm = '';
 
@@ -1342,6 +1361,7 @@ function changeScoreSelection() {
 }
 
 function loadScore() {
+  if (!studentScoresLoaded) return;
   clearTimeout(scoreAutosaveTimer);
   scoreAutosaveTimer = null;
   const yr = document.getElementById('selYear').value;
@@ -1366,6 +1386,7 @@ async function saveScore(options = {}) {
   scoreAutosaveTimer = null;
   const yr = options.year || document.getElementById('selYear').value;
   const tm = options.term || document.getElementById('selTerm').value;
+  if (!studentScoresLoaded) { toast('成績の読み込みが完了していません'); return; }
   if (!tm) { toast('テストの回を選択してください'); return; }
   const g = id => { const el = document.getElementById(id); if(!el) return ''; const v = el.value; return v === '' ? '' : Number(v); };
 
@@ -1419,7 +1440,11 @@ async function saveScore(options = {}) {
   };
   setSaveStatus('inputStatus', '保存中…', 'pending');
   let r;
-  try { r = await api(payload); }
+  try {
+    const send = studentScoreWriteQueue.catch(() => {}).then(() => api(payload));
+    studentScoreWriteQueue = send;
+    r = await send;
+  }
   catch (error) { r = { success: false, error: '通信エラー' }; }
   if (r.success) {
     if (sequence === scoreSaveSequence) {
