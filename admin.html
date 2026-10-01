@@ -143,7 +143,15 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 #meetCampusJinryo,#meetCampusOte,#meetCampusAll,#meetGradeButtons .btn-sm{
   padding:4px 9.6px;font-size:.608rem;border-radius:6px;
 }
-#meetGradeButtons{gap:4.8px!important}
+#meetGradeButtons{gap:4px!important}
+#meetStudentPanel .fld{gap:3px;margin-bottom:8px}
+#meetStudentPanel .fld input{padding:6px 10px}
+#meetStudentPanel .fld:has(#meetDate){display:flex;flex-direction:row;align-items:center;flex-wrap:wrap;gap:4px 8px}
+#meetStudentPanel .fld:has(#meetDate)>label{flex-basis:100%}
+#meetStudentPanel #meetDate{width:165px;max-width:100%}
+#meetStudentPanel #meetDateDisplay{margin-top:0!important;font-size:.9rem!important}
+#meetStudentPanel #meetGradeButtons .btn-sm{padding:3px 8px}
+#meetStudentPanel .fld:last-child{margin-bottom:0}
 .btn-full{width:100%;justify-content:center}
 
 /* FILTER ROW */
@@ -699,7 +707,7 @@ tr:hover td{background:#f8fafc}
       <div class="card">
         <div class="cardHead">🗒️ 面談・メモ 登録</div>
         <div style="display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:18px;align-items:start">
-          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+          <div id="meetStudentPanel" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px">
             <div class="fld"><label for="meetDate">日付</label><input id="meetDate" type="date" onchange="updateMeetingDateDisplay()" oninput="updateMeetingDateDisplay()"><div id="meetDateDisplay" aria-live="polite" style="margin-top:6px;font-size:1rem;font-weight:700;color:var(--primary)"></div></div>
             <div class="fld">
               <label>校舎</label>
