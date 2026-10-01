@@ -76,13 +76,7 @@
             android:text="保存した学校一覧を表示します。"
             android:textSize="13sp"
             android:textColor="#475569" />
-        <Button
-            android:id="@+id/retrySchools"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="48dp"
-            android:text="学校一覧を更新"
-            android:visibility="gone" />
+
 
         <TextView style="@style/FieldLabel" android:text="学年" />
         <Spinner android:id="@+id/grade" style="@style/FieldSpinner" />
@@ -160,21 +154,48 @@
             android:textSize="14sp"
             android:textStyle="bold"
             android:textColor="#334155" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:orientation="horizontal">
         <com.google.android.material.button.MaterialButton
             android:id="@+id/openPastExamDb"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="18dp"
-            android:minHeight="48dp"
             android:text="過去問DBへ"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:maxLines="1"
             android:textAllCaps="false"
-            android:textSize="14sp"
+            android:textSize="13sp"
             android:textColor="#475569"
+            android:paddingLeft="4dp"
+            android:paddingRight="4dp"
             app:backgroundTint="#FFFFFF"
             app:strokeColor="#94A3B8"
             app:strokeWidth="1dp"
             app:cornerRadius="8dp" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/retrySchools"
+            android:layout_marginStart="8dp"
+            android:text="学校一覧更新"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:maxLines="1"
+            android:textAllCaps="false"
+            android:textSize="13sp"
+            android:textColor="#475569"
+            android:paddingLeft="4dp"
+            android:paddingRight="4dp"
+            app:backgroundTint="#FFFFFF"
+            app:strokeColor="#94A3B8"
+            app:strokeWidth="1dp"
+            app:cornerRadius="8dp" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>
