@@ -271,7 +271,8 @@ tr:hover td{background:var(--primary-lt)}
       </div>
     </div>
     <div class="card">
-      <div class="cardHead">📝 得点入力 <strong id="scoreTarget" style="color:#b45309"></strong> <span id="inputStatus" class="saveMsg pending"></span></div>
+      <div class="cardHead">📝 得点入力 <strong id="scoreTarget" style="color:#b45309;font-size:1.1rem"></strong> <span id="inputStatus" class="saveMsg pending"></span></div>
+      <div style="margin:12px 0;padding:12px;background:#fff7ed;border:2px solid #f59e0b;border-radius:8px"><div id="scoreConfirmNote">年度とテストの回を確認してから入力してください。</div><button id="scoreConfirmButton" class="btn btn-primary" style="margin-top:8px" onclick="confirmScoreTarget()">この年度・回に入力する</button></div>
       <div style="background:#fff8e1;border-left:4px solid #f59e0b;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:.78rem;color:#92400e">
         ⚠️ 50点満点のテストは100点満点に換算（得点を2倍）して入力してください。
       </div>
@@ -1266,11 +1267,9 @@ async function initStudent() {
     const wr = await api({ action: 'getWish', studentId: me.id });
     if (wr.wish) renderWishSummary(wr.wish);
   } catch(e) {}
-  if (studentScoresLoaded && myScores.length) {
-    const latest = [...myScores].sort((a,b) => Number(b.year)-Number(a.year) || Number(b.term)-Number(a.term))[0];
-    ysel.value = String(latest.year);
-    tsel.value = String(latest.term);
-  }
+  const suggested = latestCompletedTest(sc, me?.grade);
+  ysel.value = String(suggested?.year || NOW_YEAR);
+  tsel.value = suggested ? String(suggested.term) : '';
   sTabs('input', 0);
   loadScore(); // 自動的に読み込む
   setupStudentAutosave();
@@ -1295,6 +1294,7 @@ function setSaveStatus(id, text, kind) {
 }
 
 function scheduleAutosave(type) {
+  if (type === 'score' && (!studentScoresLoaded || confirmedScoreTarget !== scoreTargetKey(loadedScoreYear, loadedScoreTerm))) return;
   if (!SEISEKI_SUPABASE_AUTOSAVE || !studentCommonMode || !studentAutosaveReady) return;
   const config = {
     score: { delay: 500, status: 'inputStatus', timer: 'scoreAutosaveTimer', sequence: 'scoreSaveSequence', save: saveScore },
@@ -1353,12 +1353,50 @@ async function refreshStudentScores(render = true) {
     setSaveStatus('inputStatus', '読み込み失敗：' + error.message, 'err');
   }
 }
+
+// 日程の各要素が第1回、第2回…に対応。複数日のテストは最終日を使用。
+function latestCompletedTest(school, grade, now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now);
+  const get = type => Number(parts.find(p=>p.type===type).value);
+  const year = get('year'), month = get('month'), day = get('day');
+  const nendo = month >= 4 ? year : year - 1;
+  const gradeNumber = String(grade || '').normalize('NFKC').match(/中\s*([123])/)?.[1];
+  const schedule = (school?.testSchedule || school?.schedule)?.['g' + gradeNumber];
+  if (!gradeNumber || !Array.isArray(schedule)) return null;
+  const today = Date.UTC(year, month - 1, day);
+  let latest = null;
+  schedule.forEach((value, index) => {
+    const dates = [...String(value || '').normalize('NFKC').matchAll(/(\d{1,2})\s*\/\s*(\d{1,2})/g)];
+    if (!dates.length) return;
+    const last = dates[dates.length - 1], m = Number(last[1]), d = Number(last[2]);
+    if (m < 1 || m > 12 || d < 1 || d > 31) return;
+    const y = m >= 4 ? nendo : nendo + 1;
+    const date = Date.UTC(y, m - 1, d);
+    if (new Date(date).getUTCMonth() !== m - 1 || new Date(date).getUTCDate() !== d) return;
+    if (date <= today && (!latest || date > latest.date)) latest = {year:nendo,term:index+1,date};
+  });
+  return latest;
+}
+let confirmedScoreTarget = '';
+function scoreTargetKey(year, term) { return String(year) + ':' + String(term); }
+function confirmScoreTarget() {
+  if (!studentScoresLoaded || !loadedScoreTerm) return;
+  const school = schools.find(s=>s.name === me?.school);
+  const latest = latestCompletedTest(school, me?.grade);
+  const past = latest && (Number(loadedScoreYear) < latest.year || (Number(loadedScoreYear) === latest.year && Number(loadedScoreTerm) < latest.term));
+  if (past && !confirm(loadedScoreYear + '年度・第' + loadedScoreTerm + '回の過去の結果を変更します。よろしいですか？')) return;
+  confirmedScoreTarget = scoreTargetKey(loadedScoreYear, loadedScoreTerm);
+  document.querySelectorAll('#sTab_input input, #sTab_input .saveRow button').forEach(el=>{el.disabled=false;});
+  document.getElementById('scoreConfirmNote').textContent = loadedScoreYear + '年度・第' + loadedScoreTerm + '回への入力を確認済みです。';
+  document.getElementById('scoreConfirmButton').disabled = true;
+}
+
 let loadedScoreYear = '';
 let loadedScoreTerm = '';
 
 function changeScoreSelection() {
   // 選択変更前の未送信入力は、表示していた回へ保存する。
-  if (scoreAutosaveTimer && loadedScoreTerm) {
+  if (scoreAutosaveTimer && loadedScoreTerm && confirmedScoreTarget === scoreTargetKey(loadedScoreYear, loadedScoreTerm)) {
     saveScore({ year: loadedScoreYear, term: loadedScoreTerm, automatic: true });
   }
   loadScore();
@@ -1372,9 +1410,14 @@ function loadScore() {
   const tm = document.getElementById('selTerm').value;
   loadedScoreYear = yr;
   loadedScoreTerm = tm;
+  confirmedScoreTarget = '';
   const target = tm ? yr + '年度・第' + tm + '回' : 'テストの回を選択してください';
   document.getElementById('scoreTarget').textContent = target;
-  document.querySelectorAll('#sTab_input input, #sTab_input .saveRow button').forEach(el => { el.disabled = !tm; });
+  document.querySelectorAll('#sTab_input input, #sTab_input .saveRow button').forEach(el => { el.disabled = true; });
+  const confirmButton = document.getElementById('scoreConfirmButton');
+  confirmButton.disabled = !tm;
+  confirmButton.textContent = tm ? target + ' に入力する' : 'テストの回を選択してください';
+  document.getElementById('scoreConfirmNote').textContent = tm ? target + 'で間違いないか確認してください。保存済みの点数は下に表示しています。' : '年度とテストの回を選択してください。';
   const sc = myScores.find(s => String(s.year) === yr && String(s.term) === tm);
   const flds = ['jpn','soc','math','sci','eng','total5','rank5','mus','art','pe','tech','total9','rank9',
                 'avg_jpn','avg_soc','avg_math','avg_sci','avg_eng','avg_total5'];
@@ -1392,6 +1435,7 @@ async function saveScore(options = {}) {
   const tm = options.term || document.getElementById('selTerm').value;
   if (!studentScoresLoaded) { toast('成績の読み込みが完了していません'); return; }
   if (!tm) { toast('テストの回を選択してください'); return; }
+  if (confirmedScoreTarget !== scoreTargetKey(yr, tm)) { toast('年度とテストの回を確認してから入力してください'); return; }
   const g = id => { const el = document.getElementById(id); if(!el) return ''; const v = el.value; return v === '' ? '' : Number(v); };
 
   // 全フィールドのエラー表示をリセット
