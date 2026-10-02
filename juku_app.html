@@ -625,7 +625,7 @@ tr:hover td{background:var(--primary-lt)}
     </div>
     <div class="card">
       <p id="reportConfirmNote">年度と学期を確認してください。</p><button id="reportConfirmButton" class="btn btn-primary" disabled onclick="confirmReportTarget()">読み込み中…</button>
-      <div class="cardHead">📒 評定入力 <span id="rpStatus" class="saveMsg pending"></span></div>
+      <div class="cardHead">📒 通知表入力 <span id="reportConfirmedLabel" style="color:#a34b0c;font-weight:800"></span> <span id="rpStatus" class="saveMsg pending"></span></div>
       <div class="subGrp">
         <div class="subGrpHead">5教科（1〜5）</div>
         <div class="subRow">
@@ -2280,6 +2280,7 @@ function changeReportSelection() { flushReportAutosave(); loadReport(); }
 function confirmReportTarget() {
   if (!reportLoaded) return;
   confirmedReportTarget=reportTargetKey(loadedReportYear,loadedReportSemester);
+  document.getElementById('reportConfirmedLabel').textContent=loadedReportYear+'年度・'+document.getElementById('rpSemester').selectedOptions[0].textContent;
   document.querySelectorAll('#sTab_report input, #sTab_report .saveRow button').forEach(el=>el.disabled=false);
   document.getElementById('reportConfirmButton').disabled=true;
   document.getElementById('reportConfirmNote').textContent='確認済み。下の評定欄に入力してください。';
@@ -2305,6 +2306,7 @@ async function loadReport() {
   clearTimeout(reportAutosaveTimer); reportAutosaveTimer=null;
   const request=++reportLoadSequence;
   reportLoaded=false; confirmedReportTarget='';
+  document.getElementById('reportConfirmedLabel').textContent='';
   document.querySelectorAll('#sTab_report input, #sTab_report .saveRow button').forEach(el=>el.disabled=true);
   document.querySelectorAll('#sTab_report input').forEach(el=>el.value='');
   const button=document.getElementById('reportConfirmButton');
