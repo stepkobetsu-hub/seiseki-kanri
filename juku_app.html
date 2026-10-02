@@ -607,12 +607,13 @@ tr:hover td{background:var(--primary-lt)}
     <div class="card">
       <div class="cardHead">🗓️ 通知表・学期選択</div>
       <div class="termRow">
-        <select id="rpYear"></select>
-        <select id="rpSemester"></select>
-        <button class="btn btn-outline btn-sm" onclick="loadReport()">読み込む</button>
+        <select id="rpYear" onchange="changeReportSelection()"></select>
+        <select id="rpSemester" onchange="changeReportSelection()"></select>
+        <button class="btn btn-outline btn-sm" onclick="changeReportSelection()">再読み込み</button>
       </div>
     </div>
     <div class="card">
+      <p id="reportConfirmNote">年度と学期を確認してください。</p><button id="reportConfirmButton" class="btn btn-primary" disabled onclick="confirmReportTarget()">読み込み中…</button>
       <div class="cardHead">📒 評定入力 <span id="rpStatus" class="saveMsg pending"></span></div>
       <div class="subGrp">
         <div class="subGrpHead">5教科（1〜5）</div>
@@ -1342,6 +1343,7 @@ function setSaveStatus(id, text, kind) {
 }
 
 function scheduleAutosave(type) {
+  if(type==='report' && (!reportLoaded || confirmedReportTarget!==reportTargetKey(loadedReportYear,loadedReportSemester))) return;
   if (type === 'score' && (!studentScoresLoaded || confirmedScoreTarget !== scoreTargetKey(loadedScoreYear, loadedScoreTerm))) return;
   if (!SEISEKI_SUPABASE_AUTOSAVE || !studentCommonMode || !studentAutosaveReady) return;
   const config = {
@@ -2256,7 +2258,24 @@ async function saveWish(options = {}) {
   }
 }
 
+let loadedReportYear = '', loadedReportSemester = '', confirmedReportTarget = '';
+let reportLoaded = false, reportLoadSequence = 0;
+const reportTargetKey = (y,s) => String(y)+':'+s;
+function flushReportAutosave() {
+  if (reportAutosaveTimer && reportLoaded && confirmedReportTarget === reportTargetKey(loadedReportYear,loadedReportSemester)) saveReport({year:loadedReportYear,semester:loadedReportSemester,automatic:true});
+  clearTimeout(reportAutosaveTimer); reportAutosaveTimer=null;
+}
+function changeReportSelection() { flushReportAutosave(); loadReport(); }
+function confirmReportTarget() {
+  if (!reportLoaded) return;
+  confirmedReportTarget=reportTargetKey(loadedReportYear,loadedReportSemester);
+  document.querySelectorAll('#sTab_report input, #sTab_report .saveRow button').forEach(el=>el.disabled=false);
+  document.getElementById('reportConfirmButton').disabled=true;
+  document.getElementById('reportConfirmNote').textContent='確認済み。下の評定欄に入力してください。';
+  document.getElementById('rp_jpn').focus();
+}
 function initReportTab() {
+  flushReportAutosave();
   // 年度セレクト
   const yrSel = document.getElementById('rpYear');
   yrSel.innerHTML = '';
@@ -2272,10 +2291,29 @@ function initReportTab() {
 }
 
 async function loadReport() {
+  clearTimeout(reportAutosaveTimer); reportAutosaveTimer=null;
+  const request=++reportLoadSequence;
+  reportLoaded=false; confirmedReportTarget='';
+  document.querySelectorAll('#sTab_report input, #sTab_report .saveRow button').forEach(el=>el.disabled=true);
+  document.querySelectorAll('#sTab_report input').forEach(el=>el.value='');
+  const button=document.getElementById('reportConfirmButton');
+  button.disabled=true; button.textContent='通知表を読み込み中…';
   const year = document.getElementById('rpYear').value;
   const semester = document.getElementById('rpSemester').value;
   if (!year || !semester) return;
-  const r = await api({ action: 'getReport', studentId: me.id, year, semester });
+  loadedReportYear=year; loadedReportSemester=semester;
+  let r;
+  try { r=await api({action:'getReport',studentId:me.id,year,semester}); } catch(error) {r={success:false};}
+  if(request!==reportLoadSequence) return;
+  if(!r.success) {
+    button.textContent='読み込み失敗';
+    document.getElementById('reportConfirmNote').textContent='再読み込みしてください。';
+    return;
+  }
+  reportLoaded=true;
+  button.textContent=year+'年度・'+document.getElementById('rpSemester').selectedOptions[0].textContent+' の通知表を入力・修正する';
+  button.disabled=false;
+  document.getElementById('reportConfirmNote').textContent='年度と学期が合っていたら、青いボタンを押してください。';
   const d = r.data || {};
   ['jpn','soc','math','sci','eng','mus','art','pe','tech'].forEach(k => {
     const el = document.getElementById('rp_' + k);
@@ -2288,8 +2326,10 @@ async function loadReport() {
 async function saveReport(options = {}) {
   const sequence = options.sequence || ++reportSaveSequence;
   clearTimeout(reportAutosaveTimer);
-  const year = document.getElementById('rpYear').value;
-  const semester = document.getElementById('rpSemester').value;
+  reportAutosaveTimer=null;
+  const year=options.year || loadedReportYear;
+  const semester=options.semester || loadedReportSemester;
+  if(!reportLoaded || confirmedReportTarget!==reportTargetKey(year,semester)) {toast('年度と学期を確認してから入力してください');return;}
   document.querySelectorAll('.inputError').forEach(el => el.classList.remove('inputError'));
   const reportFields = [
     { key:'jpn', label:'国語' },
@@ -2327,7 +2367,7 @@ async function saveReport(options = {}) {
   try { r = await api(payload); }
   catch (error) { r = { success: false, error: '通信エラー' }; }
   if (r.success) {
-    if (sequence === reportSaveSequence) {
+    if (sequence === reportSaveSequence && reportTargetKey(year,semester)===reportTargetKey(loadedReportYear,loadedReportSemester)) {
       setSaveStatus('rpStatus', options.automatic ? '自動保存済み' : '保存しました', 'ok');
       const exists = myReports.findIndex(x => x.year == year && x.semester === semester);
       if (exists >= 0) myReports[exists] = { ...myReports[exists], ...payload };
