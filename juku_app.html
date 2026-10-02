@@ -217,6 +217,14 @@ tr:hover td{background:var(--primary-lt)}
 #reportConfirmButton{display:grid;grid-template-columns:max-content minmax(0,1fr);align-items:center;gap:12px;min-height:76px;padding:22px 18px;width:100%;line-height:1.5;white-space:normal;margin-bottom:16px;max-width:100%}
 #reportConfirmButton .reportConfirmTarget{font-size:1.55rem;font-weight:900;line-height:1.3;white-space:pre}
 #reportConfirmButton .reportConfirmAction{font-size:.85rem;font-weight:400;white-space:pre-line;text-align:left}
+
+#studentPage>.tabBar{gap:8px;padding:8px}
+#studentPage>.tabBar>.tabBtn{color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.3);font-size:.9rem;font-weight:700;padding:12px 6px}
+#studentPage>.tabBar>.tabBtn:nth-child(-n+2){font-size:1.05rem;font-weight:800;min-width:110px}
+#studentPage>.tabBar>.tabBtn.on{background:#fff;color:var(--primary-dk);border-color:#fff;box-shadow:0 3px 10px rgba(0,0,0,.25)}
+#reportConfirmButton:not(:disabled){animation:scoreConfirmPulse 1.8s ease-in-out infinite}
+#reportConfirmButton:disabled{animation:none;opacity:.65;cursor:default}
+@media(prefers-reduced-motion:reduce){#reportConfirmButton:not(:disabled){animation:none;box-shadow:0 0 0 4px rgba(26,86,160,.22)}}
 </style>
 </head>
 <body>
