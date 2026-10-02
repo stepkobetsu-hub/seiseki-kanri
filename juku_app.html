@@ -214,7 +214,9 @@ tr:hover td{background:var(--primary-lt)}
 #scoreConfirmButton:disabled{animation:none;opacity:.65;cursor:default}
 @keyframes scoreConfirmPulse{0%,100%{background:#1a56a0;box-shadow:0 0 0 0 rgba(26,86,160,.15)}50%{background:#3684d8;box-shadow:0 0 0 6px rgba(26,86,160,.22)}}
 @media(prefers-reduced-motion:reduce){#scoreConfirmButton:not(:disabled){animation:none;box-shadow:0 0 0 4px rgba(26,86,160,.22)}}
-#reportConfirmButton{min-height:76px;padding:22px 24px;font-size:1.1rem;line-height:1.5;white-space:normal;margin-bottom:16px;max-width:100%}
+#reportConfirmButton{display:grid;grid-template-columns:max-content minmax(0,1fr);align-items:center;gap:12px;min-height:76px;padding:22px 18px;width:100%;line-height:1.5;white-space:normal;margin-bottom:16px;max-width:100%}
+#reportConfirmButton .reportConfirmTarget{font-size:1.55rem;font-weight:900;line-height:1.3;white-space:pre}
+#reportConfirmButton .reportConfirmAction{font-size:.85rem;font-weight:400;white-space:pre-line;text-align:left}
 </style>
 </head>
 <body>
@@ -2312,7 +2314,13 @@ async function loadReport() {
     return;
   }
   reportLoaded=true;
-  button.textContent=year+'年度・'+document.getElementById('rpSemester').selectedOptions[0].textContent+' の通知表を入力・修正する';
+  const title=document.createElement('span');
+  title.className='reportConfirmTarget';
+  title.textContent=year+'年度\n'+document.getElementById('rpSemester').selectedOptions[0].textContent;
+  const detail=document.createElement('span');
+  detail.className='reportConfirmAction';
+  detail.textContent='この学期の\n通知表を入力・\n修正する';
+  button.replaceChildren(title,detail);
   button.disabled=false;
   document.getElementById('reportConfirmNote').textContent='年度と学期が合っていたら、青いボタンを押してください。';
   const d = r.data || {};
