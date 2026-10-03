@@ -530,6 +530,7 @@ body.auth-locked > #toast{display:none!important}
 
 <div id="toast" class="toast"></div>
 
+<script src="assets/js/staff-auth.js?v=20261004"></script>
 <script>
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 const STUDENT_SEARCH_GAS = 'https://script.google.com/macros/s/AKfycbxIH2VtgwRi50xduXgrkYrjD0yrzNfQ5vCWt1XgOzil6LZSgXNj6MJo9jPYvOkjNHdu/exec';
@@ -747,7 +748,7 @@ function scheduleMeetingIdle_(){
 }
 function storeMeetingSession_(staff, fallbackCode){
   clearMeetingIdle_();
-  const token = String(staff.systemPortalSessionToken || '').trim();
+  const token = String(staff.gradeSessionToken || staff.systemPortalSessionToken || '').trim();
   const code = String(staff.code || fallbackCode || '');
   const name = String(staff.name || '');
   if (meetingDeviceMode_ === 'shared') {
@@ -757,7 +758,7 @@ function storeMeetingSession_(staff, fallbackCode){
     ].forEach(key => localStorage.removeItem(key));
     sessionStorage.setItem('meetingDeviceMode', 'shared');
     sessionStorage.setItem('adminSystemPortalSessionToken', token);
-    sessionStorage.setItem('adminSystemPortalExpiresAt', String(staff.systemPortalExpiresAt || ''));
+    sessionStorage.setItem('adminSystemPortalExpiresAt', String(staff.gradeExpiresAt || staff.systemPortalExpiresAt || ''));
     sessionStorage.setItem('adminLoggedIn', '1');
     sessionStorage.setItem('adminDeviceMode', 'school');
     sessionStorage.setItem('adminStaffCode', code);
@@ -835,10 +836,10 @@ async function meetingLogin(event){
   button.textContent = 'ログイン中...';
   error.textContent = '';
   try {
-    const staff = await meetingLegacyApi_({ action:'staffLogin', code, password });
+    const staff = await StepStaffAuth.login(code, password);
     if (!staff.success) throw new Error(staff.error || 'ログインできませんでした。');
-    if (!staff.systemPortalSessionToken) {
-      throw new Error('面談メモを利用できる管理権限がありません。');
+    if (!(staff.gradeSessionToken || staff.systemPortalSessionToken) || !['1','2','3','4'].includes(String(staff.permissionLevel))) {
+      throw new Error('面談メモにはスタッフ権限（権限1〜4）が必要です。');
     }
     storeMeetingSession_(staff, code);
     if (meetingDeviceMode_ === 'personal') {

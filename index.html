@@ -379,7 +379,7 @@ textarea{
         <div class="go">開く</div>
       </a>
 
-      <a class="app primary" href="https://stepkobetsu-hub.github.io/student-QR/points_manager.html">
+      <a class="app primary" data-required-permission="2" href="https://stepkobetsu-hub.github.io/student-QR/points_manager.html">
         <div>
           <div class="appTitle"><span class="ico">🪙</span><span>ポイント設定</span></div>
           <p class="desc">生徒のポイント確認・付与・使用・履歴管理</p>
@@ -387,7 +387,7 @@ textarea{
         <div class="go">開く</div>
       </a>
 
-      <a class="app" href="https://stepkobetsu-hub.github.io/student-QR/student_qr_register.html" target="_blank" rel="noopener noreferrer">
+      <a class="app" data-required-permission="2" href="https://stepkobetsu-hub.github.io/student-QR/student_qr_register.html" target="_blank" rel="noopener noreferrer">
         <div>
           <div class="appTitle"><span class="ico"><img src="icons/admin-qr-icon.png" alt=""></span><span>管理者QR登録</span></div>
           <p class="desc">入退くんQRデータを登録</p>
@@ -406,7 +406,7 @@ textarea{
       <a class="app" href="admin.html">
         <div>
           <div class="appTitle"><span class="ico">📊</span><span>成績管理システム</span></div>
-          <p class="desc">成績、通知表、志望校、生徒情報を確認・管理します。</p>
+          <p class="desc">権限1以上で、成績、通知表、志望校、生徒情報を確認・管理します。</p>
         </div>
         <div class="go">開く</div>
       </a>
@@ -475,7 +475,7 @@ textarea{
         <div class="go">開く</div>
       </a>
 
-      <a class="app primary" href="https://script.google.com/macros/s/AKfycbwYzQ1tM1mWRLG6jOxBirAuSUCMb41bkDsn5vviGUjDPmFKjJNCl5jdz7NFa4L45J8yvQ/exec" target="_blank" rel="noopener noreferrer">
+      <a class="app primary" data-required-permission="2" href="https://script.google.com/macros/s/AKfycbwYzQ1tM1mWRLG6jOxBirAuSUCMb41bkDsn5vviGUjDPmFKjJNCl5jdz7NFa4L45J8yvQ/exec" target="_blank" rel="noopener noreferrer">
         <div>
           <div class="appTitle"><span class="ico">🏦</span><span>ゆうちょBIZ従業員マスタ</span></div>
           <p class="desc">講師マスターから、ゆうちょBIZ新規登録用CSVを作成します。AK=2・3・4のスタッフ用です。</p>
@@ -521,6 +521,7 @@ textarea{
     </div>
   </div>
 </section>
+<script src="assets/js/staff-auth.js?v=20261004"></script>
 <script>
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 const STAFF_AUTH_KEY = 'stepStaffAppAuth';
@@ -534,7 +535,7 @@ let autoLoginAttemptedSignature = '';
 
 document.addEventListener('DOMContentLoaded', initStaffAppLogin);
 
-function initStaffAppLogin(){
+async function initStaffAppLogin(){
   const form = document.getElementById('staffLoginForm');
   const codeEl = document.getElementById('staffCode');
   const passwordEl = document.getElementById('staffPassword');
@@ -553,9 +554,15 @@ function initStaffAppLogin(){
   if (savedCode) codeEl.value = savedCode;
   if (savedPassword) passwordEl.value = savedPassword;
   document.getElementById('rememberLogin').checked = true;
-  if (saved?.systemPortalSessionToken && ['2','3','4'].includes(String(saved.permissionLevel || ''))) {
-    showStaffHome(saved.name || '', saved.permissionLevel || '');
-    return;
+  const savedToken = saved?.gradeSessionToken || saved?.systemPortalSessionToken;
+  if (savedToken && ['1','2','3','4'].includes(String(saved.permissionLevel || '').trim())) {
+    try {
+      const verified = await StepStaffAuth.verify(savedToken);
+      showStaffHome(saved.name || '', verified.permissionLevel);
+      return;
+    } catch (error) {
+      localStorage.removeItem(STAFF_AUTH_KEY);
+    }
   }
 
   // Password managers may fill fields without firing input/change events.
@@ -605,8 +612,9 @@ async function staffLogin(isAuto){
   loginInProgress = true;
   try{
     setLoginMsg('確認しています...');
-    const result = await postGas({ action:'staffLogin', code, password });
+    const result = await StepStaffAuth.login(code, password);
     if (!result.success) throw new Error(result.error || 'ログインできませんでした');
+    if (result.gradeSessionToken) await StepStaffAuth.persist(result.gradeSessionToken);
     if (document.getElementById('rememberLogin').checked) {
       localStorage.setItem(STAFF_CODE_KEY, code);
       localStorage.setItem(STAFF_PASSWORD_KEY, password);
@@ -618,13 +626,16 @@ async function staffLogin(isAuto){
       code,
       name: result.name || '',
       permissionLevel: result.permissionLevel || '',
+      gradeSessionToken: result.gradeSessionToken || '',
       systemPortalSessionToken: result.systemPortalSessionToken || '',
       systemPortalExpiresAt: result.systemPortalExpiresAt || '',
       savedAt: new Date().toISOString()
     }));
     showStaffHome(result.name || '', result.permissionLevel || '');
     if (new URLSearchParams(location.search).get('next') === 'points') {
-      location.replace('https://stepkobetsu-hub.github.io/student-QR/points_manager.html');
+      if (['2','3','4'].includes(String(result.permissionLevel))) {
+        location.replace('https://stepkobetsu-hub.github.io/student-QR/points_manager.html');
+      }
       return;
     }
   }catch(err){
@@ -640,6 +651,9 @@ function showStaffHome(name, permissionLevel){
   document.getElementById('homePage').classList.remove('hidden');
   const label = document.getElementById('staffNameLabel');
   label.textContent = name ? name + 'さん / ' : '';
+  document.querySelectorAll('[data-required-permission="2"]').forEach(card => {
+    card.classList.toggle('hidden', !['2','3','4'].includes(String(permissionLevel || '').trim()));
+  });
   const studentQrCard = document.getElementById('studentQrAppCard');
   if (studentQrCard) {
     studentQrCard.classList.toggle('hidden', String(permissionLevel || '').trim() === '1');
@@ -664,9 +678,10 @@ function showStaffHome(name, permissionLevel){
 
 async function staffLogout(){
   const saved = getSavedStaffAuth();
-  if (saved?.systemPortalSessionToken) {
+  const token = saved?.gradeSessionToken || saved?.systemPortalSessionToken;
+  if (token) {
     try {
-      await postGas({ action:'logoutSystemPortal', systemPortalSessionToken:saved.systemPortalSessionToken });
+      await StepStaffAuth.logout(token);
     } catch (e) {
       console.warn('共通セッションの失効通知に失敗しました', e);
     }
@@ -797,4 +812,3 @@ async function saveAdminQrData(){
 </script>
 </body>
 </html>
-

@@ -1146,6 +1146,7 @@ tr:hover td{background:#f8fafc}
 <div id="toast"></div>
 
 <script src="assets/js/supabase-config.js"></script>
+<script src="assets/js/staff-auth.js?v=20261004"></script>
 <script>
 if (location.hash === '#directory') location.replace('student_directory.html');
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
@@ -2008,23 +2009,40 @@ async function doAdminLogin() {
     return;
   }
   adminLoginInProgress = true;
-  const staff = await legacyApi({ action: 'staffLogin', code, password: pw });
+  let staff;
+  try {
+    staff = await StepStaffAuth.login(code, pw);
+  } catch (error) {
+    errEl.textContent = error.message || 'ログインできませんでした';
+    adminLoginInProgress = false;
+    return;
+  }
   if (!staff.success) {
     errEl.textContent = staff.error || 'ログインできませんでした';
     adminLoginInProgress = false;
     return;
   }
-  if (!staff.systemPortalSessionToken) {
-    errEl.textContent = 'この管理画面には管理権限（権限2〜4）が必要です。';
+  const gradeToken = staff.gradeSessionToken || staff.systemPortalSessionToken;
+  if (!gradeToken || !['1','2','3','4'].includes(String(staff.permissionLevel))) {
+    errEl.textContent = '成績管理にはスタッフ権限（権限1〜4）が必要です。';
     adminLoginInProgress = false;
     return;
   }
   setAdminState('adminLoggedIn', '1');
   setAdminState('adminStaffCode', staff.code || code);
   setAdminState('adminStaffName', staff.name || '');
-  setAdminState(ADMIN_SESSION_TOKEN_KEY, staff.systemPortalSessionToken);
-  setAdminState(ADMIN_SESSION_EXPIRES_KEY, staff.systemPortalExpiresAt || '');
+  setAdminState(ADMIN_SESSION_TOKEN_KEY, gradeToken);
+  setAdminState(ADMIN_SESSION_EXPIRES_KEY, staff.gradeExpiresAt || staff.systemPortalExpiresAt || '');
   if (adminDeviceMode === 'personal') {
+    try {
+      await StepStaffAuth.persist(gradeToken);
+      setAdminState(ADMIN_SESSION_EXPIRES_KEY, '2100-01-01T00:00:00.000Z');
+    } catch (error) {
+      await logout();
+      errEl.textContent = error.message;
+      adminLoginInProgress = false;
+      return;
+    }
     rememberAdminLogin(code, pw, '');
   } else {
     sessionStorage.setItem(ADMIN_IDLE_AT_KEY, String(Date.now()));
@@ -2164,11 +2182,15 @@ async function logout(options = {}) {
       document.getElementById('loginErr').textContent = 'Supabase移行後の初回のみ、もう一度ログインしてください。';
       return;
     }
+    try { await StepStaffAuth.verify(getAdminSessionToken()); }
+    catch (error) { await logout(); document.getElementById('loginErr').textContent = error.message; return; }
     showMain();
     return;
   }
   if (adminDeviceMode === 'personal' && localStorage.getItem('adminLoggedIn') === '1') {
     if (hasValidAdminSessionToken()) {
+      try { await StepStaffAuth.verify(getAdminSessionToken()); }
+      catch (error) { await logout(); document.getElementById('loginErr').textContent = error.message; return; }
       localStorage.removeItem('adminPwInput');
       showMain();
       return;
