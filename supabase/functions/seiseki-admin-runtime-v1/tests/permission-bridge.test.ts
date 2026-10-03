@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';import {checkPermissionBridge,permissionTarget} from '../permission-bridge.ts';
+const config=[{enabled:true,site_origin:'https://step-permissions.mintcocoajasmine.chatgpt.site',site_service_token:'test',bridge_key:'test'}];const read=async()=>config;let allowed=true,calls=0,last:any;const old=globalThis.fetch;
+globalThis.fetch=async(_url:any,init:any)=>{calls++;last=JSON.parse(init.body);return Response.json({allowed,level:2,scope:'all'});};
+const session={staff_code:'99999999',permission_level:'2'};
+assert.equal((await checkPermissionBridge(session,{action:'saveScore'},read))?.allowed,true);allowed=false;assert.equal((await checkPermissionBridge(session,{action:'saveScore'},read))?.allowed,false);assert.equal(calls,2);assert.equal(last.appId,'public-12');assert.equal(last.action,'write');
+assert.deepEqual(permissionTarget('deleteMeetingMemo','public-12'),{appId:'public-13',mode:'delete'});assert.deepEqual(permissionTarget('getStudentDirectoryDetail','public-12'),{appId:'student-directory',mode:'view'});assert.deepEqual(permissionTarget('getStudents','student-directory'),{appId:'student-directory',mode:'view'});assert.equal(permissionTarget('reconcileLegacy','student-directory').mode,'settings');
+assert.equal(await checkPermissionBridge(session,{action:'logoutAdmin'},read),null);
+globalThis.fetch=async()=>Response.json({allowed:true,level:2,scope:'神領'});assert.equal((await checkPermissionBridge(session,{action:'saveMeetingMemo'},read,['大手町']))?.allowed,false);assert.equal((await checkPermissionBridge(session,{action:'saveMeetingMemo'},read,['神領','大手町']))?.allowed,false);assert.equal((await checkPermissionBridge(session,{action:'addStaffMember'},read))?.allowed,false);
+globalThis.fetch=async()=>{throw new Error('offline');};await assert.rejects(()=>checkPermissionBridge(session,{action:'saveScore'},read));
+globalThis.fetch=old;console.log('12 bridge checks passed; changed rules checked on every operation');

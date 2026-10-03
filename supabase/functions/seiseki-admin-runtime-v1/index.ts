@@ -1,4 +1,5 @@
 import { CORS_HEADERS, preflightResponse } from './storage.ts';
+import {checkPermissionBridge} from './permission-bridge.ts';
 
 type JsonObject = Record<string, unknown>;
 
@@ -248,7 +249,7 @@ async function getStudents(payload: JsonObject): Promise<JsonObject> {
     select: 'student_code,name,name_kana,campus,grade,school_name,active,enrollment_status,source_updated_at,updated_at',
     order: 'active.desc,campus.asc,grade.asc,student_code.asc', limit, offset,
   };
-  if (payload.campus) params.campus = `eq.${payload.campus}`;
+  if (payload.campus) params.campus = String(payload.campus)==='大手町'||String(payload.campus)==='大手'?'in.(大手,大手町)':`eq.${payload.campus}`;
   if (Array.isArray(payload.grades) && payload.grades.length) params.grade = `in.(${payload.grades.map(String).join(',')})`;
   else if (payload.grade) params.grade = `eq.${payload.grade}`;
   if (payload.school) params.school_name = `eq.${payload.school}`;
@@ -268,7 +269,7 @@ async function readScores(payload: JsonObject, all: boolean): Promise<JsonObject
   if (payload.year) params.school_year = `eq.${payload.year}`;
   if (payload.year) params.school_year = `eq.${payload.year}`;
   if (payload.term) params.test_number = `eq.${payload.term}`;
-  if (payload.campus) params.campus = `eq.${payload.campus}`;
+  if (payload.campus) params.campus = String(payload.campus)==='大手町'||String(payload.campus)==='大手'?'in.(大手,大手町)':`eq.${payload.campus}`;
   const rows = await pg(query('test_scores_with_students', params)) as JsonObject[];
   return { success: true, scores: rows.map(score), source: 'supabase' };
 }
@@ -278,7 +279,7 @@ async function readReports(payload: JsonObject, all: boolean): Promise<JsonObjec
   if (!all || payload.studentId) params.student_code = `eq.${payload.studentId}`;
   if (payload.year) params.school_year = `eq.${payload.year}`;
   if (payload.semester) params.term = `eq.${payload.semester}`;
-  if (payload.campus) params.campus = `eq.${payload.campus}`;
+  if (payload.campus) params.campus = String(payload.campus)==='大手町'||String(payload.campus)==='大手'?'in.(大手,大手町)':`eq.${payload.campus}`;
   const rows = await pg(query('report_cards_with_students', params)) as JsonObject[];
   return { success: true, data: rows.map(report), reports: rows.map(report), source: 'supabase' };
 }
@@ -286,7 +287,7 @@ async function readReports(payload: JsonObject, all: boolean): Promise<JsonObjec
 async function readWishes(payload: JsonObject, all: boolean): Promise<JsonObject> {
   const params: Record<string, unknown> = { select: '*', order: 'updated_at.desc', limit: positiveInt(payload.limit, 1000, 2000), offset: positiveInt(payload.offset, 0, 100000) };
   if (!all || payload.studentId) params.student_code = `eq.${payload.studentId}`;
-  if (payload.campus) params.campus = `eq.${payload.campus}`;
+  if (payload.campus) params.campus = String(payload.campus)==='大手町'||String(payload.campus)==='大手'?'in.(大手,大手町)':`eq.${payload.campus}`;
   const rows = await pg(query('school_preferences_with_students', params)) as JsonObject[];
   const wishes = rows.map(wish);
   return all ? { success: true, wishes, source: 'supabase' } : { success: true, wish: wishes[0] ?? null, source: 'supabase' };
@@ -396,7 +397,7 @@ async function readMeetingMemos(payload: JsonObject): Promise<JsonObject> {
   if (payload.staff) params.staff_name = `eq.${String(payload.staff)}`;
   if (payload.counterpart && payload.counterpart !== '他') params.contact_person = `eq.${String(payload.counterpart)}`;
   if (payload.counterpart === '他') params.contact_person = 'like.他*';
-  if (payload.campus) params.campus = `eq.${String(payload.campus)}`;
+  if (payload.campus) params.campus = String(payload.campus)==='大手町'||String(payload.campus)==='大手'?'in.(大手,大手町)':`eq.${String(payload.campus)}`;
   if (payload.q) {
     const safe = String(payload.q).replace(/[()*.,%_]/g, ' ').trim();
     if (safe) params.or = `(student_code.ilike.*${safe}*,student_name.ilike.*${safe}*,content.ilike.*${safe}*,staff_name.ilike.*${safe}*)`;
@@ -779,6 +780,21 @@ async function dispatch(payload: JsonObject): Promise<JsonObject> {
   }
 }
 
+async function enforceCentralPermission(session:JsonObject,payload:JsonObject):Promise<void>{
+ const campuses:string[]=[];
+ if(payload.studentId){const rows=await pg(query('students',{select:'campus',student_code:`eq.${String(payload.studentId)}`,limit:1})) as JsonObject[];if(rows[0])campuses.push(String(rows[0].campus||''));}
+ if(payload.id&&['saveMeetingMemo','deleteMeetingMemo'].includes(String(payload.action))){const rows=await pg(query('meeting_memos',{select:'campus',id:`eq.${String(payload.id)}`,limit:1})) as JsonObject[];if(rows[0])campuses.push(String(rows[0].campus||''));}
+ let verdict:Record<string,unknown>|null;
+ try{verdict=await checkPermissionBridge(session,payload,async path=>await pg(path),campuses);}catch{throw new ResponseError(503,'PERMISSION_UNAVAILABLE','共通権限を確認できません。時間をおいて再度お試しください。');}
+ if(!verdict)return;
+ if(verdict.allowed!==true)throw new ResponseError(403,'CENTRAL_PERMISSION_DENIED',String(verdict.reason||'この操作を行う権限がありません。'));
+ if(verdict.level){session.permission_level=String(verdict.level);session.permissionLevel=String(verdict.level);}
+ if(verdict.scope&&verdict.scope!=='all'){
+  if(campuses.some(x=>!x))throw new ResponseError(403,'CAMPUS_REQUIRED','校舎を確認できないデータは操作できません。');
+  payload.campus=String(verdict.scope);
+ }
+}
+
 Deno.serve(async request => {
   const preflight = preflightResponse(request);
   if (preflight) return preflight;
@@ -790,6 +806,7 @@ Deno.serve(async request => {
     if (action === 'ingestStudentDirectory') return json(await ingestDirectorySnapshot(payload));
     if (!ADMIN_ACTIONS.has(action) && action !== 'verifyStaffSession') throw new ResponseError(400, 'UNSUPPORTED_ACTION', 'Unsupported action');
     const session = await verifyAdmin(payload.token);
+    await enforceCentralPermission(session, payload);
     requireActionPermission(session, payload.token, action);
     if (action === 'verifyStaffSession') return json({ success: true,
       code: session.staff_code ?? session.code,
@@ -804,4 +821,5 @@ Deno.serve(async request => {
     return json({ success: false, code: 'INTERNAL_ERROR', error: 'Internal server error' }, 500);
   }
 });
+
 

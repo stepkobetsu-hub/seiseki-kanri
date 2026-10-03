@@ -676,7 +676,7 @@ async function meetingSupabaseApi_(data){
     const res = await fetch(SEISEKI_ADMIN_RUNTIME_URL, {
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=UTF-8'},
-      body:JSON.stringify(payload),
+      body:JSON.stringify({...payload,permissionAppId:'public-13'}),
       cache:'no-store',
       signal:controller.signal
     });
