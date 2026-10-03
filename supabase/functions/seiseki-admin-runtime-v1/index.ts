@@ -14,6 +14,18 @@ const ADMIN_ACTIONS = new Set([
 ]);
 const WRITE_ACTIONS = new Set(['saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember', 'saveStudentDirectory']);
 const ADMIN_PERMISSION_LEVELS = new Set(['2', '3', '4']);
+const STAFF_PERMISSION_LEVELS = new Set(['1', '2', '3', '4']);
+// Grade-only sessions never authorize the directory or other management apps.
+const GRADE_SESSION_PREFIX = 'seiseki-grade:';
+const GRADE_ACTIONS = new Set([
+  'getStudents', 'getStudentList', 'getAllScores', 'getStudentScores',
+  'saveScore', 'deleteScore', 'getAllReports', 'getReports', 'saveReport',
+  'deleteReport', 'getAllWishes', 'getWish', 'saveWish', 'saveWishResult',
+  'getSchools', 'addSchool', 'updateSchool', 'deleteSchool',
+  'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
+  'getStaffMembers', 'addStaffMember', 'deleteStaffMember',
+  'reconcileLegacy', 'persistAdminSession', 'logoutAdmin', 'verifyStaffSession',
+]);
 const ADMIN_SESSION_REVERIFY_MS = 6 * 60 * 60 * 1000;
 const GRADE_GAS_URL = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 const STAFF_SESSION_API_URL = GRADE_GAS_URL;
@@ -41,7 +53,13 @@ async function verifyAdmin(token: unknown): Promise<JsonObject> {
   if (cached.length) {
     const session = cached[0];
     const unexpired = new Date(String(session.expires_at)).getTime() > Date.now();
-    if (unexpired && ADMIN_PERMISSION_LEVELS.has(String(session.permission_level))) return session;
+    const allowed = token.startsWith(GRADE_SESSION_PREFIX)
+      ? STAFF_PERMISSION_LEVELS : ADMIN_PERMISSION_LEVELS;
+    if (unexpired && allowed.has(String(session.permission_level))) return session;
+  }
+  // Locally issued grade tokens must never fall back to a portal token check.
+  if (token.startsWith(GRADE_SESSION_PREFIX)) {
+    throw new ResponseError(401, 'AUTH_REQUIRED', 'もう一度ログインしてください。');
   }
   const response = await fetch(commonApiEndpoint(STAFF_SESSION_API_URL), {
     method: 'POST',
@@ -57,6 +75,53 @@ async function verifyAdmin(token: unknown): Promise<JsonObject> {
     method:'POST', headers:{ Prefer:'resolution=merge-duplicates,return=minimal' },
     body:JSON.stringify({ token_hash:tokenHash, staff_code:String(result.code ?? ''), permission_level:String(result.permissionLevel), expires_at:String(result.expiresAt || new Date(Date.now() + 8 * 3600e3).toISOString()), verified_at:new Date().toISOString() }),
   });
+  return result;
+}
+
+function requireActionPermission(session: JsonObject, token: unknown, action: string): void {
+  if (String(token).startsWith(GRADE_SESSION_PREFIX) && !GRADE_ACTIONS.has(action)) {
+    throw new ResponseError(403, 'APP_FORBIDDEN', 'このアプリには権限2以上が必要です。');
+  }
+  const level = String(session.permission_level ?? session.permissionLevel ?? '');
+  const allowed = GRADE_ACTIONS.has(action) ? STAFF_PERMISSION_LEVELS : ADMIN_PERMISSION_LEVELS;
+  if (!allowed.has(level)) throw new ResponseError(403, 'APP_FORBIDDEN', 'このアプリを利用する権限がありません。');
+}
+
+async function loginStaff(payload: JsonObject): Promise<JsonObject> {
+  const code = String(payload.code ?? '').trim();
+  const password = String(payload.password ?? '');
+  if (!code) throw new ResponseError(400, 'INVALID_LOGIN', '講師番号を入力してください。');
+  const response = await fetch(GRADE_GAS_URL, {
+    method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+    body: JSON.stringify({ action: 'staffLogin', code, password }),
+  });
+  const staff = await response.json().catch(() => ({})) as JsonObject;
+  const permissionLevel = String(staff.permissionLevel ?? '').trim();
+  if (!response.ok || staff.success !== true || !STAFF_PERMISSION_LEVELS.has(permissionLevel)) {
+    throw new ResponseError(401, 'LOGIN_FAILED', String(staff.error || '講師番号・パスワード・権限を確認してください。'));
+  }
+  if (staff.code && String(staff.code) !== code) throw new ResponseError(401, 'LOGIN_FAILED', 'ログイン情報を確認してください。');
+  const result: JsonObject = {
+    success: true, code, name: String(staff.name ?? ''), permissionLevel,
+    systemPortalSessionToken: String(staff.systemPortalSessionToken ?? ''),
+    systemPortalExpiresAt: String(staff.systemPortalExpiresAt ?? ''),
+  };
+  if (permissionLevel === '1') {
+    const token = GRADE_SESSION_PREFIX + crypto.randomUUID() + crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 8 * 3600e3).toISOString();
+    await pg('seiseki_admin_sessions', {
+      method: 'POST', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ token_hash: await sha256Text(token), staff_code: code,
+        permission_level: permissionLevel, expires_at: expiresAt, verified_at: new Date().toISOString() }),
+    });
+    result.gradeSessionToken = token;
+    result.gradeExpiresAt = expiresAt;
+    // Never propagate an upstream management token to level 1.
+    result.systemPortalSessionToken = '';
+    result.systemPortalExpiresAt = '';
+  } else if (!result.systemPortalSessionToken) {
+    throw new ResponseError(401, 'LOGIN_FAILED', '管理用ログイン情報を取得できませんでした。');
+  }
   return result;
 }
 
@@ -590,7 +655,9 @@ async function logoutAdmin(payload: JsonObject): Promise<JsonObject> {
     await pg(query('seiseki_admin_sessions', { token_hash: `eq.${tokenHash}` }), {
       method: 'DELETE', headers: { Prefer: 'return=minimal' },
     });
-    await gas('logoutSystemPortal', { systemPortalSessionToken: token });
+    if (!token.startsWith(GRADE_SESSION_PREFIX)) {
+      await gas('logoutSystemPortal', { systemPortalSessionToken: token });
+    }
   }
   return { success: true };
 }
@@ -719,9 +786,15 @@ Deno.serve(async request => {
   try {
     const payload = await request.json() as JsonObject;
     const action = String(payload.action ?? '');
+    if (action === 'staffLogin') return json(await loginStaff(payload));
     if (action === 'ingestStudentDirectory') return json(await ingestDirectorySnapshot(payload));
-    if (!ADMIN_ACTIONS.has(action)) throw new ResponseError(400, 'UNSUPPORTED_ACTION', 'Unsupported action');
-    await verifyAdmin(payload.token);
+    if (!ADMIN_ACTIONS.has(action) && action !== 'verifyStaffSession') throw new ResponseError(400, 'UNSUPPORTED_ACTION', 'Unsupported action');
+    const session = await verifyAdmin(payload.token);
+    requireActionPermission(session, payload.token, action);
+    if (action === 'verifyStaffSession') return json({ success: true,
+      code: session.staff_code ?? session.code,
+      permissionLevel: session.permission_level ?? session.permissionLevel,
+    });
     EdgeRuntime.waitUntil(retryFailedMirrors().catch(error => console.error('Mirror retry failed', error)));
     if (WRITE_ACTIONS.has(action) && !String(payload.mutationId ?? '').trim()) throw new ResponseError(400, 'MUTATION_ID_REQUIRED', 'mutationId is required');
     return json(await dispatch(payload));
