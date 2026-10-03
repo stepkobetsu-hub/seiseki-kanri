@@ -286,6 +286,24 @@ textarea{
   .app{min-height:132px}
   .card{padding:16px}
 }
+
+.appSlot{position:relative;min-width:0}
+.appSlot[hidden]{display:none!important}
+.appSlot .app{height:100%}
+.appSlot .appTitle{padding-right:32px}
+.cardDragHandle{
+  position:absolute;top:12px;right:10px;z-index:1;
+  width:32px;height:36px;padding:0;
+  border:1px solid #cbd8e6;border-radius:8px;
+  background:#f0f5fa;color:#42627f;
+  font:24px/1 sans-serif;cursor:grab;touch-action:none;
+}
+.cardDragHandle:hover{background:#e0ecf8}
+.cardDragHandle:focus-visible{outline:3px solid #e3a008;outline-offset:2px}
+.appSlot.isDragging{opacity:.45}
+.cardSortDragging,.cardSortDragging *{cursor:grabbing!important;user-select:none!important}
+.cardSortHint{margin:0 0 12px;color:#52667c;font-size:.85rem;line-height:1.6}
+.cardSortStatus{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 </style>
 </head>
 <body>
@@ -321,6 +339,7 @@ textarea{
       </div>
     </div>
 
+    <p id="cardSortHint" class="cardSortHint">カード右上の「⠿」をドラッグすると順番を変更できます。並び順はこのブラウザーに保存されます。</p>
     <div class="grid">
 
       <a class="app primary" href="https://step-name-badge.mintcocoajasmine.chatgpt.site" target="_blank" rel="noopener noreferrer">
@@ -666,6 +685,7 @@ function showStaffHome(name, permissionLevel){
   if (timetableInputCard) {
     timetableInputCard.classList.toggle('hidden', !['2','3','4'].includes(String(permissionLevel || '').trim()));
   }
+  StepCardSort.restore(getSavedStaffAuth()?.code || document.getElementById('staffCode').value.trim());
 }
 
 async function staffLogout(){
@@ -801,6 +821,197 @@ async function saveAdminQrData(){
     setAdminMsg(err.message || '保存できませんでした', true);
   }
 }
+</script>
+<script>
+
+(() => {
+  const grid = document.querySelector('#homePage .grid');
+  if (!grid) return;
+  const prefix = 'stepStaffAppCardOrder:v1:';
+  const slots = [];
+  let storageKey = '';
+  let drag = null;
+  let suppressClickUntil = 0;
+  const status = document.createElement('span');
+  status.className = 'cardSortStatus';
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  grid.before(status);
+
+  Array.from(grid.children).forEach(card => {
+    const slot = document.createElement('div');
+    slot.className = 'appSlot';
+    slot.dataset.cardKey = card.id || card.getAttribute('href');
+    slot.draggable = true;
+    card.before(slot);
+    slot.append(card);
+    const handle = document.createElement('button');
+    handle.type = 'button';
+    handle.className = 'cardDragHandle';
+    handle.textContent = '⠿';
+    const title = card.querySelector('.appTitle').textContent.trim();
+    handle.setAttribute('aria-label', title + 'を並べ替える');
+    handle.title = 'ドラッグして移動／矢印キーで並べ替え';
+    handle.setAttribute('aria-describedby', 'cardSortHint');
+    handle.draggable = false;
+    slot.append(handle);
+    const syncVisibility = () => { slot.hidden = card.classList.contains('hidden'); };
+    syncVisibility();
+    new MutationObserver(syncVisibility).observe(card, { attributes: true, attributeFilter: ['class'] });
+    slots.push(slot);
+  });
+
+  const order = () => Array.from(grid.children).map(slot => slot.dataset.cardKey);
+  function applyOrder(keys) {
+    const byKey = new Map(slots.map(slot => [slot.dataset.cardKey, slot]));
+    const used = new Set();
+    keys.concat(slots.map(slot => slot.dataset.cardKey)).forEach(key => {
+      if (byKey.has(key) && !used.has(key)) {
+        grid.append(byKey.get(key));
+        used.add(key);
+      }
+    });
+  }
+  function save() {
+    if (!storageKey) return;
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(order()));
+      status.textContent = 'カードの並び順を保存しました。';
+    } catch (error) {
+      status.textContent = 'カードを移動しました。並び順を保存できませんでした。';
+    }
+  }
+  function restore(code) {
+    storageKey = prefix + (code || 'default');
+    let keys = [];
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      if (Array.isArray(saved)) keys = saved.filter(key => typeof key === 'string');
+    } catch (error) { /* Fall back to the original order. */ }
+    applyOrder(keys);
+  }
+  function begin(slot, mode, event) {
+    drag = { slot, mode, original: order(), x: event.clientX, y: event.clientY,
+      startX: event.clientX, startY: event.clientY, pointerId: event.pointerId,
+      started: mode === 'native' };
+    if (drag.started) slot.classList.add('isDragging');
+  }
+  function move(x, y) {
+    if (!drag || !drag.started) return;
+    const target = document.elementFromPoint(x, y)?.closest('.appSlot');
+    if (!target || target.parentElement !== grid || target === drag.slot || target.hidden) return;
+    const rect = target.getBoundingClientRect();
+    const columns = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+    const before = columns > 1 ? x < rect.left + rect.width / 2 : y < rect.top + rect.height / 2;
+    const source = drag.slot;
+    if (before && target.previousElementSibling !== source) grid.insertBefore(source, target);
+    if (!before && target.nextElementSibling !== source) target.after(source);
+  }
+  function finish(cancelled = false) {
+    if (!drag) return;
+    const current = drag;
+    drag = null;
+    current.slot.classList.remove('isDragging');
+    document.body.classList.remove('cardSortDragging');
+    if (current.mode === 'pointer' && grid.hasPointerCapture(current.pointerId)) {
+      grid.releasePointerCapture(current.pointerId);
+    }
+    if (cancelled) {
+      applyOrder(current.original);
+      status.textContent = '並べ替えを取り消しました。';
+    } else if (current.started && JSON.stringify(current.original) !== JSON.stringify(order())) {
+      save();
+    }
+    if (current.started) suppressClickUntil = Date.now() + 350;
+  }
+
+  grid.addEventListener('dragstart', event => {
+    const slot = event.target.closest('.appSlot');
+    if (!slot || event.target.closest('.cardDragHandle') || drag) {
+      event.preventDefault();
+      return;
+    }
+    begin(slot, 'native', event);
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', slot.dataset.cardKey);
+  });
+  grid.addEventListener('dragover', event => {
+    if (!drag || drag.mode !== 'native') return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    move(event.clientX, event.clientY);
+  });
+  grid.addEventListener('drop', event => {
+    if (!drag || drag.mode !== 'native') return;
+    event.preventDefault();
+    finish();
+  });
+  grid.addEventListener('dragend', () => {
+    if (drag?.mode === 'native') finish();
+  });
+  grid.addEventListener('click', event => {
+    if (event.target.closest('.cardDragHandle') || Date.now() < suppressClickUntil) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }, true);
+  grid.addEventListener('pointerdown', event => {
+    const handle = event.target.closest('.cardDragHandle');
+    if (!handle || event.button !== 0 || drag) return;
+    event.preventDefault();
+    handle.focus();
+    begin(handle.closest('.appSlot'), 'pointer', event);
+    grid.setPointerCapture(event.pointerId);
+  });
+  document.addEventListener('pointermove', event => {
+    if (!drag || drag.mode !== 'pointer' || drag.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    drag.x = event.clientX;
+    drag.y = event.clientY;
+    if (!drag.started && Math.hypot(drag.x - drag.startX, drag.y - drag.startY) >= 6) {
+      drag.started = true;
+      drag.slot.classList.add('isDragging');
+      document.body.classList.add('cardSortDragging');
+      requestAnimationFrame(autoScroll);
+    }
+    move(drag.x, drag.y);
+  }, { passive: false });
+  function autoScroll() {
+    if (!drag || drag.mode !== 'pointer' || !drag.started) return;
+    const delta = drag.y < 55 ? -12 : drag.y > innerHeight - 55 ? 12 : 0;
+    if (delta) {
+      window.scrollBy(0, delta);
+      move(drag.x, drag.y);
+    }
+    requestAnimationFrame(autoScroll);
+  }
+  document.addEventListener('pointerup', event => {
+    if (drag?.mode === 'pointer' && drag.pointerId === event.pointerId) finish();
+  });
+  document.addEventListener('pointercancel', event => {
+    if (drag?.mode === 'pointer' && drag.pointerId === event.pointerId) finish(true);
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && drag) { event.preventDefault(); finish(true); }
+  });
+  grid.addEventListener('keydown', event => {
+    const handle = event.target.closest('.cardDragHandle');
+    if (!handle || drag || !['ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const slot = handle.closest('.appSlot');
+    const visible = Array.from(grid.children).filter(item => !item.hidden);
+    const index = visible.indexOf(slot);
+    const backwards = ['ArrowUp', 'ArrowLeft', 'Home'].includes(event.key);
+    const target = event.key === 'Home' ? visible[0] : event.key === 'End' ? visible[visible.length - 1]
+      : visible[index + (backwards ? -1 : 1)];
+    if (!target || target === slot) return;
+    if (backwards) grid.insertBefore(slot, target);
+    else target.after(slot);
+    handle.focus();
+    save();
+  });
+  window.StepCardSort = { restore };
+})();
 </script>
 </body>
 </html>
