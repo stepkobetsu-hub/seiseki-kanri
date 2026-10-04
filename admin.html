@@ -68,8 +68,9 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 .loginHead{text-align:center;margin-bottom:28px}
 .loginVisual{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:12px}
 .loginHead .imgWrap{background:linear-gradient(135deg,#dcfce7 0%,#86efac 100%);border-radius:16px;padding:12px;margin-bottom:12px;display:inline-block;border:2px solid #166534}
-.loginVisual .imgWrap{margin-bottom:0}
-.teacherIllust{width:94px;height:118px;flex:0 0 auto;filter:drop-shadow(0 5px 8px rgba(6,78,59,.18))}
+.loginVisual .imgWrap{margin-bottom:0;flex:1 1 0;min-width:0}
+.loginVisual .imgWrap img{display:block;width:100%!important;height:auto}
+.teacherIllust{width:50%;max-width:220px;height:auto;flex:0 0 auto;filter:drop-shadow(0 5px 8px rgba(6,78,59,.18))}
 .loginHead h2{font-size:1.2rem;font-weight:700;color:var(--text);margin-bottom:4px}
 .loginHead p{font-size:.82rem;color:var(--sub)}
 .fld{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
@@ -93,8 +94,6 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
   .loginBox{padding:30px 20px}
   .loginVisual{gap:8px}
   .loginVisual .imgWrap{padding:9px}
-  .loginVisual .imgWrap img{width:184px!important}
-  .teacherIllust{width:70px;height:96px}
   .deviceChoices{grid-template-columns:1fr}
   .deviceChoice{min-height:78px}
 }
