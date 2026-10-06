@@ -28,6 +28,8 @@ async function login(e){
  try{
   const code=$('loginCode').value.trim();const staff=await StepStaffAuth.login(code,$('loginPassword').value);const session=staff.gradeSessionToken||staff.systemPortalSessionToken;
   if(!session)throw new Error('ログイン情報を確認できませんでした。');
+  const otherStore=mode==='shared'?localStorage:sessionStorage;
+  for(const key of ['adminSystemPortalSessionToken','adminSystemPortalExpiresAt','adminStaffCode','adminStaffName','adminLoggedIn','adminDeviceMode','meetingDeviceMode',idleKey])otherStore.removeItem(key);
   store().setItem('adminSystemPortalSessionToken',session);store().setItem('adminStaffCode',String(staff.code||code));store().setItem('adminStaffName',String(staff.name||''));store().setItem('adminLoggedIn','1');
   if(mode==='shared'){sessionStorage.setItem('meetingDeviceMode','shared');sessionStorage.setItem('adminDeviceMode','school');sessionStorage.setItem(idleKey,String(Date.now()));}
   else{sessionStorage.removeItem('meetingDeviceMode');sessionStorage.removeItem('adminSystemPortalSessionToken');await StepStaffAuth.persist(session);}
@@ -54,7 +56,7 @@ function render(){
   box.append(meta,textNode('div',r.body,'report-body'),textNode('p',r.external_use?'発信への利用可':'発信への利用は確認が必要','note'));$('history').append(box);
  }
 }
-function edit(r){editing={id:r.id,revision:r.revision};pending=null;$('campus').value=r.campus;$('category').value=r.category;$('eventDate').value=r.event_date||'';$('title').value=r.title;$('body').value=r.body;$('externalUse').checked=r.external_use;$('formTitle').textContent='報告内容を編集';$('sendButton').textContent='変更して送信';$('cancelButton').hidden=false;$('saveStatus').textContent='';$('formCard').scrollIntoView({behavior:'smooth',block:'start'});$('title').focus();}
+function edit(r){if(saving)return;editing={id:r.id,revision:r.revision};pending=null;$('campus').value=r.campus;$('category').value=r.category;$('eventDate').value=r.event_date||'';$('title').value=r.title;$('body').value=r.body;$('externalUse').checked=r.external_use;$('formTitle').textContent='報告内容を編集';$('sendButton').textContent='変更して送信';$('cancelButton').hidden=false;$('saveStatus').textContent='';$('formCard').scrollIntoView({behavior:'smooth',block:'start'});$('title').focus();}
 async function refresh(more=false){
  $('refreshButton').disabled=true;$('moreButton').disabled=true;$('historyStatus').textContent='';
  try{const result=await call({action:'list',offset:more?items.length:0});items=more?[...items,...result.reports]:result.reports;hasMore=result.hasMore;render();}
@@ -67,17 +69,17 @@ async function save(e){
  if(!value.title||!value.body){$('saveStatus').textContent='件名と内容を入力してください。';$('saveStatus').className='status error';return;}
  const fingerprint=JSON.stringify(value);
  if(!pending||pending.fingerprint!==fingerprint)pending={fingerprint,id:value.id||crypto.randomUUID(),mutationId:crypto.randomUUID()};
- saving=true;$('sendButton').disabled=true;$('cancelButton').disabled=true;$('saveStatus').className='status';$('saveStatus').textContent='送信しています…';
+ saving=true;for(const field of $('reportForm').elements)field.disabled=true;$('saveStatus').className='status';$('saveStatus').textContent='送信しています…';
  try{await call({...value,id:pending.id,mutationId:pending.mutationId});reset();$('saveStatus').className='status success';$('saveStatus').textContent='送信しました。STEP広報窓口のお知らせと話題に反映されます。';await refresh();}
  catch(e){$('saveStatus').className='status error';$('saveStatus').textContent=e.message;if(e.status===401)gate(e.message);}
- finally{saving=false;$('sendButton').disabled=false;$('cancelButton').disabled=false;}
+ finally{saving=false;for(const field of $('reportForm').elements)field.disabled=false;}
 }
 $('loginForm').addEventListener('submit',login);$('reportForm').addEventListener('submit',save);$('cancelButton').addEventListener('click',()=>{reset();$('saveStatus').textContent='';});
 $('refreshButton').addEventListener('click',()=>refresh());$('moreButton').addEventListener('click',()=>refresh(true));$('logoutButton').addEventListener('click',()=>logout());
 document.querySelectorAll('[data-device]').forEach(b=>b.addEventListener('click',()=>chooseDevice(b.dataset.device)));
 for(const name of ['pointerdown','keydown','input'])document.addEventListener(name,touch,{passive:true});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&mode==='shared'&&actor&&Date.now()-Number(sessionStorage.getItem(idleKey)||0)>=idleMs)void logout(true);});
-mode=localStorage.getItem('adminSystemPortalSessionToken')?'personal':sessionStorage.getItem('adminSystemPortalSessionToken')?'shared':'';
+mode=sessionStorage.getItem('meetingDeviceMode')==='shared'&&sessionStorage.getItem('adminSystemPortalSessionToken')?'shared':localStorage.getItem('adminSystemPortalSessionToken')?'personal':sessionStorage.getItem('adminSystemPortalSessionToken')?'shared':'';
 if(mode==='shared'&&Date.now()-Number(sessionStorage.getItem(idleKey)||Date.now())>=idleMs){void logout(true);}
 else if(token())start().catch(e=>gate(e.message));else gate('');
 })();
