@@ -356,6 +356,8 @@ body.auth-locked > #toast{display:none!important}
   .headActions{gap:5px}
   .logoutButton,.home{padding:7px 8px;font-size:.75rem}
 }
+.headActions{flex-wrap:wrap;justify-content:flex-end}.reportLink{background:#155aa5;color:#fff;border-color:#155aa5;min-height:40px;display:inline-flex;align-items:center;white-space:nowrap}
+@media(max-width:600px){.head{flex-wrap:wrap}.reportLink{font-size:.8rem;padding:8px 9px}}
 </style>
 </head>
 <body class="auth-locked">
@@ -395,6 +397,7 @@ body.auth-locked > #toast{display:none!important}
     <h1>面談メモ</h1>
     <div class="headActions">
       <span id="meetingSessionStaff" class="sessionStaff"></span>
+      <a class="home reportLink" href="classroom_reports.html">良い事や行事予定</a>
       <button class="logoutButton" type="button" onclick="meetingLogout()">ログアウト</button>
       <a class="home" href="index.html">トップへ</a>
     </div>

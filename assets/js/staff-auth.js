@@ -8,7 +8,7 @@
     try {
       const response = await fetch(endpoint, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-        body: JSON.stringify({ ...payload, permissionAppId: /student_directory/.test(location.pathname) ? 'student-directory' : /meeting_memo/.test(location.pathname) ? 'public-13' : 'public-12' }), cache: 'no-store', signal: controller.signal,
+        body: JSON.stringify({ ...payload, permissionAppId: /student_directory/.test(location.pathname) ? 'student-directory' : /meeting_memo|classroom_reports/.test(location.pathname) ? 'public-13' : 'public-12' }), cache: 'no-store', signal: controller.signal,
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || result.success !== true) {
