@@ -52,7 +52,9 @@ function render(){
   const actions=textNode('div','','report-actions');
   const b=textNode('button','編集');b.type='button';b.disabled=saving;b.addEventListener('click',()=>edit(r));
   const remove=textNode('button','削除','delete-report');remove.type='button';remove.disabled=saving;remove.setAttribute('aria-label',r.title+'を削除');remove.addEventListener('click',()=>deleteReport(r));
-  actions.append(b,remove);top.append(actions);box.append(top);
+  actions.append(b,remove);
+  if(actor?.level>=3){const forward=textNode('a','AIへ転送','btn ai-forward');forward.href='https://step-publicity-desk.mintcocoajasmine.chatgpt.site/?forwardReportId='+encodeURIComponent(r.id);forward.setAttribute('aria-label',r.title+'をAIへ転送');actions.append(forward);}
+  top.append(actions);box.append(top);
   const meta=textNode('div','','report-meta');meta.append(textNode('span',r.campus,'pill'),textNode('span',r.category,'pill'),document.createTextNode('報告者：'+(r.author_name||r.author_code)+'（'+r.author_code+'）'));
   meta.append(document.createElement('br'),document.createTextNode('送信：'+date(r.created_at,true)+(r.revision>1?' ／ 更新：'+date(r.updated_at,true):'')));
   if(r.event_date)meta.append(document.createElement('br'),document.createTextNode('出来事・予定：'+date(r.event_date)));
@@ -125,4 +127,5 @@ mode=sessionStorage.getItem('meetingDeviceMode')==='shared'&&sessionStorage.getI
 if(mode==='shared'&&Date.now()-Number(sessionStorage.getItem(idleKey)||Date.now())>=idleMs){void logout(true);}
 else if(token())start().catch(e=>gate(e.message));else gate('');
 })();
+
 
