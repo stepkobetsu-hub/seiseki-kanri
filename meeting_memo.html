@@ -359,7 +359,21 @@ body.auth-locked > #toast{display:none!important}
   .logoutButton,.home{padding:7px 8px;font-size:.75rem}
 }
 .headActions{flex-wrap:wrap;justify-content:flex-end}.reportLink{background:linear-gradient(#e76b20,#c2410c);color:#fff;border:1px solid #a83208;border-radius:10px;box-shadow:0 5px 0 #8c2e0b,0 7px 12px #933a1733,inset 0 1px 0 #ffffff65;text-shadow:0 1px 1px #6d210b70;min-height:46px;padding:10px 14px;display:inline-flex;align-items:center;justify-content:center;gap:7px;white-space:nowrap;font-weight:800;transition:transform .12s,box-shadow .12s,filter .12s;margin-bottom:5px;cursor:pointer}.reportLink:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 6px 0 #8c2e0b,0 9px 15px #933a1733,inset 0 1px 0 #ffffff65}.reportLink:active{transform:translateY(4px);box-shadow:0 1px 0 #8c2e0b,0 2px 4px #933a1726,inset 0 1px 3px #6d210b33}.reportLink:focus-visible{outline:3px solid #f59e0b;outline-offset:4px}@media(prefers-reduced-motion:reduce){.reportLink{transition:none}}.installMeetingButton{font-size:.78rem;padding:7px 9px}.installMeetingDialog{border:0;border-radius:16px;padding:24px;max-width:min(440px,calc(100% - 32px));color:#102033;box-shadow:0 20px 70px #10203340}.installMeetingDialog::backdrop{background:#10203366}.installMeetingDialog p,.installMeetingDialog li{line-height:1.7}.installMeetingDialog h2{margin:0 0 12px;font-size:1.15rem}
-@media(max-width:600px){.head{flex-wrap:wrap}.reportLink{font-size:.8rem;padding:8px 9px}}
+/* Keep the mobile title and navigation together in one compact row. */
+@media(max-width:600px){
+  header{padding:10px 8px}
+  .head{flex-wrap:nowrap;gap:6px}
+  .head h1{flex:0 0 auto;white-space:nowrap;font-size:1rem}
+  .headActions{flex-wrap:nowrap;gap:4px;min-width:0}
+  .headActions .installMeetingButton{display:none}
+  .headActions .home,.headActions .logoutButton{
+    display:inline-flex;align-items:center;justify-content:center;
+    height:34px;min-height:34px;padding:0 5px;margin:0;
+    font-size:.6875rem;line-height:1.2;border-radius:7px;
+    white-space:nowrap;flex:0 0 auto;
+  }
+  .headActions .reportLink{gap:3px;box-shadow:0 2px 0 #8c2e0b}
+}
 </style>
 </head>
 <body class="auth-locked">
