@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+ <rect width="512" height="512" fill="#155aa5"/>
+ <rect x="116" y="110" width="254" height="194" rx="34" fill="#fff"/>
+ <path d="M154 289v49l65-42" fill="#fff"/>
+ <path d="M161 162h148M161 203h111M161 244h68" stroke="#155aa5" stroke-width="17" stroke-linecap="round"/>
+ <path d="m300 287 67-67 31 31-67 67-39 9z" fill="#fb923c" stroke="#155aa5" stroke-width="10" stroke-linejoin="round"/>
+ <path d="m350 237 31 31" stroke="#fff" stroke-width="8"/>
+ <text x="256" y="397" text-anchor="middle" font-family="Arial,sans-serif" font-size="60" font-weight="700" fill="#fff" letter-spacing="3">STEP</text>
+</svg>

@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 const endpoint='https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/step-publicity-report-runtime-v1';
-const $=id=>document.getElementById(id);let mode='',actor=null,items=[],editing=null,saving=false,hasMore=false,pending=null,idleTimer=null;
+const $=id=>document.getElementById(id);let mode='',actor=null,items=[],editing=null,saving=false,hasMore=false,pending=null,idleTimer=null;const deleteMutations=new Map();
 const idleKey='meetingMemoLastActivityAt',idleMs=30*60*1000;
 function store(){return mode==='shared'?sessionStorage:localStorage;}
 function token(){return store().getItem('adminSystemPortalSessionToken')||'';}
@@ -37,7 +37,7 @@ async function login(e){
  }catch(e){$('loginError').textContent=e.message;}finally{$('loginButton').disabled=false;}
 }
 async function logout(automatic=false){
- const current=token();actor=null;items=[];reset();$('history').replaceChildren();$('staffLabel').textContent='';$('saveStatus').textContent='';$('loginPassword').value='';
+ const current=token();actor=null;items=[];deleteMutations.clear();reset();$('history').replaceChildren();$('staffLabel').textContent='';$('saveStatus').textContent='';$('loginPassword').value='';
  for(const s of [localStorage,sessionStorage])for(const k of ['adminSystemPortalSessionToken','adminSystemPortalExpiresAt','adminStaffCode','adminStaffName','adminLoggedIn','adminDeviceMode','meetingDeviceMode',idleKey,'adminCodeInput','adminPwInput'])s.removeItem(k);
  gate(automatic?'共用端末を30分使用していなかったためログアウトしました。':'');
  if(current)try{await Promise.race([StepStaffAuth.logout(current),new Promise(r=>setTimeout(r,3000))]);}catch{}
@@ -49,7 +49,10 @@ function render(){
  if(!items.length){$('history').append(textNode('p','まだ報告はありません。','note'));return;}
  for(const r of items){
   const box=textNode('article','','report'),top=textNode('div','','report-top');top.append(textNode('h3',r.title));
-  const b=textNode('button','編集');b.type='button';b.addEventListener('click',()=>edit(r));top.append(b);box.append(top);
+  const actions=textNode('div','','report-actions');
+  const b=textNode('button','編集');b.type='button';b.disabled=saving;b.addEventListener('click',()=>edit(r));
+  const remove=textNode('button','削除','delete-report');remove.type='button';remove.disabled=saving;remove.setAttribute('aria-label',r.title+'を削除');remove.addEventListener('click',()=>deleteReport(r));
+  actions.append(b,remove);top.append(actions);box.append(top);
   const meta=textNode('div','','report-meta');meta.append(textNode('span',r.campus,'pill'),textNode('span',r.category,'pill'),document.createTextNode('報告者：'+(r.author_name||r.author_code)+'（'+r.author_code+'）'));
   meta.append(document.createElement('br'),document.createTextNode('送信：'+date(r.created_at,true)+(r.revision>1?' ／ 更新：'+date(r.updated_at,true):'')));
   if(r.event_date)meta.append(document.createElement('br'),document.createTextNode('出来事・予定：'+date(r.event_date)));
@@ -57,6 +60,19 @@ function render(){
  }
 }
 function edit(r){if(saving)return;editing={id:r.id,revision:r.revision};pending=null;$('campus').value=r.campus;$('category').value=r.category;$('eventDate').value=r.event_date||'';$('title').value=r.title;$('body').value=r.body;$('externalUse').checked=r.external_use;$('formTitle').textContent='報告内容を編集';$('sendButton').textContent='変更して送信';$('cancelButton').hidden=false;$('saveStatus').textContent='';$('formCard').scrollIntoView({behavior:'smooth',block:'start'});$('title').focus();}
+async function deleteReport(r){
+ if(saving||!confirm('「'+r.title+'」を削除しますか？\n削除すると元に戻せません。'))return;
+ const session=token();
+ const key=r.id+':'+r.revision;if(!deleteMutations.has(key))deleteMutations.set(key,crypto.randomUUID());
+ saving=true;for(const field of $('reportForm').elements)field.disabled=true;render();$('historyStatus').textContent='削除しています…';
+ try{
+  await call({action:'delete',id:r.id,revision:r.revision,mutationId:deleteMutations.get(key)});
+  if(!actor||token()!==session)return;
+  deleteMutations.delete(key);items=items.filter(item=>item.id!==r.id);if(editing?.id===r.id)reset();
+  $('saveStatus').className='status success';$('saveStatus').textContent='削除しました。STEP広報窓口にも削除を反映します。';await refresh();
+ }catch(e){if(actor&&token()===session){$('historyStatus').textContent=e.message;if(e.status===401)gate(e.message);}}
+ finally{saving=false;for(const field of $('reportForm').elements)field.disabled=false;render();}
+}
 async function refresh(more=false){
  $('refreshButton').disabled=true;$('moreButton').disabled=true;$('historyStatus').textContent='';
  try{const result=await call({action:'list',offset:more?items.length:0});items=more?[...items,...result.reports]:result.reports;hasMore=result.hasMore;render();}

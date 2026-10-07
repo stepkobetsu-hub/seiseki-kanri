@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {reportAction,validateReport} from '../supabase/functions/step-publicity-report-runtime-v1/report-core.mjs';
 const id='e597c70f-bc79-436f-87ed-762b6652d07e',mutationId='004008d8-e14e-4692-b123-d59f8a5c13bf';
 const input={action:'save',id,mutationId,revision:0,campus:'神領校',category:'良い事・頑張り',title:'動作確認',body:'教室の報告',eventDate:'2026-10-07',externalUse:false,authorName:'テスト',token:'valid'};
-function setup(actor={code:'test-a',level:1}){const rows=[];let count=0;const deps={now:()=>new Date(1791324000000+(count++)*1000).toISOString(),verify:async token=>{if(token!=='valid')throw Object.assign(new Error('Unauthorized'),{status:401});return actor;},authorize:async()=> 'all',verifyReader:async k=>{if(k!=='reader')throw Object.assign(new Error('Unauthorized'),{status:401});},pg:async(path,opt={})=>{const url=new URL('https://test/'+path),p=url.searchParams;let found=rows.filter(r=>(!p.has('id')||r.id===p.get('id').slice(3))&&(!p.has('author_code')||r.author_code===p.get('author_code').slice(3))&&(!p.has('revision')||r.revision===Number(p.get('revision').slice(3))));if(opt.method==='POST'){const row=JSON.parse(opt.body);if(rows.some(r=>r.id===row.id))return [];rows.push(row);return [structuredClone(row)];}if(opt.method==='PATCH'){if(!found.length)return [];Object.assign(found[0],JSON.parse(opt.body));return [structuredClone(found[0])];}const offset=Number(p.get('offset')||0);return structuredClone(found.slice(offset,offset+Number(p.get('limit')||100)));}};return{rows,deps};}
+function setup(actor={code:'test-a',level:1}){const rows=[];let count=0;const deps={now:()=>new Date(1791324000000+(count++)*1000).toISOString(),verify:async token=>{if(token!=='valid')throw Object.assign(new Error('Unauthorized'),{status:401});return actor;},authorize:async()=> 'all',verifyReader:async k=>{if(k!=='reader')throw Object.assign(new Error('Unauthorized'),{status:401});},pg:async(path,opt={})=>{const url=new URL('https://test/'+path),p=url.searchParams;let found=rows.filter(r=>(!p.has('id')||r.id===p.get('id').slice(3))&&(!p.has('author_code')||r.author_code===p.get('author_code').slice(3))&&(!p.has('revision')||r.revision===Number(p.get('revision').slice(3)))&&(!p.has('deleted_at')||r.deleted_at==null));if(opt.method==='POST'){const row=JSON.parse(opt.body);if(rows.some(r=>r.id===row.id))return [];rows.push(row);return [structuredClone(row)];}if(opt.method==='PATCH'){if(!found.length)return [];Object.assign(found[0],JSON.parse(opt.body));return [structuredClone(found[0])];}const offset=Number(p.get('offset')||0);return structuredClone(found.slice(offset,offset+Number(p.get('limit')||100)));}};return{rows,deps};}
 test('signed-in reporter saves with server actor identity and defaults',async()=>{const{rows,deps}=setup();const r=await reportAction({...input,author_code:'forged'},deps);assert.equal(r.report.author_code,'test-a');assert.equal(rows.length,1);assert.equal(r.report.external_use,false);});
 test('missing or invalid staff session cannot save',async()=>{const{rows,deps}=setup();await assert.rejects(reportAction({...input,token:''},deps),e=>e.status===401);assert.equal(rows.length,0);});
 test('list returns only own reports except owner level 4',async()=>{const{rows,deps}=setup();rows.push({id,author_code:'test-a'},{id:crypto.randomUUID(),author_code:'test-b'});assert.equal((await reportAction({action:'list',token:'valid'},deps)).reports.length,1);const owner={...deps,verify:async()=>({code:'owner',level:4})};assert.equal((await reportAction({action:'list',token:'valid'},owner)).reports.length,2);});
@@ -14,3 +14,39 @@ test('stale revision is rejected and preserves current body',async()=>{const{row
 test('validation rejects empty body, invalid dates and forged campus',()=>{for(const extra of [{body:' '},{eventDate:'2026-02-30'},{campus:'その他'},{externalUse:'yes'}])assert.throws(()=>validateReport({...input,...extra}));});
 test('permission and campus restrictions are enforced before write',async()=>{const{rows,deps}=setup();deps.authorize=async()=>{throw Object.assign(new Error('Forbidden'),{status:403});};await assert.rejects(reportAction(input,deps),e=>e.status===403);assert.equal(rows.length,0);});
 test('owner reader key only grants feed reading',async()=>{const{deps}=setup();await reportAction(input,deps);assert.equal((await reportAction({action:'ownerFeed',readerKey:'reader'},deps)).reports.length,1);await assert.rejects(reportAction({action:'ownerFeed',readerKey:'bad'},deps),e=>e.status===401);await assert.rejects(reportAction({...input,token:'',readerKey:'reader'},deps),e=>e.status===401);});
+
+
+const deletion=(revision=1)=>({action:'delete',id,revision,mutationId:crypto.randomUUID(),token:'valid'});
+test('delete clears private content and removes report from list, while feed sends tombstone',async()=>{
+ const {rows,deps}=setup();await reportAction({...input,externalUse:true},deps);const before=rows[0].updated_at;
+ const result=await reportAction(deletion(),deps);assert.equal(result.deletedId,id);assert.equal(rows[0].revision,2);assert(rows[0].deleted_at);assert(rows[0].updated_at>before);
+ assert.equal(rows[0].body,'この報告は削除されました。');assert.equal(rows[0].title,'削除済みの報告');assert.equal(rows[0].event_date,null);assert.equal(rows[0].external_use,false);
+ assert.equal((await reportAction({action:'list',token:'valid'},deps)).reports.length,0);
+ const feed=await reportAction({action:'ownerFeed',readerKey:'reader'},deps);assert.equal(feed.reports[0].deleted_at,rows[0].deleted_at);assert.equal(feed.cursor.at,rows[0].updated_at);
+});
+test('delete replay does not increment revision and old saves cannot restore deleted report',async()=>{
+ const {rows,deps}=setup();await reportAction(input,deps);const req=deletion();await reportAction(req,deps);assert.equal((await reportAction(req,deps)).replayed,true);assert.equal(rows[0].revision,2);
+ await assert.rejects(reportAction(input,deps),e=>e.status===404);await assert.rejects(reportAction({...input,revision:2,mutationId:crypto.randomUUID()},deps),e=>e.status===404);
+ await assert.rejects(reportAction(deletion(2),deps),e=>e.status===404);assert.equal(rows[0].revision,2);
+});
+test('other reporter and reader key cannot delete; central delete permission is required',async()=>{
+ const {rows,deps}=setup();await reportAction(input,deps);
+ await assert.rejects(reportAction(deletion(),{...deps,verify:async()=>({code:'test-b',level:1})}),e=>e.status===403);
+ await assert.rejects(reportAction({...deletion(),token:'',readerKey:'reader'},deps),e=>e.status===401);
+ const denied={...deps,authorize:async(_actor,mode,campus)=>{assert.equal(mode,'delete');assert.equal(campus,'神領校');throw Object.assign(new Error('Forbidden'),{status:403});}};
+ await assert.rejects(reportAction(deletion(),denied),e=>e.status===403);assert.equal(rows[0].body,input.body);assert(!rows[0].deleted_at);
+});
+test('level 4 can delete another reporter without changing author',async()=>{
+ const {rows,deps}=setup();await reportAction(input,deps);await reportAction(deletion(),{...deps,verify:async()=>({code:'owner',level:4})});assert.equal(rows[0].author_code,'test-a');assert(rows[0].deleted_at);
+});
+test('stale or concurrent deletion preserves newer edit',async()=>{
+ const {rows,deps}=setup();await reportAction(input,deps);await reportAction({...input,revision:1,mutationId:crypto.randomUUID(),body:'新版'},deps);
+ await assert.rejects(reportAction(deletion(),deps),e=>e.status===409);assert.equal(rows[0].body,'新版');assert(!rows[0].deleted_at);
+ const conflict={...deps,pg:(path,opt={})=>opt.method==='PATCH'?[]:deps.pg(path,opt)};
+ await assert.rejects(reportAction(deletion(2),conflict),e=>e.status===409);assert.equal(rows[0].body,'新版');
+});
+test('deletion validates ID, revision and mutation before changing anything',async()=>{
+ const {rows,deps}=setup();await reportAction(input,deps);
+ for(const extra of [{id:'bad'},{revision:0},{revision:1.5},{mutationId:'bad'}])await assert.rejects(reportAction({...deletion(),...extra},deps),e=>e.status===400);
+ assert.equal(rows[0].revision,1);assert.equal(rows[0].body,input.body);
+});

@@ -4,7 +4,7 @@ export class ReportError extends Error {
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const campuses = ['両校','神領校','大手町校'];
 const categories = ['良い事・頑張り','行事予定','教室の様子','プログラミング','その他'];
-const select = 'id,author_code,author_name,campus,category,title,body,event_date,external_use,revision,created_at,updated_at';
+const select = 'id,author_code,author_name,campus,category,title,body,event_date,external_use,revision,created_at,updated_at,deleted_at';
 function text(v,max,required=true) { if(typeof v!=='string'||v.trim().length>max||(required&&!v.trim()))throw new ReportError(400,'入力内容を確認してください。');return v.trim(); }
 function q(table,params={}) { return table+'?'+new URLSearchParams(params); }
 export function validateReport(p) {
@@ -26,21 +26,36 @@ export async function reportAction(p,{pg,verify,authorize,verifyReader,now=()=>n
     const reports=await pg(q('step_publicity_reports',params));const last=reports.at(-1);
     return {success:true,reports,cursor:last?{at:last.updated_at,id:last.id}:p.cursor||null,hasMore:reports.length===100};
   }
-  if(!['list','save'].includes(p.action))throw new ReportError(400,'この操作には対応していません。');
+  if(!['list','save','delete'].includes(p.action))throw new ReportError(400,'この操作には対応していません。');
   const actor=await verify(p.token);
   if(!actor.code||![1,2,3,4].includes(actor.level))throw new ReportError(403,'この画面を利用する権限がありません。');
   if(p.action==='list'){
     const scope=await authorize(actor,'view',null);
     const offset=Number(p.offset||0);if(!Number.isInteger(offset)||offset<0||offset>100000)throw new ReportError(400,'Invalid offset');
-    const params={select,order:'created_at.desc,id.desc',limit:'51',offset:String(offset)};
+    const params={select,deleted_at:'is.null',order:'created_at.desc,id.desc',limit:'51',offset:String(offset)};
     if(actor.level!==4)params.author_code='eq.'+actor.code;
     if(scope!=='all')params.campus='eq.'+scope;
     const rows=await pg(q('step_publicity_reports',params));
     return {success:true,reports:rows.slice(0,50),hasMore:rows.length>50,actor:{code:actor.code,level:actor.level}};
   }
+  if(p.action==='delete'){
+    if(!uuid.test(p.id)||!uuid.test(p.mutationId)||!Number.isInteger(p.revision)||p.revision<1)throw new ReportError(400,'削除する報告を確認してください。');
+    const old=(await pg(q('step_publicity_reports',{id:'eq.'+p.id,limit:'1'})))[0];
+    if(!old)throw new ReportError(404,'報告が見つかりません。');
+    if(!canEdit(actor,old))throw new ReportError(403,'この報告は本人または塾長だけが削除できます。');
+    await authorize(actor,'delete',old.campus);
+    if(old.deleted_at&&old.last_mutation_id===p.mutationId)return {success:true,deletedId:old.id,replayed:true};
+    if(old.deleted_at)throw new ReportError(404,'この報告は削除済みです。一覧を更新してください。');
+    if(p.revision!==old.revision)throw new ReportError(409,'別の画面で変更されています。一覧を更新して、内容を確認してから削除してください。');
+    const at=now();
+    const saved=await pg(q('step_publicity_reports',{id:'eq.'+p.id,revision:'eq.'+old.revision,deleted_at:'is.null'}),{method:'PATCH',body:JSON.stringify({title:'削除済みの報告',body:'この報告は削除されました。',event_date:null,external_use:false,deleted_at:at,revision:old.revision+1,last_mutation_id:p.mutationId,updated_at:at}),headers:{Prefer:'return=representation'}});
+    if(!saved[0])throw new ReportError(409,'変更が重なりました。一覧を更新してから、もう一度削除してください。');
+    return {success:true,deletedId:p.id};
+  }
   const value=validateReport(p);
   const rows=await pg(q('step_publicity_reports',{id:'eq.'+p.id,limit:'1'}));const old=rows[0];
   if(old&&!canEdit(actor,old))throw new ReportError(403,'この報告は本人または塾長だけが編集できます。');
+  if(old?.deleted_at)throw new ReportError(404,'この報告は削除済みです。一覧を更新してください。');
   await authorize(actor,'write',value.campus,old?.campus);
   if(old?.last_mutation_id===p.mutationId)return {success:true,report:old,replayed:true};
   const at=now();

@@ -6,9 +6,11 @@
 <meta name="theme-color" content="#155aa5">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="面談メモ">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon-180.png">
-<link rel="manifest" href="site.webmanifest">
+<link rel="icon" href="images/meeting-memo/icon.svg" type="image/svg+xml">
+<link rel="icon" href="images/meeting-memo/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="images/meeting-memo/apple-touch-icon.png">
+<link rel="manifest" href="meeting-memo.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
 <title>面談メモ</title>
 <style>
 *{box-sizing:border-box}
@@ -356,7 +358,7 @@ body.auth-locked > #toast{display:none!important}
   .headActions{gap:5px}
   .logoutButton,.home{padding:7px 8px;font-size:.75rem}
 }
-.headActions{flex-wrap:wrap;justify-content:flex-end}.reportLink{background:#155aa5;color:#fff;border-color:#155aa5;min-height:40px;display:inline-flex;align-items:center;white-space:nowrap}
+.headActions{flex-wrap:wrap;justify-content:flex-end}.reportLink{background:#c2410c;color:#fff;border:2px solid #9a3412;box-shadow:0 3px 8px #c2410c30;min-height:44px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}.reportLink:hover{background:#9a3412}.reportLink:focus-visible{outline:3px solid #f59e0b;outline-offset:3px}.installMeetingButton{font-size:.78rem;padding:7px 9px}.installMeetingDialog{border:0;border-radius:16px;padding:24px;max-width:min(440px,calc(100% - 32px));color:#102033;box-shadow:0 20px 70px #10203340}.installMeetingDialog::backdrop{background:#10203366}.installMeetingDialog p,.installMeetingDialog li{line-height:1.7}.installMeetingDialog h2{margin:0 0 12px;font-size:1.15rem}
 @media(max-width:600px){.head{flex-wrap:wrap}.reportLink{font-size:.8rem;padding:8px 9px}}
 </style>
 </head>
@@ -389,6 +391,7 @@ body.auth-locked > #toast{display:none!important}
     </div>
     <button id="meetingLoginButton" class="loginButton" type="submit">ログイン</button>
     <div id="meetingLoginError" class="loginError" role="alert"></div>
+    <button class="installMeetingButton" type="button" data-install-meeting style="width:100%;margin-top:12px">ホーム画面に追加</button>
   </form>
 </div>
 
@@ -397,7 +400,8 @@ body.auth-locked > #toast{display:none!important}
     <h1>面談メモ</h1>
     <div class="headActions">
       <span id="meetingSessionStaff" class="sessionStaff"></span>
-      <a class="home reportLink" href="classroom_reports.html">良い事や行事予定</a>
+      <a class="home reportLink" href="classroom_reports.html"><span aria-hidden="true">★</span>良い事や行事予定</a>
+      <button class="installMeetingButton" type="button" data-install-meeting>アプリ追加</button>
       <button class="logoutButton" type="button" onclick="meetingLogout()">ログアウト</button>
       <a class="home" href="index.html">トップへ</a>
     </div>
@@ -1471,5 +1475,8 @@ function closeTrash(){
 
 bootMeetingApp_();
 </script>
+<dialog id="meetingInstallDialog" class="installMeetingDialog"><h2>面談メモをホーム画面に追加</h2><p id="meetingInstallHelp"></p><p>追加後は「面談メモ」のアイコンから開けます。</p><form method="dialog"><button type="submit">閉じる</button></form></dialog>
+<script src="assets/js/meeting-memo-pwa.js?v=20261007-1"></script>
 </body>
 </html>
+

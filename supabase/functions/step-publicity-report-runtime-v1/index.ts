@@ -20,10 +20,10 @@ async function authorize(actor:{code:string;level:number},mode:string,campus:str
   const normalize=(c:string)=>c==='大手町校'?'大手町':c==='神領校'?'神領':'';
   const requested=campus?normalize(campus):'';
   const checks=[requested,...(oldCampus?[normalize(oldCampus)]:[])].filter(Boolean);
-  const verdict=await checkPermissionBridge({staff_code:actor.code,permission_level:String(actor.level)},{action:mode==='write'?'saveMeetingMemo':'getMeetingMemos',campus:requested},pg,checks);
+  const verdict=await checkPermissionBridge({staff_code:actor.code,permission_level:String(actor.level)},{action:mode==='delete'?'deleteMeetingMemo':mode==='write'?'saveMeetingMemo':'getMeetingMemos',campus:requested},pg,checks);
   if(verdict&&verdict.allowed!==true)throw new ReportError(403,String(verdict.reason||'この操作を行う権限がありません。'));
   const scope=String(verdict?.scope||'all');
-  if(mode==='write'&&scope!=='all'&&(!requested||checks.some(c=>c!==scope)))throw new ReportError(403,'この校舎の報告を編集する権限がありません。');
+  if(['write','delete'].includes(mode)&&scope!=='all'&&(!requested||checks.some(c=>c!==scope)))throw new ReportError(403,'この校舎の報告を変更する権限がありません。');
   return scope==='神領'?'神領校':scope==='大手町'?'大手町校':'all';
 }
 async function verifyReader(key:unknown){
