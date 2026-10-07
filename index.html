@@ -358,6 +358,22 @@ textarea{
         <div class="go">開く</div>
       </a>
 
+      <a class="app primary" href="classroom_reports.html">
+        <div>
+          <div class="appTitle"><span class="ico">🌟</span><span>良いことや行事予定</span></div>
+          <p class="desc">教室であった良いことや生徒の頑張り、行事予定を報告します。写真・PDFも添付できます。</p>
+        </div>
+        <div class="go">開く</div>
+      </a>
+
+      <a class="app hidden" data-required-permission="3" href="https://step-publicity-desk.mintcocoajasmine.chatgpt.site/" target="_blank" rel="noopener noreferrer">
+        <div>
+          <div class="appTitle"><span class="ico">📣</span><span>STEP広報窓口</span></div>
+          <p class="desc">教室からの報告や広報の話題、AIへの制作依頼・原稿を確認します。権限3・4のスタッフ用です。</p>
+        </div>
+        <div class="go">別ページで開く</div>
+      </a>
+
       <a class="app" href="https://stepkobetsu-hub.github.io/step-message-center/">
         <div>
           <div class="appTitle"><span class="ico"><img src="icons/message-center-icon.png" alt=""></span><span>STEP配信システム</span></div>
@@ -656,6 +672,9 @@ function showStaffHome(name, permissionLevel){
   label.textContent = name ? name + 'さん / ' : '';
   document.querySelectorAll('[data-required-permission="2"]').forEach(card => {
     card.classList.toggle('hidden', !['2','3','4'].includes(String(permissionLevel || '').trim()));
+  });
+  document.querySelectorAll('[data-required-permission="3"]').forEach(card => {
+    card.classList.toggle('hidden', !['3','4'].includes(String(permissionLevel || '').trim()));
   });
   const studentQrCard = document.getElementById('studentQrAppCard');
   if (studentQrCard) {
