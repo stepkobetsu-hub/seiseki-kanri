@@ -122,6 +122,21 @@ async function loginStaff(payload: JsonObject): Promise<JsonObject> {
     result.systemPortalExpiresAt = '';
   } else if (!result.systemPortalSessionToken) {
     throw new ResponseError(401, 'LOGIN_FAILED', '管理用ログイン情報を取得できませんでした。');
+  } else {
+    // The trusted staffLogin response has already authenticated this staff member.
+    // Save its issued session before returning; a second legacy round trip can
+    // otherwise reject the newly issued token. Central permissions are still
+    // checked by every authenticated action, including verifyStaffSession.
+    const token = String(result.systemPortalSessionToken);
+    const expiresAt = String(result.systemPortalExpiresAt || new Date(Date.now() + 8 * 3600e3).toISOString());
+    if (token.startsWith(GRADE_SESSION_PREFIX) || !Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) <= Date.now()) {
+      throw new ResponseError(401, 'LOGIN_FAILED', '有効なログイン情報を取得できませんでした。');
+    }
+    await pg(query('seiseki_admin_sessions', { on_conflict: 'token_hash' }), {
+      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ token_hash: await sha256Text(token), staff_code: code,
+        permission_level: permissionLevel, expires_at: expiresAt, verified_at: new Date().toISOString() }),
+    });
   }
   return result;
 }
