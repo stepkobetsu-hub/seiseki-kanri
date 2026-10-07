@@ -8,6 +8,7 @@ CREATE TABLE public.step_publicity_reports (
  body text NOT NULL CHECK (length(btrim(body)) BETWEEN 1 AND 3000),
  event_date date,
  deleted_at timestamptz,
+ attachments jsonb NOT NULL DEFAULT '[]'::jsonb,
  external_use boolean NOT NULL DEFAULT false,
  revision integer NOT NULL DEFAULT 1 CHECK (revision > 0),
  last_mutation_id uuid NOT NULL,
@@ -30,4 +31,5 @@ REVOKE ALL ON public.step_publicity_reader_config FROM PUBLIC,anon,authenticated
 GRANT SELECT,INSERT,UPDATE,DELETE ON public.step_publicity_reader_config TO service_role;
 COMMENT ON TABLE public.step_publicity_reports IS '講師の良い事・行事予定報告。Edge Functionで共通講師認証・本人/塾長の編集権限を確認。STEP広報窓口で取り込む。';
 COMMENT ON TABLE public.step_publicity_reader_config IS 'STEP広報窓口の読み取り専用連携キーのSHA256。平文キーはSitesのsecretのみ。';
+
 

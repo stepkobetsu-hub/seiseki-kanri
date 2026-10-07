@@ -13,9 +13,10 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
 async function setup(){
  const nodes=new Map(),get=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
  const memory=new Map([['adminSystemPortalSessionToken','test-only']]);const storage={getItem:k=>memory.get(k)||null,setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)};
- const state={confirm:false,calls:[],failDelete:false,deleted:false};
+ const state={confirm:false,calls:[],failDelete:false,failUpload:false,deleted:false};
  const doc={getElementById:get,createElement:()=>new Element(),createTextNode:()=>new Element(),querySelectorAll:()=>[],addEventListener(){}};
- vm.runInNewContext(source,{document:doc,localStorage:storage,sessionStorage:{getItem:()=>null,removeItem(){},setItem(){}},crypto:webcrypto,Intl,Date,AbortController,setTimeout,clearTimeout,confirm:()=>state.confirm,fetch:async(_url,o)=>{
+ vm.runInNewContext(source,{document:doc,localStorage:storage,sessionStorage:{getItem:()=>null,removeItem(){},setItem(){}},crypto:webcrypto,Intl,Date,AbortController,URL,FormData,setTimeout,clearTimeout,confirm:()=>state.confirm,fetch:async(_url,o)=>{
+  if(o.body instanceof FormData){const p={action:'upload',id:o.body.get('reportId'),attachmentId:o.body.get('attachmentId')};state.calls.push(p);if(state.failUpload)throw new Error('添付失敗');const file=o.body.get('file');return{ok:true,json:async()=>({success:true,attachment:{id:p.attachmentId,name:file.name,mimeType:file.type,size:file.size}})};}
   const p=JSON.parse(o.body);state.calls.push(p);
   if(p.action==='delete'){if(state.failDelete)throw new Error('通信失敗');state.deleted=true;return{ok:true,json:async()=>({success:true,deletedId:p.id})};}
   return{ok:true,json:async()=>({success:true,actor:{code:'test-a',level:1},reports:state.deleted?[]:[report],hasMore:false})};
@@ -29,4 +30,11 @@ test('canceling confirmation sends no delete request',async()=>{
 test('failed delete keeps report and retry uses same mutation; success refreshes without report',async()=>{
  const {state,remove,get}=await setup();state.confirm=true;state.failDelete=true;await remove().handlers.click();await tick();assert.equal(get('history').children[0].className,'report');assert.equal(get('historyStatus').textContent,'通信失敗');
  state.failDelete=false;await remove().handlers.click();await tick();const deletes=state.calls.filter(p=>p.action==='delete');assert.equal(deletes.length,2);assert.equal(deletes[0].mutationId,deletes[1].mutationId);assert.equal(deletes[0].revision,1);assert.equal(get('history').children[0].textContent,'まだ報告はありません。');assert(get('saveStatus').textContent.includes('削除しました'));
+});
+
+
+test('failed attachment upload keeps selection; retry sends report once without consent checkbox',async()=>{
+ const {state,get}=await setup();get('title').value='写真の報告';get('body').value='教室の様子';get('attachmentsInput').files=[new File(['%PDF-1.7\nexample'],'予定.pdf',{type:'application/pdf'})];get('attachmentsInput').handlers.change();assert.equal(get('attachmentList').children.length,1);
+ state.failUpload=true;await get('reportForm').handlers.submit({preventDefault(){}});assert.equal(state.calls.filter(p=>p.action==='save').length,0);assert.equal(get('attachmentList').children.length,1);
+ state.failUpload=false;await get('reportForm').handlers.submit({preventDefault(){}});const uploads=state.calls.filter(p=>p.action==='upload'),saved=state.calls.filter(p=>p.action==='save');assert.equal(uploads.length,2);assert.equal(uploads[0].attachmentId,uploads[1].attachmentId);assert.equal(saved.length,1);assert.equal(saved[0].attachmentIds[0],uploads[0].attachmentId);assert.equal(saved[0].id,uploads[0].id);assert.equal(saved[0].externalUse,undefined);assert.equal(get('attachmentList').children.length,0);
 });
