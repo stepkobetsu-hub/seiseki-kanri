@@ -285,9 +285,11 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&ready&&to
 function renderStudentGrades(card,student){
   const title=document.createElement('h3');title.textContent='📊 成績・通知表';card.append(title);
   const area=document.createElement('div');area.textContent='成績・通知表を読み込み中…';card.append(area);
-  loadStudentGrades(String(student.id),area);
+  const admission=document.createElement('p');admission.className='muted';admission.textContent='入塾日・通塾期間を読み込み中…';card.insertBefore(admission,area);
+  loadDirectoryAdmission(String(student.id),admission);
+  loadStudentGrades(String(student.id),area,student);
 }
-async function loadStudentGrades(id,area){
+async function loadStudentGrades(id,area,student){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
   const request=async action=>{
     const response=await fetch(MEETING_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action,studentId:id,token:token()}),cache:'no-store',signal:controller.signal});
@@ -298,33 +300,65 @@ async function loadStudentGrades(id,area){
     const [scores,reports]=await Promise.all([request('getStudentScores'),request('getReports')]);
     if(String(selectedId)!==id||!area.isConnected)return;
     area.replaceChildren();
-    renderGradeTable(area,'テスト成績',Array.isArray(scores.scores)?scores.scores:[],false);
-    renderGradeTable(area,'通知表',Array.isArray(reports.data)?reports.data:[],true);
+    renderDirectoryCompare(area,Array.isArray(scores.scores)?scores.scores:[],Array.isArray(reports.data)?reports.data:[],student);
   }catch(error){
     if(String(selectedId)!==id||!area.isConnected)return;
     area.replaceChildren();const message=document.createElement('p');message.className='error';message.textContent='成績・通知表を読み込めませんでした：'+(error.name==='AbortError'?'通信に時間がかかっています。':error.message);area.append(message);
-    const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';retry.onclick=()=>loadStudentGrades(id,area);area.append(retry);
+    const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';retry.onclick=()=>loadStudentGrades(id,area,student);area.append(retry);
   }finally{clearTimeout(timer)}
 }
-function renderGradeTable(area,title,rows,report){
-  const heading=document.createElement('h4');heading.textContent=title;heading.style.margin='12px 0 8px';area.append(heading);
-  rows=rows.slice().sort((a,b)=>Number(b.year)-Number(a.year)||String(b.semester||b.term).localeCompare(String(a.semester||a.term),'ja',{numeric:true}));
-  if(!rows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='登録された'+title+'はありません。';area.append(empty);return}
-  const wrap=document.createElement('div');wrap.style.cssText='overflow-x:auto;border:1px solid #d9ebdf;border-radius:8px';
-  const table=document.createElement('table');table.style.cssText='border-collapse:collapse;width:100%;font-size:.9rem;white-space:nowrap';
-  const subjects=['jpn','soc','math','sci','eng','mus','art','pe','tech'];
-  const header=['年度・回／学期','国','社','数','理','英','音','美','体','技','5科計','9科計'];if(!report)header.push('5科順位','9科順位');
-  const makeRow=(values,head=false)=>{const tr=document.createElement('tr');for(const value of values){const td=document.createElement(head?'th':'td');td.textContent=value==null||value===''?'－':String(value);td.style.cssText='padding:8px 10px;text-align:center;border-bottom:1px solid #d9ebdf;'+(head?'background:#e8f8ee':'');tr.append(td)}return tr};
-  const thead=document.createElement('thead');thead.append(makeRow(header,true));table.append(thead);const tbody=document.createElement('tbody');
-  for(const row of rows){
-    const values=subjects.map(key=>row[(report?'rp_':'')+key]);
-    const total=n=>values.slice(0,n).every(v=>v!==''&&v!=null&&Number.isFinite(Number(v)))?values.slice(0,n).reduce((sum,v)=>sum+Number(v),0):'';
-    const savedTotal=(key,n)=>row[key]!==''&&row[key]!=null?row[key]:total(n);
-    const cells=[`${row.year||''}年度 ${report?(row.semester||''):'第'+(row.term||'')+'回'}`,...values,report?total(5):savedTotal('total5',5),report?total(9):savedTotal('total9',9)];
-    if(!report)cells.push(row.rank5,row.rank9);tbody.append(makeRow(cells));
-  }
-  table.append(tbody);wrap.append(table);area.append(wrap);
+async function loadDirectoryAdmission(id,label){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+  try{
+    const response=await fetch(MEETING_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action:'getEntrySheetData',studentId:id,token:token()}),cache:'no-store',signal:controller.signal});
+    const data=await response.json();
+    if(!response.ok||data.success!==true)throw Error(data.error||'取得できませんでした');
+    if(String(selectedId)!==id||!label.isConnected)return;
+    const date=String(data.data?.masterInfo?.colC||data.data?.masterColumnC||'').slice(0,10);
+    const duration=calcEnrollmentDuration(date);
+    label.textContent=date?'入塾日: '+date+(duration?'（'+duration+'通塾）':''):'入塾日: 未登録';
+  }catch(error){if(String(selectedId)===id&&label.isConnected)label.textContent='入塾日・通塾期間を取得できませんでした。'}
+  finally{clearTimeout(timer)}
 }
+function renderDirectoryCompare(area,scores,reports,student){
+  const sort=(rows,report)=>rows.slice().sort((a,b)=>Number(a.year)-Number(b.year)||String(report?b.semester:a.term).localeCompare(String(report?a.semester:b.term),'ja',{numeric:true}));
+  scores=sort(scores,false);reports=reports.slice().sort((a,b)=>Number(b.year)-Number(a.year)||String(b.semester).localeCompare(String(a.semester),'ja',{numeric:true}));
+  const wrap=document.createElement('div');wrap.style.cssText='overflow-x:auto;border:1px solid #e0e8f2;border-radius:8px';
+  const table=document.createElement('table');table.style.cssText='border-collapse:collapse;width:100%;font-size:.75rem;white-space:nowrap;color:#14345e';
+  const row=(values,header=false)=>{const tr=document.createElement('tr');for(let i=0;i<values.length;i++){const cell=document.createElement(header?'th':'td');cell.textContent=values[i]==null||values[i]===''?'-':String(values[i]);cell.style.cssText='padding:4px 5px;text-align:center;border-bottom:1px solid #e0e8f2;'+(header?'background:#f7f9fc;font-weight:600':'');if(!header&&i>=11&&i<=19){const value=Number(values[i]);cell.style.color=value<=3&&value>=1?'#ea6500':'#155aa5';}if(!header&&[6,8,20,21].includes(i))cell.style.fontWeight='800';tr.append(cell)}return tr};
+  const head=document.createElement('thead'),group=document.createElement('tr');
+  for(const [text,span,color] of [['テスト成績',10,'#eef2ff'],['通知表評定',12,'#fef9ee']]){const th=document.createElement('th');th.textContent=text;th.colSpan=span;th.style.cssText='background:'+color+';padding:5px;text-align:center';group.append(th)}
+  head.append(group,row(['年度・回次','国','社','数','理','英','5科計','5科順','9科計','9科順','年度・学期','国','社','数','理','英','音','美','体','技','5計','9計'],true));table.append(head);
+  const body=document.createElement('tbody'),subjects=['jpn','soc','math','sci','eng','mus','art','pe','tech'];
+  const sum=(r,prefix,n)=>subjects.slice(0,n).every(k=>r[prefix+k]!==''&&r[prefix+k]!=null&&Number.isFinite(Number(r[prefix+k])))?subjects.slice(0,n).reduce((v,k)=>v+Number(r[prefix+k]),0):'';
+  const total=(r,key,n)=>r[key]!==''&&r[key]!=null?r[key]:sum(r,'',n);
+  const grade=String(student?.grade||'').normalize('NFKC').match(/^中([123])/);
+  const now=new Date();const schoolYear=now.getMonth()<3?now.getFullYear()-1:now.getFullYear();
+  const labelGrade=year=>{const n=grade?Number(grade[1])-(schoolYear-Number(year)):0;return n>=1&&n<=3?'（中'+n+'）':''};
+  const length=Math.max(scores.length,reports.length);
+  for(let i=0;i<length;i++){const sc=scores[i]||{},rp=reports[i]||{};
+    body.append(row([sc.year?sc.year+'年度 第'+sc.term+'回'+labelGrade(sc.year):'',sc.jpn,sc.soc,sc.math,sc.sci,sc.eng,total(sc,'total5',5),sc.rank5,total(sc,'total9',9),sc.rank9,rp.year?rp.year+'年度 '+rp.semester+labelGrade(rp.year):'',...subjects.map(k=>rp['rp_'+k]),sum(rp,'rp_',5),sum(rp,'rp_',9)]));
+  }
+  if(!length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=22;td.textContent='登録された成績・通知表はありません。';td.style.padding='12px';tr.append(td);body.append(tr)}
+  table.append(body);wrap.append(table);area.append(wrap);
+}
+function calcEnrollmentDuration(value) {
+  const s = String(value || '').trim();
+  const m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (!m) return '';
+  const start = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (Number.isNaN(start.getTime())) return '';
+  const today = new Date();
+  let months = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth());
+  if (today.getDate() < start.getDate()) months--;
+  if (months < 0) return '';
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  if (years && rest) return `${years}年${rest}ヶ月`;
+  if (years) return `${years}年`;
+  return `${rest}ヶ月`;
+}
+
 function meetingDate(value){const raw=String(value||'');if(/^\d{4}-\d{2}-\d{2}/.test(raw))return raw.slice(0,10);const d=new Date(raw);return Number.isNaN(d.valueOf())?raw:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function renderMeetingSection(card,id){
   const head=document.createElement('div');head.className='meetingHead';
