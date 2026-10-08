@@ -316,7 +316,8 @@ async function loadStudentGrades(id,area,student){
   }finally{clearTimeout(timer)}
 }
 async function loadDirectoryAdmission(id,label){
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),90000);
+  const slowTimer=setTimeout(()=>{if(String(selectedId)===id&&label.isConnected)label.textContent='入塾日・通塾期間を取得中です。少しお待ちください…';},12000);
   try{
     const response=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action:'getEntrySheetData',studentId:id,systemPortalSessionToken:token()}),cache:'no-store',signal:controller.signal});
     const data=await response.json();
@@ -326,7 +327,7 @@ async function loadDirectoryAdmission(id,label){
     const duration=calcEnrollmentDuration(date);
     label.textContent=date?'入塾日: '+date+(duration?'（'+duration+'通塾）':''):'入塾日: 未登録';
   }catch(error){if(String(selectedId)===id&&label.isConnected)label.textContent='入塾日・通塾期間を取得できませんでした。'}
-  finally{clearTimeout(timer)}
+  finally{clearTimeout(timer);clearTimeout(slowTimer)}
 }
 function renderDirectoryCompare(area,scores,reports,student){
   const sort=(rows,report)=>rows.slice().sort((a,b)=>Number(a.year)-Number(b.year)||String(report?b.semester:a.term).localeCompare(String(report?a.semester:b.term),'ja',{numeric:true}));
