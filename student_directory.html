@@ -296,7 +296,7 @@ function renderStudentGrades(card,student){
   link.target='_blank';link.rel='noopener';link.textContent='📊 この生徒の成績・志望校をみる';
   head.append(info,link);card.append(head);
   const area=document.createElement('div');area.textContent='成績・通知表を読み込み中…';card.append(area);
-  loadDirectoryAdmission(String(student.id),admission);
+  loadDirectoryAdmission(String(student.id),admission,student);
   loadStudentGrades(String(student.id),area,student);
 }
 async function loadStudentGrades(id,area,student){
@@ -317,20 +317,14 @@ async function loadStudentGrades(id,area,student){
     const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';retry.onclick=()=>loadStudentGrades(id,area,student);area.append(retry);
   }finally{clearTimeout(timer)}
 }
-async function loadDirectoryAdmission(id,label){
-  const showAdmission=text=>{label.textContent=text;const top=el('detail').querySelector('.admissionTop');if(String(selectedId)===id&&top)top.textContent=text;};
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),90000);
-  const slowTimer=setTimeout(()=>{if(String(selectedId)===id&&label.isConnected)showAdmission('入塾日・通塾期間を取得中です。少しお待ちください…');},12000);
-  try{
-    const response=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action:'getEntrySheetData',studentId:id}),signal:controller.signal});
-    const data=await response.json();
-    if(!response.ok||data.success!==true)throw Error(data.error||'取得できませんでした');
-    if(String(selectedId)!==id||!label.isConnected)return;
-    const date=String(data.data?.masterInfo?.colC||data.data?.masterColumnC||'').slice(0,10);
-    const duration=calcEnrollmentDuration(date);
-    showAdmission(date?'入塾日: '+date+(duration?'（'+duration+'通塾）':''):'入塾日: 未登録');
-  }catch(error){if(String(selectedId)===id&&label.isConnected)showAdmission('入塾日・通塾期間を取得できませんでした：'+(error.name==='AbortError'?'通信に時間がかかっています。':error.message))}
-  finally{clearTimeout(timer);clearTimeout(slowTimer)}
+function loadDirectoryAdmission(id,label,student){
+  const date=String(student.admissionDate||'');
+  const raw=String(student.admissionDateText||'');
+  const duration=calcEnrollmentDuration(date);
+  const text=date?'入塾日: '+date+(duration?'（'+duration+'通塾）':''):raw?'入塾日: '+raw+'（日付要確認）':'入塾日: 未登録';
+  label.textContent=text;
+  const top=el('detail').querySelector('.admissionTop');
+  if(String(selectedId)===id&&top)top.textContent=text;
 }
 function renderDirectoryCompare(area,scores,reports,student){
   const sort=(rows,report)=>rows.slice().sort((a,b)=>Number(a.year)-Number(b.year)||String(report?b.semester:a.term).localeCompare(String(report?a.semester:b.term),'ja',{numeric:true}));
