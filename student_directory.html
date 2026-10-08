@@ -322,7 +322,7 @@ async function loadDirectoryAdmission(id,label){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),90000);
   const slowTimer=setTimeout(()=>{if(String(selectedId)===id&&label.isConnected)showAdmission('入塾日・通塾期間を取得中です。少しお待ちください…');},12000);
   try{
-    const response=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'getEntrySheetData',studentId:id}),signal:controller.signal});
+    const response=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action:'getEntrySheetData',studentId:id}),signal:controller.signal});
     const data=await response.json();
     if(!response.ok||data.success!==true)throw Error(data.error||'取得できませんでした');
     if(String(selectedId)!==id||!label.isConnected)return;
