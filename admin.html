@@ -4224,21 +4224,15 @@ function clearCmpStudentSelection() {
   input?.focus();
 }
 function updateCmpAdmissionDate(sid) {
-  const box = document.getElementById('cmpAdmissionDate');
-  if (!box) return;
-  const targetId = String(sid || '');
-  box.textContent = '';
-  if (!targetId) return;
-  box.textContent = '入塾日: 読込中';
-  api({ action: 'getEntrySheetData', studentId: targetId }).then(r => {
-    if (String(document.getElementById('cmpStudent')?.value || targetId) !== targetId) return;
-    const info = Object.assign({ colC: r?.data?.masterColumnC || '' }, r?.data?.masterInfo || {});
-    const date = formatEntryValue(info.colC || '');
-    const duration = calcEnrollmentDuration(date);
-    box.textContent = date ? `入塾日: ${date}${duration ? `（${duration}通塾）` : ''}` : '';
-  }).catch(() => {
-    if (String(document.getElementById('cmpStudent')?.value || targetId) === targetId) box.textContent = '';
-  });
+  const box=document.getElementById('cmpAdmissionDate');
+  if(!box)return;
+  const targetId=String(sid||'');
+  if(!targetId){box.textContent='';return;}
+  const st=students.find(s=>String(s.id ?? s.studentId ?? s.studentCode ?? '')===targetId)||{};
+  const date=String(st.admissionDate||'');
+  const raw=String(st.admissionDateText||'');
+  const duration=calcEnrollmentDuration(date);
+  box.textContent=date?`入塾日: ${date}${duration?`（${duration}通塾）`:''}`:raw?`入塾日: ${raw}（日付要確認）`:'入塾日: 未登録';
 }
 async function loadCompare(overrideSid) {
   const sid = overrideSid ? String(overrideSid) : document.getElementById('cmpStudent').value;
