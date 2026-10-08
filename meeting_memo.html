@@ -1012,6 +1012,7 @@ async function init(){
     updateNameDatalist();
     renderStudents();
     renderStaff();
+    selectLinkedStudent_();
     renderMemos();
 
     // メール送信システムの最新フリガナも後から取り込み、初期表示は待たせない
@@ -1026,6 +1027,18 @@ async function init(){
     $('formError').textContent = '読み込みに失敗しました。通信状態を確認してください。';
     $('formError').classList.add('show');
   }
+}
+
+function selectLinkedStudent_(){
+  const id = new URLSearchParams(location.search).get('studentId') || '';
+  if (!/^\d{1,10}$/.test(id)) return;
+  const student = students.find(s => String(s.id) === id);
+  if (!student) return;
+  currentGradeGroup = '';
+  $('gradeGroup').value = '';
+  selectCampus('');
+  selectStudent(id);
+  $('searchName').value = student.name;
 }
 
 function debounce(fn, wait){
