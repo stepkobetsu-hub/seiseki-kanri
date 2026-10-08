@@ -329,7 +329,7 @@ function meetingDate(value){const raw=String(value||'');if(/^\d{4}-\d{2}-\d{2}/.
 function renderMeetingSection(card,id){
   const head=document.createElement('div');head.className='meetingHead';
   const title=document.createElement('h3');title.textContent='🗒️ 面談記録';
-  const add=document.createElement('a');add.href=`admin.html?studentId=${encodeURIComponent(id)}#meetings`;add.target='_blank';add.rel='noopener';add.className='btn secondary small';add.textContent='＋ 面談メモを登録';
+  const add=document.createElement('a');add.href=`meeting_memo.html?studentId=${encodeURIComponent(id)}`;add.target='_blank';add.rel='noopener';add.className='btn secondary small';add.textContent='＋ 面談メモを登録';
   head.append(title,add);card.append(head);
   const area=document.createElement('div');area.className='meetingStatus';area.textContent='面談記録を読み込み中…';card.append(area);
   loadMeetingRecords(id,area);
