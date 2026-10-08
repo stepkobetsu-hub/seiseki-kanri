@@ -295,9 +295,50 @@ function renderStudentGrades(card,student){
   link.href=`admin.html?studentId=${encodeURIComponent(student.id)}&v=20261008-admin-restored#compare`;
   link.target='_blank';link.rel='noopener';link.textContent='📊 この生徒の成績・志望校をみる';
   head.append(info,link);card.append(head);
+  const wishCard=document.createElement('div');wishCard.style.display='none';card.append(wishCard);
+  loadDirectoryWish(String(student.id),wishCard);
   const area=document.createElement('div');area.textContent='成績・通知表を読み込み中…';card.append(area);
   loadDirectoryAdmission(String(student.id),admission,student);
   loadStudentGrades(String(student.id),area,student);
+}
+function renderDirectoryWish(card,wish){
+  card.replaceChildren();card.style.display='none';
+  if(!wish)return;
+  const entries=[['公立1','#6366f1','pub1'],['公立2','#6366f1','pub2'],['公立3','#6366f1','pub3'],['私立1','#f59e0b','pri1'],['私立2','#f59e0b','pri2'],['私立3','#f59e0b','pri3']]
+    .filter(([, ,key])=>String(wish[key+'name']||'').trim());
+  if(!entries.length)return;
+  card.style.cssText='background:linear-gradient(135deg,#eef2ff,#fef9ee);border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:14px';
+  const head=document.createElement('div');head.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:6px';
+  const title=document.createElement('span');title.textContent='🏫 志望校';title.style.cssText='font-size:.9rem;font-weight:700;color:#1e293b';head.append(title);
+  if(wish.updatedAt){const date=document.createElement('span');date.textContent='更新: '+String(wish.updatedAt).slice(0,10);date.style.cssText='font-size:.68rem;color:#94a3b8';head.append(date)}
+  const body=document.createElement('div');body.style.cssText='font-size:.8rem;color:#475569;line-height:2';
+  const results=wish.results||{};
+  for(const [label,color,key] of entries){
+    const line=document.createElement('div'),tag=document.createElement('span');tag.textContent=label;tag.style.cssText='font-weight:600;color:'+color;
+    line.append(tag,document.createTextNode(' '+wish[key+'name']+(wish[key+'dept']?'／'+wish[key+'dept']:'')));
+    const badge=(text,style)=>{const span=document.createElement('span');span.textContent=text;span.style.cssText='font-size:.7rem;margin-left:4px;border-radius:4px;padding:1px 6px;'+style;line.append(span)};
+    if(results[key+'type'])badge(results[key+'type'],'color:#1a56a0;background:#dbeafe');
+    if(results[key]&&results[key]!=='-')badge(results[key],'font-weight:700;'+(results[key]==='合格'?'color:#10b981;background:#dcfce7':'color:#ef4444;background:#fee2e2'));
+    if(results[key+'enroll'])badge('進学先','font-weight:700;color:#ef4444;border:1.5px solid #ef4444;padding:0 4px');
+    body.append(line);
+  }
+  card.append(head,body);
+}
+async function loadDirectoryWish(id,card){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+  try{
+    const response=await fetch(MEETING_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action:'getWish',studentId:id,token:token()}),cache:'no-store',signal:controller.signal});
+    const data=await response.json();
+    if(String(selectedId)!==id||!card.isConnected)return;
+    if(!response.ok||data.success!==true)throw Error(data.error||'志望校を取得できませんでした。');
+    renderDirectoryWish(card,data.wish);
+  }catch(error){
+    if(String(selectedId)!==id||!card.isConnected)return;
+    card.style.cssText='margin-bottom:14px';
+    const message=document.createElement('p');message.className='error';message.textContent='志望校を読み込めませんでした：'+(error.name==='AbortError'?'通信に時間がかかっています。':error.message);
+    const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';retry.onclick=()=>{card.replaceChildren();card.style.display='none';loadDirectoryWish(id,card)};
+    card.replaceChildren(message,retry);
+  }finally{clearTimeout(timer)}
 }
 async function loadStudentGrades(id,area,student){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
