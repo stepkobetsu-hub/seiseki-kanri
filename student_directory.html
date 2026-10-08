@@ -284,17 +284,47 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&ready&&to
 
 function renderStudentGrades(card,student){
   const title=document.createElement('h3');title.textContent='📊 成績・通知表';card.append(title);
-  const frame=document.createElement('iframe');frame.id='studentGradesFrame';frame.title=`${student.name||''}の成績・通知表`;
-  frame.src=`admin.html?studentId=${encodeURIComponent(student.id)}&embed=directory#compare`;
-  frame.style.cssText='width:100%;height:480px;border:1px solid #d9ebdf;border-radius:10px;display:block';
-  card.append(frame);
+  const area=document.createElement('div');area.textContent='成績・通知表を読み込み中…';card.append(area);
+  loadStudentGrades(String(student.id),area);
 }
-window.addEventListener('message',event=>{
-  const frame=el('studentGradesFrame');
-  if(event.origin!==location.origin||!frame||event.source!==frame.contentWindow||event.data?.type!=='directoryGradesHeight')return;
-  const height=Number(event.data.height);
-  if(Number.isFinite(height)&&height>0)frame.style.height=Math.max(240,Math.min(20000,Math.ceil(height)))+'px';
-});
+async function loadStudentGrades(id,area){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+  const request=async action=>{
+    const response=await fetch(MEETING_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action,studentId:id,token:token()}),cache:'no-store',signal:controller.signal});
+    const data=await response.json();
+    if(!response.ok||data.success!==true)throw Error(data.error||'成績を取得できませんでした。');return data;
+  };
+  try{
+    const [scores,reports]=await Promise.all([request('getStudentScores'),request('getReports')]);
+    if(String(selectedId)!==id||!area.isConnected)return;
+    area.replaceChildren();
+    renderGradeTable(area,'テスト成績',Array.isArray(scores.scores)?scores.scores:[],false);
+    renderGradeTable(area,'通知表',Array.isArray(reports.data)?reports.data:[],true);
+  }catch(error){
+    if(String(selectedId)!==id||!area.isConnected)return;
+    area.replaceChildren();const message=document.createElement('p');message.className='error';message.textContent='成績・通知表を読み込めませんでした：'+(error.name==='AbortError'?'通信に時間がかかっています。':error.message);area.append(message);
+    const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';retry.onclick=()=>loadStudentGrades(id,area);area.append(retry);
+  }finally{clearTimeout(timer)}
+}
+function renderGradeTable(area,title,rows,report){
+  const heading=document.createElement('h4');heading.textContent=title;heading.style.margin='12px 0 8px';area.append(heading);
+  rows=rows.slice().sort((a,b)=>Number(b.year)-Number(a.year)||String(b.semester||b.term).localeCompare(String(a.semester||a.term),'ja',{numeric:true}));
+  if(!rows.length){const empty=document.createElement('p');empty.className='muted';empty.textContent='登録された'+title+'はありません。';area.append(empty);return}
+  const wrap=document.createElement('div');wrap.style.cssText='overflow-x:auto;border:1px solid #d9ebdf;border-radius:8px';
+  const table=document.createElement('table');table.style.cssText='border-collapse:collapse;width:100%;font-size:.9rem;white-space:nowrap';
+  const subjects=['jpn','soc','math','sci','eng','mus','art','pe','tech'];
+  const header=['年度・回／学期','国','社','数','理','英','音','美','体','技','5科計','9科計'];if(!report)header.push('5科順位','9科順位');
+  const makeRow=(values,head=false)=>{const tr=document.createElement('tr');for(const value of values){const td=document.createElement(head?'th':'td');td.textContent=value==null||value===''?'－':String(value);td.style.cssText='padding:8px 10px;text-align:center;border-bottom:1px solid #d9ebdf;'+(head?'background:#e8f8ee':'');tr.append(td)}return tr};
+  const thead=document.createElement('thead');thead.append(makeRow(header,true));table.append(thead);const tbody=document.createElement('tbody');
+  for(const row of rows){
+    const values=subjects.map(key=>row[(report?'rp_':'')+key]);
+    const total=n=>values.slice(0,n).every(v=>v!==''&&v!=null&&Number.isFinite(Number(v)))?values.slice(0,n).reduce((sum,v)=>sum+Number(v),0):'';
+    const savedTotal=(key,n)=>row[key]!==''&&row[key]!=null?row[key]:total(n);
+    const cells=[`${row.year||''}年度 ${report?(row.semester||''):'第'+(row.term||'')+'回'}`,...values,report?total(5):savedTotal('total5',5),report?total(9):savedTotal('total9',9)];
+    if(!report)cells.push(row.rank5,row.rank9);tbody.append(makeRow(cells));
+  }
+  table.append(tbody);wrap.append(table);area.append(wrap);
+}
 function meetingDate(value){const raw=String(value||'');if(/^\d{4}-\d{2}-\d{2}/.test(raw))return raw.slice(0,10);const d=new Date(raw);return Number.isNaN(d.valueOf())?raw:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function renderMeetingSection(card,id){
   const head=document.createElement('div');head.className='meetingHead';
