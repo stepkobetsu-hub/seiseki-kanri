@@ -213,6 +213,7 @@ function student(row: JsonObject): JsonObject {
     id: row.student_code, studentId: row.student_code, studentCode: row.student_code,
     name: row.name ?? '', nameKana: row.name_kana ?? '', kana: row.name_kana ?? '', furigana: row.name_kana ?? '', campus: row.campus ?? '',
     grade: row.grade ?? '', school: row.school_name ?? '',
+    admissionDate: row.admission_date ?? '', admissionDateText: row.admission_date_text ?? '',
     flag, enrollmentFlag: flag, enrollmentStatus: status,
     active: status === 'active', syncedAt: row.source_updated_at ?? row.updated_at ?? '',
   };
@@ -261,7 +262,7 @@ async function getStudents(payload: JsonObject): Promise<JsonObject> {
   const limit = positiveInt(payload.limit, 1000, 1000);
   const offset = positiveInt(payload.offset, 0, 100000);
   const params: Record<string, unknown> = {
-    select: 'student_code,name,name_kana,campus,grade,school_name,active,enrollment_status,source_updated_at,updated_at',
+    select: 'student_code,name,name_kana,campus,grade,school_name,active,enrollment_status,source_updated_at,updated_at,admission_date,admission_date_text',
     order: 'active.desc,campus.asc,grade.asc,student_code.asc', limit, offset,
   };
   if (payload.campus) params.campus = String(payload.campus)==='大手町'||String(payload.campus)==='大手'?'in.(大手,大手町)':`eq.${payload.campus}`;
@@ -286,7 +287,8 @@ async function readScores(payload: JsonObject, all: boolean): Promise<JsonObject
   if (payload.term) params.test_number = `eq.${payload.term}`;
   if (payload.campus) params.campus = String(payload.campus)==='大手町'||String(payload.campus)==='大手'?'in.(大手,大手町)':`eq.${payload.campus}`;
   const rows = await pg(query('test_scores_with_students', params)) as JsonObject[];
-  return { success: true, scores: rows.map(score), source: 'supabase' };
+  const admissions = !all && payload.studentId ? await pg(query('students', {select:'admission_date,admission_date_text',student_code:`eq.${payload.studentId}`,limit:1})) as JsonObject[] : [];
+  return { success: true, scores: rows.map(score), admissionDate:admissions[0]?.admission_date ?? '', admissionDateText:admissions[0]?.admission_date_text ?? '', source: 'supabase' };
 }
 
 async function readReports(payload: JsonObject, all: boolean): Promise<JsonObject> {
@@ -679,6 +681,30 @@ async function logoutAdmin(payload: JsonObject): Promise<JsonObject> {
 }
 
 
+
+function normalizeAdmissionDate(value: unknown): string | null {
+  const match=String(value ?? '').trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if(!match)return null;
+  const date=match[1]+'-'+match[2].padStart(2,'0')+'-'+match[3].padStart(2,'0');
+  const check=new Date(date+'T00:00:00Z');
+  return Number.isFinite(check.getTime())&&check.toISOString().slice(0,10)===date?date:null;
+}
+async function importMissingAdmissionDates(): Promise<void> {
+  // Only new/unimported students touch the master. Display requests read Postgres only.
+  const rows=await pg(query('students',{select:'student_code',admission_date_text:'is.null',active:'eq.true',limit:4,order:'student_code.desc'})) as JsonObject[];
+  await Promise.all(rows.map(async row=>{
+    try {
+      const result=await gas('getEntrySheetData',{studentId:row.student_code});
+      const data=parseObject(result.data),master=parseObject(data.masterInfo);
+      const raw=String(master.colC ?? data.masterColumnC ?? '').trim();
+      if(!result.data)return;
+      await pg(query('students',{student_code:`eq.${row.student_code}`,admission_date_text:'is.null'}),{
+        method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({admission_date:normalizeAdmissionDate(raw),admission_date_text:raw}),
+      });
+    }catch(error){console.warn('Admission import pending',String(row.student_code),String(error));}
+  }));
+}
+
 async function putDirectoryDetails(details: JsonObject[], fetchedAt: string): Promise<number> {
   if (!Array.isArray(details) || !details.length || details.length > 1000) throw new Error('Invalid directory snapshot');
   const seen = new Set<string>();
@@ -693,6 +719,7 @@ async function putDirectoryDetails(details: JsonObject[], fetchedAt: string): Pr
       method:'POST', headers:{ Prefer:'resolution=merge-duplicates,return=minimal' }, body:JSON.stringify(rows.slice(i, i + 50)),
     });
   }
+  EdgeRuntime.waitUntil(importMissingAdmissionDates().catch(error=>console.warn('Admission import pending',String(error))));
   return rows.length;
 }
 
@@ -715,7 +742,8 @@ async function readDirectoryDetail(payload: JsonObject): Promise<JsonObject> {
   if (!rows.length) return { success:false, code:'MIRROR_NOT_READY', error:'Directory mirror is not ready' };
   const detail = parseObject(rows[0].detail);
   if (String((detail.student as JsonObject)?.id ?? '') !== id) throw new Error('Directory mirror mismatch');
-  return { ...detail, source:'supabase', sourceFetchedAt:rows[0].source_fetched_at };
+  const admissions = await pg(query('students', {select:'admission_date,admission_date_text',student_code:`eq.${id}`,limit:1})) as JsonObject[];
+  return { ...detail, student:{...parseObject(detail.student),admissionDate:admissions[0]?.admission_date ?? '',admissionDateText:admissions[0]?.admission_date_text ?? ''}, source:'supabase', sourceFetchedAt:rows[0].source_fetched_at };
 }
 
 async function saveDirectoryDetail(payload: JsonObject): Promise<JsonObject> {
