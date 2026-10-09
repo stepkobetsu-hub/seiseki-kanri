@@ -799,8 +799,8 @@ async function dispatch(payload: JsonObject): Promise<JsonObject> {
     case 'getStudentScores': return readScores(payload, false);
     case 'getStudentGradeProfile': {
       if(!/^\d{1,10}$/.test(String(payload.studentId||'')))throw new ResponseError(400,'STUDENT_REQUIRED','生徒番号が必要です。');
-      const [scores,reports,wish]=await Promise.all([readScores(payload,false),readReports(payload,false),readWishes(payload,false)]);
-      return {success:true,scores:scores.scores,reports:reports.data,wish:wish.wish,admissionDate:scores.admissionDate,admissionDateText:scores.admissionDateText,source:'supabase'};
+      const [scores,reports,wish,studentRows]=await Promise.all([readScores(payload,false),readReports(payload,false),readWishes(payload,false),pg(query('students',{select:'*',student_code:`eq.${String(payload.studentId)}`,limit:1})) as Promise<JsonObject[]>]);
+      return {success:true,student:studentRows[0]?student(studentRows[0]):null,scores:scores.scores,reports:reports.data,wish:wish.wish,admissionDate:scores.admissionDate,admissionDateText:scores.admissionDateText,source:'supabase'};
     }
     case 'getAllReports': return readReports(payload, true);
     case 'getReports': return readReports(payload, false);
