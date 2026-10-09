@@ -4,7 +4,7 @@ import {checkPermissionBridge} from './permission-bridge.ts';
 type JsonObject = Record<string, unknown>;
 
 const ADMIN_ACTIONS = new Set([
-  'getStudents', 'getStudentList', 'getAllScores', 'getStudentScores',
+  'getStudents', 'getStudentList', 'getAllScores', 'getStudentScores', 'getStudentGradeProfile',
   'saveScore', 'deleteScore', 'getAllReports', 'getReports', 'saveReport',
   'deleteReport', 'getAllWishes', 'getWish', 'saveWish', 'saveWishResult',
   'getSchools', 'addSchool', 'updateSchool', 'deleteSchool',
@@ -19,7 +19,7 @@ const STAFF_PERMISSION_LEVELS = new Set(['1', '2', '3', '4']);
 // Grade-only sessions never authorize the directory or other management apps.
 const GRADE_SESSION_PREFIX = 'seiseki-grade:';
 const GRADE_ACTIONS = new Set([
-  'getStudents', 'getStudentList', 'getAllScores', 'getStudentScores',
+  'getStudents', 'getStudentList', 'getAllScores', 'getStudentScores', 'getStudentGradeProfile',
   'saveScore', 'deleteScore', 'getAllReports', 'getReports', 'saveReport',
   'deleteReport', 'getAllWishes', 'getWish', 'saveWish', 'saveWishResult',
   'getSchools', 'addSchool', 'updateSchool', 'deleteSchool',
@@ -797,6 +797,11 @@ async function dispatch(payload: JsonObject): Promise<JsonObject> {
     case 'saveStudentDirectory': return saveDirectoryDetail(payload);
     case 'getAllScores': return readScores(payload, true);
     case 'getStudentScores': return readScores(payload, false);
+    case 'getStudentGradeProfile': {
+      if(!/^\d{1,10}$/.test(String(payload.studentId||'')))throw new ResponseError(400,'STUDENT_REQUIRED','生徒番号が必要です。');
+      const [scores,reports,wish]=await Promise.all([readScores(payload,false),readReports(payload,false),readWishes(payload,false)]);
+      return {success:true,scores:scores.scores,reports:reports.data,wish:wish.wish,admissionDate:scores.admissionDate,admissionDateText:scores.admissionDateText,source:'supabase'};
+    }
     case 'getAllReports': return readReports(payload, true);
     case 'getReports': return readReports(payload, false);
     case 'getAllWishes': return readWishes(payload, true);
