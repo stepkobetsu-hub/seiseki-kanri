@@ -1145,7 +1145,7 @@ tr:hover td{background:#f8fafc}
 <div id="toast"></div>
 
 <script src="assets/js/supabase-config.js"></script>
-<script src="assets/js/staff-auth.js?v=20261009-network-retry"></script>
+<script src="assets/js/staff-auth.js?v=20261009-google-login-restored"></script>
 <script>
 if (location.hash === '#directory') location.replace('student_directory.html');
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
@@ -1871,15 +1871,9 @@ async function adminSupabaseApi(data) {
     payload.mutationId = newAdminMutationId();
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), 45000);
   try {
-    const response = await fetch(SEISEKI_ADMIN_RUNTIME_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-      body: JSON.stringify(payload),
-      cache: 'no-store',
-      signal: controller.signal
-    });
+    const response = await StepStaffAuth.fetchRuntime(payload, controller.signal);
     const result = await response.json().catch(() => ({}));
     if (!response.ok || result.success !== true) {
       const authRequired = response.status === 401 || response.status === 403 || result.code === 'AUTH_REQUIRED';
