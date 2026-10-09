@@ -857,11 +857,15 @@ Deno.serve(async request => {
   try {
     const payload = await request.json() as JsonObject;
     const action = String(payload.action ?? '');
+    const trace=String(payload.requestTrace||'');
+    if(/^[a-zA-Z0-9-]{8,64}$/.test(trace))console.info(JSON.stringify({event:'request_received',trace,action}));
     if (action === 'staffLogin') return json(await loginStaff(payload));
     if (action === 'ingestStudentDirectory') return json(await ingestDirectorySnapshot(payload));
     if (!ADMIN_ACTIONS.has(action) && action !== 'verifyStaffSession') throw new ResponseError(400, 'UNSUPPORTED_ACTION', 'Unsupported action');
     const session = await verifyAdmin(payload.token);
+    if(/^[a-zA-Z0-9-]{8,64}$/.test(trace))console.info(JSON.stringify({event:'session_checked',trace,action}));
     await enforceCentralPermission(session, payload);
+    if(/^[a-zA-Z0-9-]{8,64}$/.test(trace))console.info(JSON.stringify({event:'permission_checked',trace,action}));
     requireActionPermission(session, payload.token, action);
     if (action === 'verifyStaffSession') return json({ success: true,
       code: session.staff_code ?? session.code,
@@ -869,7 +873,9 @@ Deno.serve(async request => {
     });
     EdgeRuntime.waitUntil(retryFailedMirrors().catch(error => console.error('Mirror retry failed', error)));
     if (WRITE_ACTIONS.has(action) && !String(payload.mutationId ?? '').trim()) throw new ResponseError(400, 'MUTATION_ID_REQUIRED', 'mutationId is required');
-    return json(await dispatch(payload));
+    const result=await dispatch(payload);
+    if(/^[a-zA-Z0-9-]{8,64}$/.test(trace))console.info(JSON.stringify({event:'request_completed',trace,action}));
+    return json(result);
   } catch (error) {
     if (error instanceof ResponseError) return json({ success: false, code: error.code, error: error.message }, error.status);
     console.error(error);
