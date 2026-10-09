@@ -709,13 +709,18 @@ async function meetingSupabaseApi_(data){
   }
 }
 async function meetingLegacyApi_(data){
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45000);
+  try {
   const res = await fetch(GAS, {
+    signal:controller.signal,
     method:'POST',
     headers:{'Content-Type':'text/plain;charset=UTF-8'},
     body:JSON.stringify(data),
     cache:'no-store'
   });
   return await res.json();
+  } finally { clearTimeout(timeout); }
 }
 async function api(data){
   if (SUPABASE_MEETING_ACTIONS.has(data.action)) return meetingSupabaseApi_(data);
@@ -798,6 +803,7 @@ function storeMeetingSession_(staff, fallbackCode){
 function clearMeetingSession_(){
   clearMeetingIdle_();
   localStorage.removeItem('stepStudentDirectorySearchIndexV1');
+  localStorage.removeItem('stepMeetingStudentIndexV1');
   [
     'adminSystemPortalSessionToken','adminSystemPortalExpiresAt','adminLoggedIn',
     'adminStaffCode','adminStaffName','adminDeviceMode','adminCodeInput','adminPwInput'
@@ -985,26 +991,56 @@ function selectableMeetingStudents_(rows){
   });
 }
 
+function readMeetingStudentCache_(){
+  try{
+    const staffCode=localStorage.getItem('adminStaffCode')||sessionStorage.getItem('adminStaffCode')||'';
+    if(!staffCode||!meetingAdminToken_())return [];
+    for(const key of ['stepMeetingStudentIndexV1','stepStudentDirectorySearchIndexV1']){
+      const cached=JSON.parse(localStorage.getItem(key)||'null');
+      if(!cached||String(cached.staffCode)!==staffCode||Date.now()-Number(cached.time)>7*86400000||!Array.isArray(cached.students))continue;
+      const rows=selectableMeetingStudents_(cached.students);
+      if(rows.length)return rows;
+    }
+  }catch(e){}
+  return [];
+}
+function saveMeetingStudentCache_(){
+  try{
+    const staffCode=localStorage.getItem('adminStaffCode')||sessionStorage.getItem('adminStaffCode')||'';
+    if(!staffCode)return;
+    localStorage.setItem('stepMeetingStudentIndexV1',JSON.stringify({staffCode,time:Date.now(),students:students.map(s=>({id:s.id,name:s.name,kana:s.kana,campus:s.campus,grade:s.grade,flag:s.flag,enrollmentFlag:s.enrollmentFlag,enrollmentStatus:s.enrollmentStatus,active:s.active}))}));
+  }catch(e){}
+}
+function applyMeetingStudents_(rows){
+  students=rows.map(s=>({...s,campus:s.campus==='大手町'?'大手':s.campus}));
+  studentsLoadState='ready';
+  updateNameDatalist();renderStudents();
+  if(!$('student').value)selectLinkedStudent_();
+  renderMemos();
+}
 async function loadMeetingStudents_(){
-  studentsLoadState = 'loading';
+  const cached=readMeetingStudentCache_();
+  if(!students.length&&cached.length)applyMeetingStudents_(cached);
+  if(!students.length)studentsLoadState='loading';
   renderStudents();
-  try {
-    const sr = await api({ action:'getStudents' });
-    if (!sr.success || !Array.isArray(sr.students)) throw new Error(sr.error || '生徒一覧を読み込めませんでした');
-    students = selectableMeetingStudents_(sr.students);
-    studentsLoadState = 'ready';
-    updateNameDatalist();
-    renderStudents();
-    if (!$('student').value) selectLinkedStudent_();
-    renderMemos();
-    Promise.all([fetchLocalSearchStudents_().catch(() => []), fetchSearchStudents_().catch(() => [])]).then(([localRows, searchRows]) => {
-      students = mergeSearchKana_(mergeSearchKana_(students, localRows), searchRows);
-      updateNameDatalist();
-      renderStudents();
-      renderMemos();
+  try{
+    const checked=promise=>promise.then(sr=>{
+      if(!sr.success||!Array.isArray(sr.students))throw Error(sr.error||'生徒一覧を読み込めませんでした');
+      const rows=selectableMeetingStudents_(sr.students);
+      if(!rows.length)throw Error('生徒一覧が空でした。');
+      return rows;
     });
-  } catch (e) {
-    studentsLoadState = 'error';
+    const rows=await Promise.any([
+      checked(api({action:'getStudents'})),
+      checked(meetingLegacyApi_({action:'getStudentDirectoryList',systemPortalSessionToken:meetingAdminToken_()}))
+    ]);
+    applyMeetingStudents_(rows);saveMeetingStudentCache_();
+    Promise.all([fetchLocalSearchStudents_().catch(()=>[]),fetchSearchStudents_().catch(()=>[])]).then(([localRows,searchRows])=>{
+      students=mergeSearchKana_(mergeSearchKana_(students,localRows),searchRows);
+      updateNameDatalist();renderStudents();renderMemos();saveMeetingStudentCache_();
+    });
+  }catch(e){
+    if(!students.length)studentsLoadState='error';
     renderStudents();
   }
 }
@@ -1040,7 +1076,10 @@ function selectLinkedStudent_(){
   $('gradeGroup').value = '';
   selectCampus('');
   selectStudent(id);
+  $('studentSearch').value = student.name;
   $('searchName').value = student.name;
+  renderStudents();
+  renderMemos();
 }
 
 function debounce(fn, wait){
