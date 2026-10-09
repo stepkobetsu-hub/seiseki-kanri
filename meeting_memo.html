@@ -551,7 +551,7 @@ body.auth-locked > #toast{display:none!important}
 
 <div id="toast" class="toast"></div>
 
-<script src="assets/js/staff-auth.js?v=20261009-login-wait"></script>
+<script src="assets/js/staff-auth.js?v=20261009-dual-endpoint"></script>
 <script>
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 const STUDENT_SEARCH_GAS = 'https://script.google.com/macros/s/AKfycbxIH2VtgwRi50xduXgrkYrjD0yrzNfQ5vCWt1XgOzil6LZSgXNj6MJo9jPYvOkjNHdu/exec';
@@ -692,15 +692,9 @@ async function meetingSupabaseApi_(data){
   const payload = { ...data, token };
   if (SUPABASE_MEETING_WRITES.has(data.action) && !payload.mutationId) payload.mutationId = meetingMutationId_();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), 45000);
   try {
-    const res = await fetch(SEISEKI_ADMIN_RUNTIME_URL, {
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=UTF-8'},
-      body:JSON.stringify({...payload,permissionAppId:'public-13'}),
-      cache:'no-store',
-      signal:controller.signal
-    });
+    const res = await StepStaffAuth.fetchRuntime({...payload,permissionAppId:'public-13'},controller.signal);
     const result = await res.json().catch(() => ({}));
     if (!res.ok || result.success !== true) {
       throw new Error(result.error || (res.status === 401 || res.status === 403
