@@ -4,7 +4,7 @@
   const endpoint = 'https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
   async function requestOnce(payload) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
+    const timeout = setTimeout(() => controller.abort(), payload.action === 'staffLogin' ? 90000 : 45000);
     try {
       const response = await fetch(endpoint, {
         method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
