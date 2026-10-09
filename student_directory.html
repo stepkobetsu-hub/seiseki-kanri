@@ -77,6 +77,7 @@ const INDEX_CACHE_KEY='stepStudentDirectorySearchIndexV1';
 const LABELS={E:'生徒氏名',F:'フリガナ',H:'校舎',K:'学年',L:'生徒ログインPASS',M:'口座振替提出',N:'口座振替有効',P:'学校名',Q:'保護者氏名',R:'保護者フリガナ',S:'保護者続柄',T:'郵便番号',U:'住所（都道府県・市区町村）',V:'住所（番地）',W:'住所（建物名）',X:'保護者メール',Y:'保護者携帯',Z:'保護者自宅電話',AA:'第2保護者氏名',AB:'第2保護者フリガナ',AC:'第2保護者続柄',AE:'第2保護者携帯',AW:'成績パス'};
 const el=id=>document.getElementById(id);
 function statusBadge(flag){const value=String(flag??'').trim();if(value!=='0'&&value!=='')return null;const badge=document.createElement('span');badge.className='statusBadge '+(value===''?'withdrawn':'scheduled');badge.textContent=value===''?'退塾':'退塾予定';return badge}
+let admissionIndexPromise=Promise.resolve();
 let mode='personal',students=[],ready=false,selectedId='',editable=null,request=0,listRequest=0,listRefreshing=false,detailView=false;
 function storage(){return localStorage}
 function token(){return storage().getItem(TOKEN)||''}
@@ -126,33 +127,35 @@ function readCachedIndex(){
   catch{return []}
 }
 function saveCachedIndex(list){
-  try{localStorage.setItem(INDEX_CACHE_KEY,JSON.stringify({staffCode:localStorage.getItem('adminStaffCode'),time:Date.now(),students:list.map(s=>({id:s.id,flag:s.flag,name:s.name,kana:s.kana,campus:s.campus,grade:s.grade}))}))}catch{}
+  try{localStorage.setItem(INDEX_CACHE_KEY,JSON.stringify({staffCode:localStorage.getItem('adminStaffCode'),time:Date.now(),students:list.map(s=>({id:s.id,flag:s.flag,name:s.name,kana:s.kana,campus:s.campus,grade:s.grade,admissionDate:s.admissionDate||'',admissionDateText:s.admissionDateText||''}))}))}catch{}
 }
 async function fastIndex(seq){
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),3500);
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
   try{
     const response=await fetch(MEETING_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action:'getStudentList',permissionAppId:'student-directory',token:token(),limit:1000}),cache:'no-store',signal:controller.signal});
     const data=await response.json().catch(()=>({}));
     if(!response.ok||data.success!==true||!Array.isArray(data.students)||!data.students.length)return;
     if(seq!==listRequest||!token())return;
-    students=prepareSearch(data.students.map(s=>({id:String(s.id),flag:String(s.flag??''),name:String(s.name||''),kana:String(s.kana||s.nameKana||''),campus:String(s.campus||''),grade:String(s.grade||'')})));
+    students=prepareSearch(data.students.map(s=>({id:String(s.id),flag:String(s.flag??''),name:String(s.name||''),kana:String(s.kana||s.nameKana||''),campus:String(s.campus||''),grade:String(s.grade||''),admissionDate:String(s.admissionDate||''),admissionDateText:String(s.admissionDateText||'')})));
 
-    ready=true;renderCandidates();
+    saveCachedIndex(students);ready=true;if(!detailView)renderCandidates();
   }finally{clearTimeout(timer)}
 }
 async function loadList(){
   resetDetails();
   const seq=++listRequest;request++;editable=null;selectedId='';detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').classList.add('hidden');
   const cached=readCachedIndex();students=prepareSearch(cached);ready=!!cached.length;listRefreshing=true;el('refresh').disabled=true;
+  admissionIndexPromise=fastIndex(seq).catch(()=>{});
   if(ready){renderCandidates();refreshDirectoryMirror()}else{el('candidates').replaceChildren();setStatus('生徒の検索候補を準備しています…')}
-  if(!ready){try{await fastIndex(seq)}catch{} if(seq!==listRequest)return;if(ready)refreshDirectoryMirror()}
+  if(!ready){await admissionIndexPromise; if(seq!==listRequest)return;if(ready)refreshDirectoryMirror()}
   if(!ready)setStatus('生徒マスタから最新の候補を取得しています…');
   try{
     const r=await api('getStudentDirectoryList',{systemPortalSessionToken:token()});
     if(seq!==listRequest)return;
     if(!r.success)throw Error(r.error||'取得できませんでした。');
     if(!Array.isArray(r.students)||!r.students.length)throw Error('原本から生徒を取得できませんでした。');
-    students=prepareSearch(r.students);ready=true;saveCachedIndex(students);
+    const admissionRows=students;
+    students=prepareSearch(r.students.map(s=>{const saved=admissionRows.find(row=>String(row.id)===String(s.id));return {...s,admissionDate:s.admissionDate||saved?.admissionDate||'',admissionDateText:s.admissionDateText||saved?.admissionDateText||''}}));ready=true;saveCachedIndex(students);
   }catch(e){
     if(seq!==listRequest)return;
     if(/ログイン情報|ログインしてください|管理権限/.test(e.message)){clearSession();showLogin('再ログインしてください。');return}
@@ -364,6 +367,8 @@ async function loadStudentGrades(id,area,student){
   }finally{clearTimeout(timer)}
 }
 async function loadDirectoryAdmission(id,label,student){
+  if(!student.admissionDate&&!student.admissionDateText)await admissionIndexPromise;
+  if(String(selectedId)!==String(id)||!label.isConnected)return;
   const indexed=students.find(s=>String(s.id)===String(id));
   let date=String(student.admissionDate||indexed?.admissionDate||'');
   let raw=String(student.admissionDateText||indexed?.admissionDateText||'');
