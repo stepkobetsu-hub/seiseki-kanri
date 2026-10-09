@@ -58,3 +58,16 @@ test('level 1 retains grade-only token and never exposes a management token', as
   assert.equal(r.status, 200); assert.equal(r.body.systemPortalSessionToken, ''); assert.match(r.body.gradeSessionToken, /^seiseki-grade:/);
   assert.equal([...f.rows.values()][0].permission_level, '1');
 });
+
+test('directory saves require verified level 4 even with a valid level 2 or 3 session', async () => {
+  for (const level of ['2', '3']) {
+    const f=fixture({level,centralLevel:level});
+    const login=await f.call({action:'staffLogin',code:'7001',password:'fixture'});
+    const r=await f.call({action:'saveStudentDirectory',token:login.body.systemPortalSessionToken,permissionAppId:'student-directory',mutationId:'fixture'});
+    assert.equal(r.status,403);assert.equal(r.body.code,'DIRECTORY_EDITOR_REQUIRED');
+    assert.equal(f.calls.filter(c=>c.url.startsWith('https://script.google.com/')).length,1,'no master write');
+  }
+  const f=fixture();const login=await f.call({action:'staffLogin',code:'7001',password:'fixture'});
+  const r=await f.call({action:'saveStudentDirectory',token:login.body.systemPortalSessionToken,permissionAppId:'student-directory'});
+  assert.equal(r.status,400);assert.equal(r.body.code,'MUTATION_ID_REQUIRED','level 4 passes role check');
+});
