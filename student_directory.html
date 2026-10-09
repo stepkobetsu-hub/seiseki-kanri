@@ -230,7 +230,7 @@ async function directoryDetailRuntime_(id,signal){
   };
   return Promise.any(endpoints.map(read));
 }
-const DIRECTORY_DEFAULT_STAGE_='none';
+const DIRECTORY_DEFAULT_STAGE_='all';
 const directoryStage_=new URLSearchParams(location.search).get('sections')||DIRECTORY_DEFAULT_STAGE_;
 const directorySections_={
  scores:['test','test-report','all'].includes(directoryStage_),
@@ -430,6 +430,8 @@ async function fetchDirectoryGradeProfile_(id){
   const session=token(),key=session+':'+String(id)+':'+directoryStage_;
   const cached=directoryGradeProfiles_.get(key);
   if(cached&&Date.now()-cached.time<60000)return cached.promise;
+  const saved=directoryStage_==='all'?readDirectoryGradeCache_(id,session):null;
+  if(saved)return saved;
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
   const requestTrace='directory-'+crypto.randomUUID();
   const read=async action=>{
@@ -440,12 +442,16 @@ async function fetchDirectoryGradeProfile_(id){
     return data;
   };
   const promise=(async()=>{
-    const [scores,reports,wish]=await Promise.all([
+    const [scoreResult,reportResult]=await Promise.allSettled([
       directorySections_.scores?read('getStudentScores'):Promise.resolve({scores:[]}),
-      directorySections_.reports?read('getReports'):Promise.resolve({data:[]}),
-      directorySections_.wishes?read('getWish'):Promise.resolve({wish:null})
+      directorySections_.reports?read('getReports'):Promise.resolve({data:[]})
     ]);
-    return {success:true,scores:scores.scores,reports:reports.data,wish:wish.wish,admissionDate:scores.admissionDate,admissionDateText:scores.admissionDateText};
+    const scores=scoreResult.status==='fulfilled'?scoreResult.value:{scores:[]};
+    const reports=reportResult.status==='fulfilled'?reportResult.value:{data:[]};
+    const profile={success:true,scores:scores.scores,reports:reports.data,admissionDate:scores.admissionDate,admissionDateText:scores.admissionDateText,scoreError:scoreResult.status==='rejected'?scoreResult.reason.message:'',reportError:reportResult.status==='rejected'?reportResult.reason.message:''};
+    if(!profile.scoreError&&!profile.reportError&&directoryStage_==='all')saveDirectoryGradeCache_(id,session,profile);
+    else if(profile.scoreError||profile.reportError)directoryGradeProfiles_.delete(key);
+    return profile;
   })().catch(error=>{error.requestTrace=requestTrace;directoryGradeProfiles_.delete(key);throw error}).finally(()=>clearTimeout(timer));
   directoryGradeProfiles_.set(key,{promise,time:Date.now()});
   return promise;
@@ -454,7 +460,9 @@ async function loadDirectoryWish(id,card){
   if(!directorySections_.wishes)return;
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
   try{
-    const data=await fetchDirectoryGradeProfile_(id);
+    const response=await StepStaffAuth.fetchRuntime({action:'getWish',studentId:String(id),token:token()},controller.signal);
+    const data=await response.json();
+    if(!response.ok||data.success!==true)throw Error(data.error||'志望校を取得できませんでした。');
     if(String(selectedId)!==id||!card.isConnected)return;
 
     renderDirectoryWish(card,data.wish);
@@ -479,6 +487,11 @@ async function loadStudentGrades(id,area,student){
     }
     area.replaceChildren();
     renderDirectoryCompare(area,Array.isArray(scores.scores)?scores.scores:[],Array.isArray(reports.data)?reports.data:[],student);
+    if(profile.scoreError||profile.reportError){
+      const message=document.createElement('p');message.className='error';
+      message.textContent=[profile.scoreError?'テスト成績：'+profile.scoreError:'',profile.reportError?'通知表：'+profile.reportError:''].filter(Boolean).join(' ／ ');
+      area.prepend(message);
+    }
   }catch(error){
     if(String(selectedId)!==id||!area.isConnected)return;
     area.replaceChildren();const message=document.createElement('p');message.className='error';message.textContent='成績・通知表を読み込めませんでした：'+((error.name==='AbortError'?'通信に時間がかかっています。':error.message)+(error.requestTrace?'　通信確認番号：'+error.requestTrace:''));area.append(message);
@@ -589,7 +602,7 @@ function renderDirectoryCompare(area,scores,reports,student){
     for(const tr of table.querySelectorAll('tr')){
       const cells=Array.from(tr.children);
       if(tr===group){cells[directorySections_.scores?1:0]?.remove();}
-      else for(const cell of cells.filter((_,i)=>directorySections_.scores?i>=10:i<10))cell.remove();
+      else if(cells.length>1)for(const cell of cells.filter((_,i)=>directorySections_.scores?i>=10:i<10))cell.remove();
     }
     const empty=body.querySelector('td[colspan]');if(empty)empty.colSpan=directorySections_.scores?10:12;
   }
