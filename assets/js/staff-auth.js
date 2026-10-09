@@ -6,30 +6,37 @@
     'https://wisedgcgwaebtkprdhth.functions.supabase.co/seiseki-admin-runtime-v1'
   ];
   let activeEndpoint = 0;
+  try { activeEndpoint = Number(localStorage.getItem('stepStaffRuntimeEndpoint')) === 1 ? 1 : 0; } catch(e) {}
   async function fetchRuntime(payload, signal) {
     signal?.throwIfAborted();
-    const first = activeEndpoint;
-    for (let attempt = 0; attempt < endpoints.length; attempt++) {
-      const index = (first + attempt) % endpoints.length;
-      const controller = new AbortController();
-      const abort = () => controller.abort();
-      if (signal?.aborted) abort();
-      else signal?.addEventListener('abort', abort, {once:true});
-      const timer = setTimeout(abort, attempt === 0 ? 8000 : 35000);
+    const first=activeEndpoint;
+    const readOnly=/^get|^verify/.test(String(payload.action||''));
+    const controllers=[];
+    async function send(index) {
+      const controller=new AbortController();controllers.push(controller);
+      const abort=()=>controller.abort();
+      if(signal?.aborted)abort();else signal?.addEventListener('abort',abort,{once:true});
+      const timer=setTimeout(abort,45000);
       try {
-        const response = await fetch(endpoints[index], {
-          method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
-          body:JSON.stringify(payload),cache:'no-store',signal:controller.signal
-        });
-        // Read the body inside the timeout so a stalled body also fails over.
-        const body = await response.text();
-        activeEndpoint = index;
+        const response=await fetch(endpoints[index],{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(payload),cache:'no-store',signal:controller.signal});
+        const body=await response.text();
+        activeEndpoint=index;
+        try{localStorage.setItem('stepStaffRuntimeEndpoint',String(index));}catch(e){}
         return new Response(body,{status:response.status,headers:response.headers});
-      } catch (error) {
-        if (signal?.aborted || attempt === endpoints.length - 1) throw error;
-        const network = controller.signal.aborted || error instanceof TypeError || /Failed to fetch|NetworkError|Load failed/i.test(String(error.message||''));
-        if (!network) throw error;
-      } finally {clearTimeout(timer);signal?.removeEventListener('abort',abort);}
+      }finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
+    }
+    if(readOnly){
+      try{return await Promise.any([send(first),send(1-first)]);}
+      catch(error){if(signal?.aborted)throw new DOMException('Aborted','AbortError');throw error.errors?.[0]||error;}
+      finally{controllers.forEach(controller=>controller.abort());}
+    }
+    // Writes carry one stable mutation ID; do not send concurrent duplicate writes.
+    try{return await send(first);}
+    catch(error){
+      if(signal?.aborted)throw error;
+      const network=error.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError|Load failed/i.test(String(error.message||''));
+      if(!network)throw error;
+      return await send(1-first);
     }
   }
   async function requestOnce(payload) {
