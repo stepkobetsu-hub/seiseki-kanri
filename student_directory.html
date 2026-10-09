@@ -230,7 +230,7 @@ async function directoryDetailRuntime_(id,signal){
   };
   return Promise.any(endpoints.map(read));
 }
-const DIRECTORY_DEFAULT_STAGE_='all';
+const DIRECTORY_DEFAULT_STAGE_='none';
 const directoryStage_=new URLSearchParams(location.search).get('sections')||DIRECTORY_DEFAULT_STAGE_;
 const directorySections_={
  scores:['test','test-report','all'].includes(directoryStage_),
