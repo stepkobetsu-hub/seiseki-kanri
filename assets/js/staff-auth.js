@@ -7,19 +7,29 @@
   ];
   let activeEndpoint = 0;
   async function fetchRuntime(payload, signal) {
+    signal?.throwIfAborted();
     const first = activeEndpoint;
     for (let attempt = 0; attempt < endpoints.length; attempt++) {
       const index = (first + attempt) % endpoints.length;
+      const controller = new AbortController();
+      const abort = () => controller.abort();
+      if (signal?.aborted) abort();
+      else signal?.addEventListener('abort', abort, {once:true});
+      const timer = setTimeout(abort, attempt === 0 ? 8000 : 35000);
       try {
         const response = await fetch(endpoints[index], {
-          method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-          body: JSON.stringify(payload), cache: 'no-store', signal
+          method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},
+          body:JSON.stringify(payload),cache:'no-store',signal:controller.signal
         });
+        // Read the body inside the timeout so a stalled body also fails over.
+        const body = await response.text();
         activeEndpoint = index;
-        return response;
+        return new Response(body,{status:response.status,headers:response.headers});
       } catch (error) {
-        if (error.name === 'AbortError' || !(error instanceof TypeError || /Failed to fetch|NetworkError|Load failed/i.test(String(error.message || ''))) || attempt === endpoints.length - 1) throw error;
-      }
+        if (signal?.aborted || attempt === endpoints.length - 1) throw error;
+        const network = controller.signal.aborted || error instanceof TypeError || /Failed to fetch|NetworkError|Load failed/i.test(String(error.message||''));
+        if (!network) throw error;
+      } finally {clearTimeout(timer);signal?.removeEventListener('abort',abort);}
     }
   }
   async function requestOnce(payload) {
@@ -29,7 +39,9 @@
       const response = await fetchRuntime({ ...payload, permissionAppId: /student_directory/.test(location.pathname) ? 'student-directory' : /meeting_memo|classroom_reports/.test(location.pathname) ? 'public-13' : 'public-12' }, controller.signal);
       const result = await response.json().catch(() => ({}));
       if (!response.ok || result.success !== true) {
-        throw new Error(result.error || 'ログイン情報を確認できませんでした。');
+        const error = new Error(result.error || 'ログイン情報を確認できませんでした。');
+        error.authRequired = response.status === 401 || response.status === 403;
+        throw error;
       }
       return result;
     } catch (error) {
