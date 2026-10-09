@@ -4053,7 +4053,12 @@ function drawReportChart() {
 // ===== 成績×通知表 比較 =====
 async function initCompare() {
   const r = await api({ action: 'getStudents' });
-  students = r.students || [];
+  if(r.success&&Array.isArray(r.students)){
+    const selectedId=document.getElementById('cmpStudent').value;
+    const selected=students.find(s=>String(s.id)===selectedId);
+    students=r.students;
+    if(selected&&!students.some(s=>String(s.id)===selectedId))students.push(selected);
+  }
   filterCmpStudents();
 }
 function normalizeCmpStudentSearch_(value) {
@@ -4297,6 +4302,13 @@ async function loadCompare(overrideSid) {
   if(profile.success!==true){
     document.getElementById('cmpBody').innerHTML='<tr><td colspan="22" class="noData">'+htmlEsc(profile.error||'成績情報を取得できませんでした。')+'</td></tr>';
     return;
+  }
+  if(profile.student){
+    const found=students.findIndex(s=>String(s.id)===sid);
+    if(found>=0)students[found]=profile.student;else students.push(profile.student);
+    const selectedOption=Array.from(document.getElementById('cmpStudent').options).find(option=>option.value===sid);
+    if(selectedOption)selectedOption.text=profile.student.name+'（'+(profile.student.grade||'')+'）';
+    renderCmpSelectedStudent_();updateCmpAdmissionDate(sid);
   }
   const scoreRes={scores:profile.scores},rpRes={data:profile.reports};
   cmpScoreData = (scoreRes.scores || []).filter(s => !year || String(s.year) === String(year)).sort((a,b) => a.year !== b.year ? a.year - b.year : a.term - b.term);
