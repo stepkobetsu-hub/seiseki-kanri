@@ -1871,9 +1871,15 @@ async function adminSupabaseApi(data) {
     payload.mutationId = newAdminMutationId();
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45000);
+  const timeout = setTimeout(() => controller.abort(), 15000);
   try {
-    const response = await StepStaffAuth.fetchRuntime(payload, controller.signal);
+    const response = await fetch(SEISEKI_ADMIN_RUNTIME_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+      signal: controller.signal
+    });
     const result = await response.json().catch(() => ({}));
     if (!response.ok || result.success !== true) {
       const authRequired = response.status === 401 || response.status === 403 || result.code === 'AUTH_REQUIRED';
@@ -4258,13 +4264,12 @@ async function loadCompare(overrideSid) {
   if (!sid) return;
   document.getElementById('cmpBody').innerHTML='<tr><td colspan="22" class="noData">選択した生徒の成績を読み込み中…</td></tr>';
   const meetingCard=document.getElementById('cmpMeetingCard');if(meetingCard)meetingCard.style.display='none';
-  const profileRequest=api({action:'getStudentGradeProfile',studentId:sid});
   // 志望校を取得して表示
   const wishCard = document.getElementById('cmpWishCard');
   const wishBody = document.getElementById('cmpWishBody');
   const wishDate = document.getElementById('cmpWishDate');
   if (wishCard) wishCard.style.display = 'none';
-  profileRequest.then(wr => {
+  api({ action: 'getWish', studentId: sid }).then(wr => {
     if(document.getElementById('cmpStudent').value!==sid)return;
     const w = wr.wish;
     if (!w || !wishCard) return;
@@ -4320,20 +4325,15 @@ async function loadCompare(overrideSid) {
   }
   renderCmpSelectedStudent_();
   updateCmpAdmissionDate(sid);
-  const profile=await profileRequest;
+  const [scoreRes, rpRes] = await Promise.all([
+    api({ action: 'getStudentScores', studentId: sid }),
+    api({ action: 'getReports', studentId: sid })
+  ]);
   if(document.getElementById('cmpStudent').value!==sid)return;
-  if(profile.success!==true){
-    document.getElementById('cmpBody').innerHTML='<tr><td colspan="22" class="noData">'+htmlEsc(profile.error||'成績情報を取得できませんでした。')+'</td></tr>';
+  if(scoreRes.success!==true||rpRes.success!==true){
+    document.getElementById('cmpBody').innerHTML='<tr><td colspan="22" class="noData">'+htmlEsc(scoreRes.error||rpRes.error||'成績情報を取得できませんでした。')+'</td></tr>';
     return;
   }
-  if(profile.student){
-    const found=students.findIndex(s=>String(s.id)===sid);
-    if(found>=0)students[found]=profile.student;else students.push(profile.student);
-    const selectedOption=Array.from(document.getElementById('cmpStudent').options).find(option=>option.value===sid);
-    if(selectedOption)selectedOption.text=profile.student.name+'（'+(profile.student.grade||'')+'）';
-    renderCmpSelectedStudent_();updateCmpAdmissionDate(sid);
-  }
-  const scoreRes={scores:profile.scores},rpRes={data:profile.reports};
   cmpScoreData = (scoreRes.scores || []).filter(s => !year || String(s.year) === String(year)).sort((a,b) => a.year !== b.year ? a.year - b.year : a.term - b.term);
   cmpRpData = (rpRes.data || []).filter(d => !year || String(d.year) === String(year));
   loadCompareMeetings(sid);
