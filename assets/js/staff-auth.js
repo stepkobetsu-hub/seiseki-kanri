@@ -1,15 +1,32 @@
 // Shared authentication client. Authorization remains on the server.
 (function () {
   'use strict';
-  const endpoint = 'https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
+  const endpoints = [
+    'https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1',
+    'https://wisedgcgwaebtkprdhth.functions.supabase.co/seiseki-admin-runtime-v1'
+  ];
+  let activeEndpoint = 0;
+  async function fetchRuntime(payload, signal) {
+    const first = activeEndpoint;
+    for (let attempt = 0; attempt < endpoints.length; attempt++) {
+      const index = (first + attempt) % endpoints.length;
+      try {
+        const response = await fetch(endpoints[index], {
+          method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+          body: JSON.stringify(payload), cache: 'no-store', signal
+        });
+        activeEndpoint = index;
+        return response;
+      } catch (error) {
+        if (error.name === 'AbortError' || !(error instanceof TypeError || /Failed to fetch|NetworkError|Load failed/i.test(String(error.message || ''))) || attempt === endpoints.length - 1) throw error;
+      }
+    }
+  }
   async function requestOnce(payload) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), payload.action === 'staffLogin' ? 90000 : 45000);
     try {
-      const response = await fetch(endpoint, {
-        method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-        body: JSON.stringify({ ...payload, permissionAppId: /student_directory/.test(location.pathname) ? 'student-directory' : /meeting_memo|classroom_reports/.test(location.pathname) ? 'public-13' : 'public-12' }), cache: 'no-store', signal: controller.signal,
-      });
+      const response = await fetchRuntime({ ...payload, permissionAppId: /student_directory/.test(location.pathname) ? 'student-directory' : /meeting_memo|classroom_reports/.test(location.pathname) ? 'public-13' : 'public-12' }, controller.signal);
       const result = await response.json().catch(() => ({}));
       if (!response.ok || result.success !== true) {
         throw new Error(result.error || 'ログイン情報を確認できませんでした。');
@@ -37,6 +54,7 @@
     }
   }
   window.StepStaffAuth = {
+    fetchRuntime,
     login: (code, password) => request({ action: 'staffLogin', code, password }),
     verify: token => request({ action: 'verifyStaffSession', token }),
     persist: token => request({ action: 'persistAdminSession', token }),
