@@ -725,8 +725,15 @@ async function meetingLegacyApi_(data){
   } finally { clearTimeout(timeout); }
 }
 async function api(data){
-  if (SUPABASE_MEETING_ACTIONS.has(data.action)) return meetingSupabaseApi_(data);
-  return meetingLegacyApi_(data);
+  const request=SUPABASE_MEETING_ACTIONS.has(data.action)
+    ? meetingSupabaseApi_(data) : meetingLegacyApi_(data);
+  // The UI must finish even if a browser/transport fails to settle on abort.
+  let timer;
+  try{
+    return await Promise.race([request,new Promise((_,reject)=>{
+      timer=setTimeout(()=>reject(new Error('通信が時間内に完了しませんでした。再取得してください。')),46000);
+    })]);
+  }finally{clearTimeout(timer);}
 }
 
 let meetingAppInitialized_ = false;
@@ -1023,6 +1030,7 @@ function applyMeetingStudents_(rows){
   renderMemos();
 }
 async function loadMeetingStudents_(){
+  const session=meetingAdminToken_();
   const cached=readMeetingStudentCache_();
   if(!students.length&&cached.length)applyMeetingStudents_(cached);
   if(!students.length)studentsLoadState='loading';
@@ -1038,14 +1046,17 @@ async function loadMeetingStudents_(){
       checked(api({action:'getStudents'})),
       checked(meetingLegacyApi_({action:'getStudentDirectoryList',systemPortalSessionToken:meetingAdminToken_()}))
     ]);
+    if(session!==meetingAdminToken_())return false;
     applyMeetingStudents_(rows);saveMeetingStudentCache_();
     Promise.all([fetchLocalSearchStudents_().catch(()=>[]),fetchSearchStudents_().catch(()=>[])]).then(([localRows,searchRows])=>{
+      if(session!==meetingAdminToken_())return;
       students=mergeSearchKana_(mergeSearchKana_(students,localRows),searchRows);
       updateNameDatalist();renderStudents();renderMemos();saveMeetingStudentCache_();
     });
+    return true;
   }catch(e){
     if(!students.length)studentsLoadState='error';
-    renderStudents();
+    renderStudents();return false;
   }
 }
 
@@ -1063,34 +1074,49 @@ async function init(){
   renderStaff();
   const cached=readMeetingStudentCache_();if(cached.length)applyMeetingStudents_(cached);
   const session=meetingAdminToken_();
-  memosLoadState='loading';renderMemos();
-  try{
-    const data=await api({action:'getMeetingBootstrap',persistentSession:meetingDeviceMode_==='personal'});
-    if(!data.success||!Array.isArray(data.students)||!Array.isArray(data.staff)||!Array.isArray(data.memos))throw Error('初期データを取得できませんでした。');
-    staffMembers=data.staff;renderStaff();
-    applyMeetingStudents_(selectableMeetingStudents_(data.students));saveMeetingStudentCache_();
-    allMemos=data.memos;memosLoadState='ready';renderMemos();
-    if(meetingDeviceMode_==='personal')localStorage.setItem('adminSystemPortalExpiresAt','2100-01-01T00:00:00.000Z');
-    restoreMeetingDraft_();
-    fetchLocalSearchStudents_().then(rows=>{students=mergeSearchKana_(students,rows);updateNameDatalist();renderStudents();saveMeetingStudentCache_();}).catch(()=>{});
-  }catch(error){
-    if(error.authRequired&&session===meetingAdminToken_()){clearMeetingSession_();showMeetingLogin_(error.message);return;}
-    memosLoadState='error';renderMemos();
-    $('formError').textContent='読み込みが完了していません。再取得してください。入力内容は保存されるまで残ります。';
-    $('formError').classList.add('show');
-    await Promise.allSettled([loadMeetingStudents_(),loadMemos(),loadMeetingStaff_()]);
-    restoreMeetingDraft_();
+  // Start independent reads immediately: a slow student or staff read must
+  // never delay displaying saved memos.
+  const results=await Promise.allSettled([
+    loadMeetingStudents_(),
+    loadMemos(),
+    loadMeetingStaff_()
+  ]);
+  if(session!==meetingAdminToken_())return;
+  restoreMeetingDraft_();
+  if(results.every(result=>result.status==='fulfilled'&&result.value!==false)){
+    clearMeetingLoadError_();
+    if(meetingDeviceMode_==='personal'){
+      api({action:'persistAdminSession'}).then(()=>{
+        if(session===meetingAdminToken_())localStorage.setItem('adminSystemPortalExpiresAt','2100-01-01T00:00:00.000Z');
+      }).catch(()=>{});
+    }
   }
 }
+function clearMeetingLoadError_(){
+  const el=$('formError');
+  if(el&&/読み込みが完了していません|初期データを取得|担当者一覧を取得できません/.test(el.textContent||'')){
+    el.textContent='';el.classList.remove('show');
+  }
+}
+function handleMeetingReadAuth_(error,session){
+  if(error.authRequired&&session===meetingAdminToken_()){
+    clearMeetingSession_();showMeetingLogin_(error.message);
+  }
+}
+
 async function loadMeetingStaff_(){
+  const session=meetingAdminToken_();
   try{
     const result=await api({action:'getStaffMembers'});
     if(!result.success||!Array.isArray(result.staff))throw Error('担当者を取得できませんでした。');
-    staffMembers=result.staff;renderStaff();
+    if(session!==meetingAdminToken_())return false;
+    staffMembers=result.staff;renderStaff();return true;
   }catch(error){
+    handleMeetingReadAuth_(error,session);
     renderStaff();
     $('formError').textContent='担当者一覧を取得できませんでした。「他」を選ぶと担当者を入力できます。';
     $('formError').classList.add('show');
+    return false;
   }
 }
 
@@ -1389,16 +1415,18 @@ function clearForm(keepStudent){
 }
 
 async function loadMemos(){
+  const session=meetingAdminToken_();
   const seq=++memoLoadRequest;
   memosLoadState='loading';renderMemos();
   try{
     const result=await api({action:'getMeetingMemos'});
     if(!result.success||!Array.isArray(result.memos))throw Error(result.error||'面談一覧を読み込めませんでした');
-    if(seq!==memoLoadRequest)return false;
-    allMemos=result.memos;memosLoadState='ready';renderMemos();return true;
+    if(seq!==memoLoadRequest||session!==meetingAdminToken_())return false;
+    allMemos=result.memos;memosLoadState='ready';renderMemos();
+    clearMeetingLoadError_();return true;
   }catch(error){
-    if(seq!==memoLoadRequest)return false;
-    memosLoadState='error';renderMemos();return false;
+    if(seq!==memoLoadRequest||session!==meetingAdminToken_())return false;
+    memosLoadState='error';renderMemos();handleMeetingReadAuth_(error,session);return false;
   }
 }
 
