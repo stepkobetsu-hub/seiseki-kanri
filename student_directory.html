@@ -363,10 +363,27 @@ async function loadStudentGrades(id,area,student){
     const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';retry.onclick=()=>loadStudentGrades(id,area,student);area.append(retry);
   }finally{clearTimeout(timer)}
 }
-function loadDirectoryAdmission(id,label,student){
+async function loadDirectoryAdmission(id,label,student){
   const indexed=students.find(s=>String(s.id)===String(id));
-  const date=String(student.admissionDate||indexed?.admissionDate||'');
-  const raw=String(student.admissionDateText||indexed?.admissionDateText||'');
+  let date=String(student.admissionDate||indexed?.admissionDate||'');
+  let raw=String(student.admissionDateText||indexed?.admissionDateText||'');
+  if(!date&&!raw){
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+    try{
+      label.textContent='入塾日・通塾期間を確認中…';
+      const result=await mirrorApi('getStudentDirectoryDetail',{studentId:String(id)},controller.signal);
+      if(!result.success||String(result.student?.id)!==String(id))throw Error(result.error||'生徒情報を取得できませんでした。');
+      if(String(selectedId)!==String(id)||!label.isConnected)return;
+      date=String(result.student.admissionDate||'');raw=String(result.student.admissionDateText||'');
+    }catch(error){
+      if(String(selectedId)!==String(id)||!label.isConnected)return;
+      label.textContent='入塾日を取得できませんでした。';
+      const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';
+      retry.onclick=()=>{label.replaceChildren();loadDirectoryAdmission(id,label,student)};label.append(retry);
+      const top=el('detail').querySelector('.admissionTop');if(top)top.textContent='入塾日: 取得できませんでした';
+      return;
+    }finally{clearTimeout(timer)}
+  }
   const duration=calcEnrollmentDuration(date);
   const text=date?'入塾日: '+date+(duration?'（'+duration+'通塾）':''):raw?'入塾日: '+raw+'（日付要確認）':'入塾日: 未登録';
   label.textContent=text;
