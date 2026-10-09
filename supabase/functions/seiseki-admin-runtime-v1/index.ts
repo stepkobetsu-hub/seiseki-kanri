@@ -84,6 +84,9 @@ function requireActionPermission(session: JsonObject, token: unknown, action: st
     throw new ResponseError(403, 'APP_FORBIDDEN', 'このアプリには権限2以上が必要です。');
   }
   const level = String(session.permission_level ?? session.permissionLevel ?? '');
+  if (action === 'saveStudentDirectory' && level !== '4') {
+    throw new ResponseError(403, 'DIRECTORY_EDITOR_REQUIRED', '生徒マスタの保存には権限4でログインしてください。');
+  }
   const allowed = GRADE_ACTIONS.has(action) ? STAFF_PERMISSION_LEVELS : ADMIN_PERMISSION_LEVELS;
   if (!allowed.has(level)) throw new ResponseError(403, 'APP_FORBIDDEN', 'このアプリを利用する権限がありません。');
 }
