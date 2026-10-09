@@ -463,6 +463,7 @@ async function fetchDirectoryAdmission_(id,signal){
     const result=await api('getEntrySheetData',{studentId:id,systemPortalSessionToken:session},signal);
     if(!result.success||String(result.data?.studentId)!==String(id)||!result.data?.masterInfo)throw Error(result.error||'生徒マスタの入塾日を取得できませんでした。');
     const raw=String(result.data.masterInfo.colC||'');
+    if(!raw)return {date:'',raw:''}; // Confirmed blank in the authoritative master.
     return checkDate('',raw);
   };
   try{return await Promise.any([db(),master()]);}
