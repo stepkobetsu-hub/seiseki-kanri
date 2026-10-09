@@ -58,6 +58,9 @@ header #logout{color:#175443;background:#fff;border-color:#def5e7}.card{backgrou
 .admissionTop{display:inline-block;font-size:1rem;font-weight:650;color:#456c5a;line-height:1.6;background:#f1fbf5;border:1px solid #d7ede2;border-radius:9px;padding:7px 10px;margin-right:12px}.detailTop h2{flex-wrap:wrap}@media(max-width:600px){.admissionTop{font-size:.95rem;max-width:100%}}
 .directoryGradeLink{font-size:1rem;font-weight:650;padding:10px 15px;border-radius:9px;white-space:nowrap}.admissionTop{margin-right:0;margin-left:12px}.directoryGradesHead .directoryGradeLink{flex:none}@media(max-width:600px){.directoryGradeLink{font-size:.85rem;padding:10px 12px}.directoryGradesHead{flex-wrap:wrap}.directoryGradesHead .directoryGradeLink{margin-left:auto}}
 .recordsGradeGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:12px}.recordPanel{margin:14px 0;min-width:0}.recordPanelHead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.recordPanelHead h3{margin:0 auto 8px 0}.recordBody{overflow-x:auto}.recordsTable{border-collapse:collapse;width:100%;font-size:.75rem;white-space:nowrap;color:#14345e}.recordsTable th,.recordsTable td{padding:4px 5px;border-bottom:1px solid #e0e8f2;text-align:center}.recordsTable th{background:#f7f9fc}.recordsGradeGrid .recordPanel:first-child h3{color:#4f46e5}.recordsGradeGrid .recordPanel:last-child h3{color:#9a6700}.directoryRecords{margin:12px 0}
+
+/* Read-only academic records added from the 2026-10-08 registry contract. */
+.directoryAcademic{margin:20px 0}.academicGrid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}.academicPanel{min-width:0;border:1px solid #d7ede2;border-radius:12px;padding:12px 14px;background:#fbfdfb}.academicPanel[hidden]{display:none}.academicHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.academicHead h3{margin:0!important}.academicBody{overflow-x:auto}.academicTable{border-collapse:collapse;width:100%;font-size:.85rem;white-space:nowrap}.academicTable th,.academicTable td{text-align:center;padding:8px 9px;border-bottom:1px solid #dce9e1}.academicTable th{background:#eaf7ef;color:#235c44}.academicTable tbody tr:first-child{background:#f1fbf5;font-weight:650}.academicCaption{text-align:left;font-size:.76rem;color:#627683;margin-bottom:6px}.academicWishes{display:grid;gap:7px}.academicWish{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px;background:#eff8f2;border-radius:8px}.academicWishLabel{font-size:.8rem;color:#456c5a}.directoryAcademic>.academicPanel{margin-bottom:14px}@media(max-width:600px){.academicPanel{padding:11px 9px}.academicTable{font-size:.8rem}.academicTable th,.academicTable td{padding:7px}.academicHead h3{font-size:1rem}}
 </style>
 </head>
 <body>
@@ -85,7 +88,7 @@ function storage(){return localStorage}
 function token(){return storage().getItem(TOKEN)||''}
 function setStatus(text,error=false){el('status').textContent=text;el('status').classList.toggle('error',error)}
 async function api(action,extra={},signal){const response=await fetch(GAS,{signal,method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action,...extra})});if(!response.ok)throw Error('通信に失敗しました。もう一度お試しください。');return response.json()}
-function clearSession(){sessionStorage.removeItem('stepDirectoryGradeProfilesV1');resetDetails();request++;listRequest++;localStorage.removeItem(INDEX_CACHE_KEY);for(const store of [localStorage,sessionStorage])for(const key of [TOKEN,EXPIRY,'adminLoggedIn','adminStaffCode','adminStaffName','adminDeviceMode'])store.removeItem(key);mode='';students=[];ready=false;editable=null;selectedId='';detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').replaceChildren();el('detail').classList.add('hidden')}
+function clearSession(){DirectoryAcademic.clear();sessionStorage.removeItem('stepDirectoryGradeProfilesV1');resetDetails();request++;listRequest++;localStorage.removeItem(INDEX_CACHE_KEY);for(const store of [localStorage,sessionStorage])for(const key of [TOKEN,EXPIRY,'adminLoggedIn','adminStaffCode','adminStaffName','adminDeviceMode'])store.removeItem(key);mode='';students=[];ready=false;editable=null;selectedId='';detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').replaceChildren();el('detail').classList.add('hidden')}
 function showLogin(message=''){el('app').classList.add('hidden');el('logout').classList.add('hidden');el('login').classList.remove('hidden');el('loginError').textContent=message;el('password').value='';}
 function showApp(){el('login').classList.add('hidden');el('app').classList.remove('hidden');el('logout').classList.remove('hidden');loadList()}
 async function logout(){const t=token();clearSession();showLogin();if(t)api('logoutSystemPortal',{systemPortalSessionToken:t}).catch(()=>{})}
@@ -218,7 +221,7 @@ const detailCache=new Map(),detailPending=new Map();
 let detailEpoch=0,prefetchTimer=0;
 const DETAIL_REUSE_MS=300000;
 // Detail data stays only in this page's memory, never in browser storage.
-function resetDetails(){detailEpoch++;clearTimeout(prefetchTimer);detailCache.clear();for(const entry of detailPending.values())entry.controller.abort();detailPending.clear()}
+function resetDetails(){DirectoryAcademic.clear();detailEpoch++;clearTimeout(prefetchTimer);detailCache.clear();for(const entry of detailPending.values())entry.controller.abort();detailPending.clear()}
 function validDetail(r,id){return r?.success===true&&String(r.student?.id)===String(id)}
 async function directoryDetailRuntime_(id,signal){
   const payload={action:'getStudentDirectoryDetail',permissionAppId:'student-directory',token:token(),studentId:id};
@@ -244,6 +247,7 @@ function renderStudentPreview_(s){
   for(const [label,url] of [['📊 この生徒の成績・志望校をみる','admin.html?studentId='+encodeURIComponent(s.id)+'#compare'],['面談メモを登録・見る','meeting_memo.html?studentId='+encodeURIComponent(s.id)]]){
     const a=document.createElement('a');a.className='btn';a.textContent=label;a.href=url;a.target='_blank';a.rel='noopener';actions.append(a);
   }
+  DirectoryAcademic.mount(card,s);
   card.append(actions);
   const status=document.createElement('p');status.id='detailFetchStatus';status.className='muted';status.textContent='連絡先・時間割などの詳細を取得しています…';card.append(status);
   
@@ -316,7 +320,144 @@ async function loadDetail(id){
   }
 }
 
-function renderDetail(s){const card=el('detail');card.replaceChildren();const title=document.createElement('h2');title.textContent=s.name||'氏名未入力';const admissionTop=document.createElement('span');admissionTop.className='admissionTop';admissionTop.textContent='入塾日・通塾期間を読み込み中…';title.append(admissionTop);const enrollment=statusBadge(s.flag);const detailTop=document.createElement('div');detailTop.className='detailTop';const detailMeta=document.createElement('div');detailMeta.className='detailMeta';const identity=document.createElement('div');identity.className='detailIdentity';identity.append(document.createTextNode(`No.${s.id}`));if(enrollment)identity.append(enrollment);const topGrades=document.createElement('a');topGrades.className='btn small detailGrades';topGrades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261009-selection-verified#compare`;topGrades.target='_blank';topGrades.rel='noopener';topGrades.textContent='📊 この生徒の成績・志望校をみる';const topMaster=document.createElement('a');topMaster.className='btn secondary small masterShortcut';topMaster.href=MASTER_SHEET;topMaster.target='_blank';topMaster.rel='noopener';topMaster.textContent='★生徒マスタへ';const detailLinks=document.createElement('div');detailLinks.className='detailLinks';detailLinks.append(topMaster);detailMeta.append(identity,detailLinks);detailTop.append(title,detailMeta);card.append(detailTop);section(card,'基本情報',[['生徒氏名',s.name],['フリガナ',s.kana],['学年',s.grade],['学校名',s.school]],{big:true});loadDirectoryAdmission(String(s.id),admissionTop,s);section(card,'連絡先',[['保護者携帯',s.guardianPhone,{phone:true}],['保護者自宅電話',s.homePhone,{phone:true}],['第2保護者携帯',s.secondPhone,{phone:true}]],{big:true});const h=document.createElement('h3');h.textContent='通塾時間割';card.append(h);if(s.lessons?.length){for(const v of s.lessons){const p=document.createElement('div');p.className='lesson';p.textContent=`${v.weekday} ${v.time} ${v.subject}`;card.append(p)}}else{const p=document.createElement('p');p.className='muted';p.textContent='登録されている授業枠はありません。';card.append(p)}if(s.course||s.options||s.note)section(card,'コース・備考',[['コース・オプション',[s.course,s.options].filter(Boolean).join('＋')],['時間割の備考',s.note]],{small:true});renderDebitSection(card,s);section(card,'その他の情報（タップで拡大）',[['保護者氏名',s.guardian],['第2保護者氏名',s.secondGuardian],['郵便番号',s.postcode],['住所',s.address],['保護者メール',s.guardianEmail],['第2保護者メール',s.secondEmail],['生徒ログインPASS（L列）',s.loginPassword,{secret:true}],['成績パス（AW列）',s.gradePassword,{secret:true}]],{small:true});const actions=document.createElement('div');actions.className='actions';const edit=document.createElement('button');edit.className='btn';edit.type='button';edit.textContent='✏️ 生徒マスタを編集';edit.onclick=openEditor;const sheet=document.createElement('a');sheet.className='btn secondary';sheet.href=SHEET;sheet.target='_blank';sheet.rel='noopener';sheet.textContent='時間割の変更はシートへ';const grades=document.createElement('a');grades.className='btn secondary directoryGradeLink';grades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261009-selection-verified#compare`;grades.target='_blank';grades.rel='noopener';grades.textContent='📊 この生徒の成績・志望校をみる';actions.append(edit,sheet,grades);card.append(actions)}
+// Added from the 2026-10-08 registry's canonical grade API contract.
+// This module is independent of the removed directory-records-v2 panels.
+const DirectoryAcademic = (() => {
+  const reads = new Map();
+  const subjects = ['jpn','soc','math','sci','eng','mus','art','pe','tech'];
+  const labels = ['国語','社会','数学','理科','英語','音楽','美術','保体','技家'];
+  const make = (tag, text, cls) => {
+    const n = document.createElement(tag);
+    if (text != null) n.textContent = String(text);
+    if (cls) n.className = cls;
+    return n;
+  };
+  const present = value => value != null && String(value).trim() !== '';
+  const total = (row, prefix, count, saved) => {
+    if (present(saved)) return saved;
+    const values = subjects.slice(0,count).map(key => row[prefix + key]);
+    return values.every(value => present(value) && Number.isFinite(Number(value)))
+      ? values.reduce((sum,value) => sum + Number(value),0) : '';
+  };
+  function clear() {
+    for (const entry of reads.values()) entry.controller.abort();
+    reads.clear();
+  }
+  function select(id, session) {
+    for (const [key,entry] of reads) {
+      if (entry.id !== id || entry.session !== session) {
+        entry.controller.abort(); reads.delete(key);
+      }
+    }
+  }
+  function read(action,id,session,force) {
+    const key = JSON.stringify([session,id,action]);
+    const old = reads.get(key);
+    if (!force && old && (!old.finished || Date.now() - old.at < 60000)) return old.promise;
+    old?.controller.abort();
+    const controller = new AbortController();
+    const entry = {id,session,controller,finished:false,at:Date.now(),promise:null};
+    const timer = setTimeout(() => controller.abort(),15000);
+    entry.promise = (async () => {
+      const response = await fetch(MEETING_API, {
+        method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},cache:'no-store',
+        signal:controller.signal,
+        body:JSON.stringify({action,studentId:id,token:session,permissionAppId:'student-directory'})
+      });
+      const data = await response.json();
+      if (!response.ok || data.success !== true) throw Error(data.error || '成績情報を取得できませんでした。');
+      const rows = action === 'getWish' ? (data.wish ? [data.wish] : [])
+        : action === 'getReports' ? data.data : data.scores;
+      if (!Array.isArray(rows) || rows.some(row => String(row.studentId) !== id)) {
+        throw Error('生徒番号と取得した情報が一致しません。再取得してください。');
+      }
+      controller.signal.throwIfAborted();
+      return rows;
+    })().then(rows => {entry.finished=true;entry.at=Date.now();return rows;})
+      .catch(error => {
+        if (reads.get(key) === entry) reads.delete(key);
+        throw Error(error.name === 'AbortError' ? '通信が時間切れになりました。再取得してください。' : error.message);
+      }).finally(() => clearTimeout(timer));
+    reads.set(key,entry);
+    return entry.promise;
+  }
+  function table(area,caption,columns,rows,values) {
+    if (!rows.length) {area.append(make('p','登録されたデータはありません。','muted'));return;}
+    const table = make('table',null,'academicTable');
+    table.append(make('caption',caption,'academicCaption'));
+    const head=make('thead'),line=make('tr');
+    for (const label of columns) {const th=make('th',label);th.scope='col';line.append(th);}
+    head.append(line);table.append(head);
+    const body=make('tbody');
+    for (const row of rows) {
+      const tr=make('tr');
+      for (const value of values(row)) tr.append(make('td',present(value)?value:'－'));
+      body.append(tr);
+    }
+    table.append(body);area.append(table);
+  }
+  function renderWishes(area,rows) {
+    const wish=rows[0],result=wish?.results || {};
+    const list=make('div',null,'academicWishes');
+    for (const [key,label] of [['pub1','公立1'],['pub2','公立2'],['pub3','公立3'],['pri1','私立1'],['pri2','私立2'],['pri3','私立3']]) {
+      if (!String(wish?.[key+'name'] || '').trim()) continue;
+      const item=make('div',null,'academicWish');
+      item.append(make('span',label,'academicWishLabel'),make('strong',wish[key+'name']));
+      if (wish[key+'dept']) item.append(make('span',wish[key+'dept']));
+      for (const value of [result[key+'type'],result[key] === '-' ? '' : result[key],result[key+'enroll'] ? '進学先' : '']) {
+        if (present(value)) item.append(make('span',value));
+      }
+      list.append(item);
+    }
+    if (!list.childElementCount) area.closest('.academicPanel').hidden=true;
+    else area.append(list);
+  }
+  function mount(card,student) {
+    const id=String(student.id),session=token();
+    if (!session || !/^\d{1,10}$/.test(id)) return;
+    select(id,session);
+    const wrap=make('section',null,'directoryAcademic');
+    wrap.dataset.studentId=id;wrap.setAttribute('aria-label','志望校・テスト成績・通知表');
+    card.append(wrap);
+    const live=()=>wrap.isConnected && selectedId === id && token() === session;
+    function panel(title,action,render,parent=wrap,hidden=false) {
+      const box=make('section',null,'academicPanel'),head=make('div',null,'academicHead');
+      box.hidden=hidden;
+      const update=make('button','再取得','btn secondary small');update.type='button';
+      update.setAttribute('aria-label',title+'を再取得');
+      head.append(make('h3',title),update);
+      const area=make('div',null,'academicBody');area.setAttribute('aria-live','polite');
+      box.append(head,area);parent.append(box);
+      async function load(force=false) {
+        update.disabled=true;area.replaceChildren(make('p','読み込み中…','muted'));
+        box.dataset.state='loading';
+        try {
+          const rows=await read(action,id,session,force);
+          if (!live()) return;
+          box.hidden=false;area.replaceChildren();render(area,rows);box.dataset.state='loaded';
+        } catch(error) {
+          if (!live()) return;
+          box.hidden=false;box.dataset.state='error';
+          area.replaceChildren(make('p','読み込めませんでした：'+error.message,'error'));
+        } finally {if (live()) update.disabled=false;}
+      }
+      update.onclick=()=>load(true);load();
+    }
+    panel('志望校','getWish',renderWishes,wrap,true);
+    const grid=make('div',null,'academicGrid');wrap.append(grid);
+    panel('テスト成績','getStudentScores',(area,rows)=>table(area,'テスト成績（新しい順）',
+      ['年度・回',...labels,'5科計','5科順位','9科計','9科順位'],
+      rows.slice().sort((a,b)=>Number(b.year)-Number(a.year)||Number(b.term)-Number(a.term)),
+      row=>[row.year+'年度 第'+row.term+'回',...subjects.map(key=>row[key]),total(row,'',5,row.total5),row.rank5,total(row,'',9,row.total9),row.rank9]),grid);
+    panel('通知表','getReports',(area,rows)=>table(area,'通知表（新しい順）',
+      ['年度・学期',...labels,'5科計','9科計'],
+      rows.slice().sort((a,b)=>Number(b.year)-Number(a.year)||String(b.semester).localeCompare(String(a.semester),'ja',{numeric:true})),
+      row=>[row.year+'年度 '+row.semester,...subjects.map(key=>row['rp_'+key]),total(row,'rp_',5),total(row,'rp_',9)]),grid);
+  }
+  return {mount,clear};
+})();
+
+function renderDetail(s){const card=el('detail');card.replaceChildren();const title=document.createElement('h2');title.textContent=s.name||'氏名未入力';const admissionTop=document.createElement('span');admissionTop.className='admissionTop';admissionTop.textContent='入塾日・通塾期間を読み込み中…';title.append(admissionTop);const enrollment=statusBadge(s.flag);const detailTop=document.createElement('div');detailTop.className='detailTop';const detailMeta=document.createElement('div');detailMeta.className='detailMeta';const identity=document.createElement('div');identity.className='detailIdentity';identity.append(document.createTextNode(`No.${s.id}`));if(enrollment)identity.append(enrollment);const topGrades=document.createElement('a');topGrades.className='btn small detailGrades';topGrades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261009-selection-verified#compare`;topGrades.target='_blank';topGrades.rel='noopener';topGrades.textContent='📊 この生徒の成績・志望校をみる';const topMaster=document.createElement('a');topMaster.className='btn secondary small masterShortcut';topMaster.href=MASTER_SHEET;topMaster.target='_blank';topMaster.rel='noopener';topMaster.textContent='★生徒マスタへ';const detailLinks=document.createElement('div');detailLinks.className='detailLinks';detailLinks.append(topMaster);detailMeta.append(identity,detailLinks);detailTop.append(title,detailMeta);card.append(detailTop);section(card,'基本情報',[['生徒氏名',s.name],['フリガナ',s.kana],['学年',s.grade],['学校名',s.school]],{big:true});loadDirectoryAdmission(String(s.id),admissionTop,s);DirectoryAcademic.mount(card,s);section(card,'連絡先',[['保護者携帯',s.guardianPhone,{phone:true}],['保護者自宅電話',s.homePhone,{phone:true}],['第2保護者携帯',s.secondPhone,{phone:true}]],{big:true});const h=document.createElement('h3');h.textContent='通塾時間割';card.append(h);if(s.lessons?.length){for(const v of s.lessons){const p=document.createElement('div');p.className='lesson';p.textContent=`${v.weekday} ${v.time} ${v.subject}`;card.append(p)}}else{const p=document.createElement('p');p.className='muted';p.textContent='登録されている授業枠はありません。';card.append(p)}if(s.course||s.options||s.note)section(card,'コース・備考',[['コース・オプション',[s.course,s.options].filter(Boolean).join('＋')],['時間割の備考',s.note]],{small:true});renderDebitSection(card,s);section(card,'その他の情報（タップで拡大）',[['保護者氏名',s.guardian],['第2保護者氏名',s.secondGuardian],['郵便番号',s.postcode],['住所',s.address],['保護者メール',s.guardianEmail],['第2保護者メール',s.secondEmail],['生徒ログインPASS（L列）',s.loginPassword,{secret:true}],['成績パス（AW列）',s.gradePassword,{secret:true}]],{small:true});const actions=document.createElement('div');actions.className='actions';const edit=document.createElement('button');edit.className='btn';edit.type='button';edit.textContent='✏️ 生徒マスタを編集';edit.onclick=openEditor;const sheet=document.createElement('a');sheet.className='btn secondary';sheet.href=SHEET;sheet.target='_blank';sheet.rel='noopener';sheet.textContent='時間割の変更はシートへ';const grades=document.createElement('a');grades.className='btn secondary directoryGradeLink';grades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261009-selection-verified#compare`;grades.target='_blank';grades.rel='noopener';grades.textContent='📊 この生徒の成績・志望校をみる';actions.append(edit,sheet,grades);card.append(actions)}
 const MEETING_API='https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
 
 let directorySyncBusy=false,directorySyncedAt=0;
@@ -450,7 +591,7 @@ function calcEnrollmentDuration(value) {
 
 function openEditor(){if(!selectedId||!editable)return;const body=el('editFields');body.replaceChildren();for(const [letter,label] of Object.entries(LABELS)){const source=editable[letter];if(!source||source.formula)continue;const wrap=document.createElement('label');wrap.className='edit-field';wrap.textContent=`${label}（${letter}列）`;const input=document.createElement('input');input.dataset.letter=letter;if(['M','N'].includes(letter)){wrap.classList.add('checkboxEdit');input.type='checkbox';input.checked=checkboxChecked(source.value);wrap.append(input)}else{input.type=['L','AW'].includes(letter)?'password':'text';input.autocomplete='off';input.value=source.value??'';wrap.append(input)}body.append(wrap)}el('editStatus').textContent='';el('editor').showModal()}
 async function save(){const changes={},lines=[];for(const input of el('editFields').querySelectorAll('input')){const letter=input.dataset.letter,before=String(editable[letter].value??''),isCheckbox=['M','N'].includes(letter),after=isCheckbox?(input.checked?'TRUE':'FALSE'):input.value;if(isCheckbox?checkboxChecked(before)===input.checked:before===after)continue;changes[letter]={before,after};lines.push(`${LABELS[letter]}：${isCheckbox?`${checkboxChecked(before)?'☑':'□'} → ${input.checked?'☑':'□'}`:['L','AW'].includes(letter)?'（変更前後の値は非表示）':`「${before||'空欄'}」→「${after||'空欄'}」`}`)}if(!lines.length){el('editStatus').textContent='変更はありません。';return}if(!confirm(`この変更を保存しますか？\n生徒番号：${selectedId}\n\n${lines.join('\n')}`))return;el('save').disabled=true;el('editStatus').textContent='原本に保存しています…';try{resetDetails();const id=selectedId,r=await mirrorApi('saveStudentDirectory',{studentId:id,changes,mutationId:crypto.randomUUID()});if(!r.success)throw Error(r.error||'保存できませんでした。');el('editor').close();await showSavedDetail(id,r);directorySyncedAt=0;setStatus('☆マスタへ保存し、最新の内容を読み直しました。')}catch(e){el('editStatus').textContent=e.message}finally{el('save').disabled=false}}
-document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>el(b.dataset.close).close());el('loginButton').onclick=login;el('password').onkeydown=e=>{if(e.key==='Enter')login()};el('refresh').onclick=loadList;el('search').oninput=()=>{if(detailView){request++;selectedId='';editable=null;detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').replaceChildren();el('detail').classList.add('hidden')}renderCandidates()};el('save').onclick=save;el('logout').onclick=()=>logout();start();
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>el(b.dataset.close).close());el('loginButton').onclick=login;el('password').onkeydown=e=>{if(e.key==='Enter')login()};el('refresh').onclick=loadList;el('search').oninput=()=>{if(detailView){DirectoryAcademic.clear();request++;selectedId='';editable=null;detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').replaceChildren();el('detail').classList.add('hidden')}renderCandidates()};el('save').onclick=save;el('logout').onclick=()=>logout();start();
 </script>
 </body>
 </html>
