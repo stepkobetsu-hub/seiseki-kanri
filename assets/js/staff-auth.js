@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const endpoint = 'https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
-  async function request(payload) {
+  async function requestOnce(payload) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 45000);
     try {
@@ -20,6 +20,20 @@
       throw error;
     } finally {
       clearTimeout(timeout);
+    }
+  }
+  async function request(payload) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await requestOnce(payload);
+      } catch (error) {
+        const networkFailure = error instanceof TypeError || /Failed to fetch|NetworkError|Load failed/i.test(String(error.message || ''));
+        if (!networkFailure) throw error;
+        if (attempt === 2) {
+          throw new Error('ログインサーバーに接続できませんでした。ネット接続を確認し、もう一度ログインしてください。');
+        }
+        await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+      }
     }
   }
   window.StepStaffAuth = {
