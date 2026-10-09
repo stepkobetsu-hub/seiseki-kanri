@@ -3374,6 +3374,7 @@ async function goToCompare(studentId) {
   }
   const yearSel = document.getElementById('cmpYear');
   if (yearSel) yearSel.value = '';
+  prepareCompareStudentSelection_(String(studentId));
   // Do not wait for the entire student list before requesting this student's data.
   initCompare().then(()=>{
     if(currentCompareStudentId()===String(studentId))setTimeout(()=>drawCompareCharts(),50);
@@ -4051,7 +4052,27 @@ function drawReportChart() {
 }
 
 // ===== 成績×通知表 比較 =====
+function readDirectoryStudentIndexForCompare_(){
+  try{
+    const cache=JSON.parse(localStorage.getItem('stepStudentDirectorySearchIndexV1')||'null');
+    if(!cache||cache.staffCode!==getAdminState('adminStaffCode')||Date.now()-cache.time>7*86400000||!Array.isArray(cache.students))return [];
+    return cache.students.filter(row=>row&&/^\\d+$/.test(String(row.id))&&typeof row.name==='string')
+      .map(row=>({id:String(row.id),name:row.name,nameKana:String(row.kana||''),kana:String(row.kana||''),grade:String(row.grade||''),campus:String(row.campus||''),flag:row.flag,admissionDate:String(row.admissionDate||''),admissionDateText:String(row.admissionDateText||'')}));
+  }catch(e){return [];}
+}
+function prepareCompareStudentSelection_(id){
+  const saved=readDirectoryStudentIndexForCompare_();
+  for(const row of saved)if(!students.some(s=>String(s.id)===row.id))students.push(row);
+  if(id&&!students.some(s=>String(s.id)===String(id)))students.push({id:String(id),name:'No.'+id,grade:'',campus:'',flag:'1'});
+  if(id){for(const key of ['cmpCampus','cmpGrade']){const field=document.getElementById(key);if(field)field.value='';}}
+  filterCmpStudents();
+  if(id){
+    document.getElementById('cmpStudent').value=String(id);
+    renderCmpSelectedStudent_();updateCmpEntryButton(String(id));updateCmpAdmissionDate(String(id));
+  }
+}
 async function initCompare() {
+  prepareCompareStudentSelection_();
   const r = await api({ action: 'getStudents' });
   if(r.success&&Array.isArray(r.students)){
     const selectedId=document.getElementById('cmpStudent').value;
