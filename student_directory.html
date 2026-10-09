@@ -67,7 +67,7 @@ header #logout{color:#175443;background:#fff;border-color:#def5e7}.card{backgrou
 </main>
 <dialog id="zoom"><h2 id="zoomLabel"></h2><p id="zoomValue" style="font-size:1.6rem;overflow-wrap:anywhere;white-space:pre-wrap"></p><button class="btn" type="button" data-close="zoom">閉じる</button></dialog>
 <dialog id="editor"><h2>☆マスタを編集</h2><p class="muted">数式の項目は変更できません。保存すると原本を書き換えます。</p><div id="editFields"></div><p id="editStatus" role="alert"></p><div class="actions"><button class="btn" id="save" type="button">変更を確認</button><button class="btn secondary" type="button" data-close="editor">キャンセル</button></div></dialog>
-<script src="assets/js/staff-auth.js?v=20261009-dual-endpoint"></script>
+<script src="assets/js/staff-auth.js?v=20261009-session-recovery"></script>
 <script>
 'use strict';
 const GAS='https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
@@ -89,7 +89,7 @@ function showLogin(message=''){el('app').classList.add('hidden');el('logout').cl
 function showApp(){el('login').classList.add('hidden');el('app').classList.remove('hidden');el('logout').classList.remove('hidden');loadList()}
 async function logout(){const t=token();clearSession();showLogin();if(t)api('logoutSystemPortal',{systemPortalSessionToken:t}).catch(()=>{})}
 async function start(){if(!token()){showLogin();return}showApp()}
-async function login(){const code=el('code').value.trim(),password=el('password').value;if(!code||!password){el('loginError').textContent='講師番号とパスワードを入力してください。';return}el('loginButton').disabled=true;el('loginError').textContent='確認しています…';try{const r=await api('staffLogin',{code,password});if(!r.success||!r.systemPortalSessionToken)throw Error(r.error||'この画面には管理権限が必要です。');const store=storage();store.setItem('adminDeviceMode',mode);store.setItem('adminLoggedIn','1');store.setItem('adminStaffCode',r.code||code);store.setItem('adminStaffName',r.name||'');store.setItem(TOKEN,r.systemPortalSessionToken);store.setItem(EXPIRY,r.systemPortalExpiresAt||'');el('password').value='';showApp()}catch(e){el('loginError').textContent=e.message}finally{el('loginButton').disabled=false}}
+async function login(){const code=el('code').value.trim(),password=el('password').value;if(!code||!password){el('loginError').textContent='講師番号とパスワードを入力してください。';return}el('loginButton').disabled=true;el('loginError').textContent='確認しています…';try{const r=await api('staffLogin',{code,password});if(!r.success||!r.systemPortalSessionToken)throw Error(r.error||'この画面には管理権限が必要です。');const store=storage();store.setItem('adminDeviceMode',mode);store.setItem('adminLoggedIn','1');store.setItem('adminStaffCode',r.code||code);store.setItem('adminStaffName',r.name||'');store.setItem(TOKEN,r.systemPortalSessionToken);store.setItem(EXPIRY,r.systemPortalExpiresAt||'');StepStaffAuth.persist(r.systemPortalSessionToken).then(()=>{if(token()===r.systemPortalSessionToken)store.setItem(EXPIRY,'2100-01-01T00:00:00.000Z')}).catch(()=>{});el('password').value='';showApp()}catch(e){el('loginError').textContent=e.message}finally{el('loginButton').disabled=false}}
 function normalize(v){return String(v||'').normalize('NFKC').toLowerCase().replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-96)).replace(/[\s　]+/g,'')}
 const PAIRS = {
   'きゃ':'kya','きゅ':'kyu','きょ':'kyo','ぎゃ':'gya','ぎゅ':'gyu','ぎょ':'gyo',
@@ -221,9 +221,14 @@ async function requestDetail(id){
   detailCache.delete(id);
   const pending=detailPending.get(id);
   if(pending&&pending.session===session)return pending.promise;
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
   const entry={session,promise:null,controller};
-  entry.promise=mirrorApi('getStudentDirectoryDetail',{studentId:id},controller.signal).then(r=>r.success?r:api('getStudentDirectoryDetail',{studentId:id,systemPortalSessionToken:session},controller.signal)).catch(e=>{if(e.name==='AbortError')throw e;return api('getStudentDirectoryDetail',{studentId:id,systemPortalSessionToken:session},controller.signal)}).then(r=>{
+  // Both services authenticate the supplied session; use the first valid read.
+  const checked=promise=>promise.then(r=>{if(!validDetail(r,id))throw Error(r.error||'取得できませんでした。');return r;});
+  entry.promise=Promise.any([
+    checked(mirrorApi('getStudentDirectoryDetail',{studentId:id},controller.signal)),
+    checked(api('getStudentDirectoryDetail',{studentId:id,systemPortalSessionToken:session},controller.signal))
+  ]).catch(error=>{if(controller.signal.aborted)throw Error('通信に時間がかかっています。再取得してください。');throw Error(error.errors?.map(e=>e.message).join(' / ')||error.message)}).then(r=>{
     if(epoch!==detailEpoch||session!==token())throw Error('情報を更新しました。もう一度選択してください。');
     if(!validDetail(r,id))throw Error(r.error||'取得できませんでした。');
     detailCache.set(id,{session,at:Date.now(),data:r});
