@@ -53,9 +53,27 @@
       }
     }
   }
+  async function loginViaGoogle(code, password) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
+    try {
+      const response = await fetch('https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec', {
+        method:'POST', headers:{'Content-Type':'text/plain;charset=UTF-8'},
+        body:JSON.stringify({action:'staffLogin',code,password}), signal:controller.signal
+      });
+      const staff = await response.json();
+      if (!response.ok || staff.success !== true) throw new Error(staff.error || '講師番号・パスワードを確認してください。');
+      if (String(staff.permissionLevel) === '1') return request({action:'staffLogin',code,password});
+      if (!['2','3','4'].includes(String(staff.permissionLevel)) || !staff.systemPortalSessionToken) throw new Error('利用できるログイン情報を取得できませんでした。');
+      return staff;
+    } catch (error) {
+      if (error.name === 'AbortError') throw new Error('Google側のログイン確認が時間切れになりました。');
+      throw error;
+    } finally { clearTimeout(timeout); }
+  }
   window.StepStaffAuth = {
     fetchRuntime,
-    login: (code, password) => request({ action: 'staffLogin', code, password }),
+    login: loginViaGoogle,
     verify: token => request({ action: 'verifyStaffSession', token }),
     persist: token => request({ action: 'persistAdminSession', token }),
     logout: token => request({ action: 'logoutAdmin', token }),
