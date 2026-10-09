@@ -8,7 +8,7 @@ const ADMIN_ACTIONS = new Set([
   'saveScore', 'deleteScore', 'getAllReports', 'getReports', 'saveReport',
   'deleteReport', 'getAllWishes', 'getWish', 'saveWish', 'saveWishResult',
   'getSchools', 'addSchool', 'updateSchool', 'deleteSchool',
-  'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
+  'getMeetingBootstrap', 'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
   'getStaffMembers', 'addStaffMember', 'deleteStaffMember',
   'reconcileLegacy', 'persistAdminSession', 'logoutAdmin',
   'syncStudentDirectory', 'getStudentDirectoryDetail', 'saveStudentDirectory', 'enableStudentDirectoryAutoSync',
@@ -23,7 +23,7 @@ const GRADE_ACTIONS = new Set([
   'saveScore', 'deleteScore', 'getAllReports', 'getReports', 'saveReport',
   'deleteReport', 'getAllWishes', 'getWish', 'saveWish', 'saveWishResult',
   'getSchools', 'addSchool', 'updateSchool', 'deleteSchool',
-  'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
+  'getMeetingBootstrap', 'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
   'getStaffMembers', 'addStaffMember', 'deleteStaffMember',
   'reconcileLegacy', 'persistAdminSession', 'logoutAdmin', 'verifyStaffSession',
 ]);
@@ -802,6 +802,13 @@ async function dispatch(payload: JsonObject): Promise<JsonObject> {
     case 'getAllWishes': return readWishes(payload, true);
     case 'getWish': return readWishes(payload, false);
     case 'getSchools': return getSchools();
+    case 'getMeetingBootstrap': {
+      const [studentsResult, staffResult, memosResult] = await Promise.all([
+        getStudents({...payload,limit:1000}), readMeetingStaff(), readMeetingMemos(payload)
+      ]);
+      if(payload.persistentSession===true)await persistAdminSession(payload);
+      return {success:true,students:studentsResult.students,staff:staffResult.staff,staffMembers:staffResult.staffMembers,memos:memosResult.memos,source:'supabase'};
+    }
     case 'getMeetingMemos': return readMeetingMemos(payload);
     case 'getStaffMembers': return readMeetingStaff();
     case 'saveMeetingMemo': return saveMeetingMemo(payload);
