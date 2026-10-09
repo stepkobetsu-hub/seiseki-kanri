@@ -232,7 +232,7 @@ async function directoryDetailRuntime_(id,signal){
   };
   return Promise.any(endpoints.map(read));
 }
-const DIRECTORY_RECORDS_DEFAULT_='none';
+const DIRECTORY_RECORDS_DEFAULT_='all';
 function mountStudentRecords_(card,s){StepDirectoryRecords.mount(card,s,{session:token(),active:()=>String(selectedId),stage:new URLSearchParams(location.search).get('sections')||DIRECTORY_RECORDS_DEFAULT_});}
 function renderStudentPreview_(s){
   const card=el('detail');card.replaceChildren();
