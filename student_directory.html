@@ -428,6 +428,51 @@ async function loadStudentGrades(id,area,student){
     const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';retry.onclick=()=>loadStudentGrades(id,area,student);area.append(retry);
   }finally{clearTimeout(timer)}
 }
+function normalizeDirectoryAdmission_(value){
+  const raw=String(value||'').trim();if(!raw)return '';
+  let year,month,day;
+  const plain=raw.match(/^(\d{4})[-\/年](\d{1,2})[-\/月](\d{1,2})(?:日)?$/);
+  if(plain){year=plain[1];month=plain[2].padStart(2,'0');day=plain[3].padStart(2,'0');}
+  else {
+    const date=new Date(raw);if(!Number.isFinite(date.getTime()))return '';
+    const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date);
+    const get=type=>parts.find(part=>part.type===type)?.value||'';
+    year=get('year');month=get('month');day=get('day');
+  }
+  const result=year+'-'+month+'-'+day,check=new Date(result+'T00:00:00Z');
+  return Number.isFinite(check.getTime())&&check.toISOString().slice(0,10)===result?result:'';
+}
+const admissionPending_=new Map();
+async function fetchDirectoryAdmission_(id,signal){
+  const session=token();
+  const checkDate=(date,raw)=>{
+    if(!date&&!raw){const error=Error('入塾日が未登録です。');error.noDate=true;throw error;}
+    return {date:normalizeDirectoryAdmission_(date||raw),raw:String(raw||date||'')};
+  };
+  const db=async()=>{
+    const result=await mirrorApi('getStudentList',{q:String(id),limit:10},signal);
+    const row=result.students?.find(s=>String(s.id)===String(id));
+    if(!result.success||!row)throw Error(result.error||'DBの入塾日を取得できませんでした。');
+    return checkDate(row.admissionDate,row.admissionDateText);
+  };
+  const master=async()=>{
+    // Reuse the server-authenticated detail for this exact student and session.
+    const detail=await requestDetail(id);
+    if(!validDetail(detail,id)||token()!==session)throw Error('ログイン情報が変わりました。');
+    signal?.throwIfAborted();
+    const result=await api('getEntrySheetData',{studentId:id,systemPortalSessionToken:session},signal);
+    if(!result.success||String(result.data?.studentId)!==String(id)||!result.data?.masterInfo)throw Error(result.error||'生徒マスタの入塾日を取得できませんでした。');
+    const raw=String(result.data.masterInfo.colC||'');
+    return checkDate('',raw);
+  };
+  try{return await Promise.any([db(),master()]);}
+  catch(error){
+    if(error.errors?.length&&error.errors.every(e=>e.noDate))return {date:'',raw:''};
+    if(signal?.aborted)throw new DOMException('Aborted','AbortError');
+    throw Error(error.errors?.map(e=>e.message).join(' / ')||error.message);
+  }
+}
+
 async function loadDirectoryAdmission(id,label,student){
   if(String(selectedId)!==String(id)||!label.isConnected)return;
   const indexed=students.find(s=>String(s.id)===String(id));
@@ -437,11 +482,12 @@ async function loadDirectoryAdmission(id,label,student){
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
     try{
       label.textContent='入塾日・通塾期間を確認中…';
-      const result=await mirrorApi('getStudentList',{q:String(id),limit:10},controller.signal);
-      const found=result.students?.find(row=>String(row.id)===String(id));
-      if(!result.success||!found)throw Error(result.error||'DBの入塾日を取得できませんでした。');
+      const key=token()+':'+id;
+      let pending=admissionPending_.get(key);
+      if(!pending){pending=fetchDirectoryAdmission_(id,controller.signal);admissionPending_.set(key,pending);pending.finally(()=>{if(admissionPending_.get(key)===pending)admissionPending_.delete(key)}).catch(()=>{});}
+      const result=await pending;
       if(String(selectedId)!==String(id)||!label.isConnected)return;
-      date=String(found.admissionDate||'');raw=String(found.admissionDateText||'');
+      date=result.date;raw=result.raw;
       student.admissionDate=date;student.admissionDateText=raw;
       if(indexed){indexed.admissionDate=date;indexed.admissionDateText=raw;saveCachedIndex(students);}
       const cached=detailCache.get(String(id));if(cached){cached.data.student.admissionDate=date;cached.data.student.admissionDateText=raw;}
