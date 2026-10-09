@@ -61,6 +61,8 @@ header #logout{color:#175443;background:#fff;border-color:#def5e7}.card{backgrou
 
 /* Read-only academic records added from the 2026-10-08 registry contract. */
 .directoryAcademic{margin:20px 0}.academicGrid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}.academicPanel{min-width:0;border:1px solid #d7ede2;border-radius:12px;padding:12px 14px;background:#fbfdfb}.academicPanel[hidden]{display:none}.academicHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.academicHead h3{margin:0!important}.academicBody{overflow-x:auto}.academicTable{border-collapse:collapse;width:100%;font-size:.85rem;white-space:nowrap}.academicTable th,.academicTable td{text-align:center;padding:8px 9px;border-bottom:1px solid #dce9e1}.academicTable th{background:#eaf7ef;color:#235c44}.academicTable tbody tr:first-child{background:#f1fbf5;font-weight:650}.academicCaption{text-align:left;font-size:.76rem;color:#627683;margin-bottom:6px}.academicWishes{display:grid;gap:7px}.academicWish{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px;background:#eff8f2;border-radius:8px}.academicWishLabel{font-size:.8rem;color:#456c5a}.directoryAcademic>.academicPanel{margin-bottom:14px}@media(max-width:600px){.academicPanel{padding:11px 9px}.academicTable{font-size:.8rem}.academicTable th,.academicTable td{padding:7px}.academicHead h3{font-size:1rem}}
+
+.academicCombined{margin-bottom:14px}.academicControls{display:flex;flex-wrap:wrap;gap:6px}.academicCompareTable{font-size:.72rem;min-width:920px}.academicCompareTable th,.academicCompareTable td{padding:4px 3px}.academicCompareTable th{background:#f7f9fc;color:#14345e;font-weight:500}.academicCompareTable th.academicScoreTitle{background:#eef2ff}.academicCompareTable th.academicReportTitle{background:#fef9ee}.academicCompareTable tbody tr:first-child{background:transparent;font-weight:400}.academicRating{font-weight:700}.academicRating5{color:#059669}.academicRating4{color:#1a56a0}.academicRating3{color:#d97706}.academicRating2,.academicRating1{color:#dc2626}.academicTotal{font-weight:700;color:#1a56a0}.academicMemo{border-bottom:1px solid #edf2f7;padding:8px 0}.academicMemoMeta{font-size:.76rem;color:#64748b;margin-bottom:3px}.academicMemoContent{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;font-size:.82rem}@media(max-width:600px){.academicCombined .academicHead{flex-wrap:wrap}.academicControls .btn{font-size:.7rem;padding:5px 8px}}
 </style>
 </head>
 <body>
@@ -367,7 +369,7 @@ const DirectoryAcademic = (() => {
       const data = await response.json();
       if (!response.ok || data.success !== true) throw Error(data.error || '成績情報を取得できませんでした。');
       const rows = action === 'getWish' ? (data.wish ? [data.wish] : [])
-        : action === 'getReports' ? data.data : data.scores;
+        : action === 'getReports' ? data.data : action === 'getMeetingMemos' ? data.memos : data.scores;
       if (!Array.isArray(rows) || rows.some(row => String(row.studentId) !== id)) {
         throw Error('生徒番号と取得した情報が一致しません。再取得してください。');
       }
@@ -417,7 +419,7 @@ const DirectoryAcademic = (() => {
     if (!session || !/^\d{1,10}$/.test(id)) return;
     select(id,session);
     const wrap=make('section',null,'directoryAcademic');
-    wrap.dataset.studentId=id;wrap.setAttribute('aria-label','志望校・テスト成績・通知表');
+    wrap.dataset.studentId=id;wrap.setAttribute('aria-label','志望校・テスト成績・通知表・面談メモ');
     card.append(wrap);
     const live=()=>wrap.isConnected && selectedId === id && token() === session;
     function panel(title,action,render,parent=wrap,hidden=false) {
@@ -441,18 +443,84 @@ const DirectoryAcademic = (() => {
           area.replaceChildren(make('p','読み込めませんでした：'+error.message,'error'));
         } finally {if (live()) update.disabled=false;}
       }
-      update.onclick=()=>load(true);load();
+      update.onclick=()=>load(true);load();return box;
     }
     panel('志望校','getWish',renderWishes,wrap,true);
-    const grid=make('div',null,'academicGrid');wrap.append(grid);
-    panel('テスト成績','getStudentScores',(area,rows)=>table(area,'テスト成績（新しい順）',
-      ['年度・回',...labels,'5科計','5科順位','9科計','9科順位'],
-      rows.slice().sort((a,b)=>Number(b.year)-Number(a.year)||Number(b.term)-Number(a.term)),
-      row=>[row.year+'年度 第'+row.term+'回',...subjects.map(key=>row[key]),total(row,'',5,row.total5),row.rank5,total(row,'',9,row.total9),row.rank9]),grid);
-    panel('通知表','getReports',(area,rows)=>table(area,'通知表（新しい順）',
-      ['年度・学期',...labels,'5科計','9科計'],
-      rows.slice().sort((a,b)=>Number(b.year)-Number(a.year)||String(b.semester).localeCompare(String(a.semester),'ja',{numeric:true})),
-      row=>[row.year+'年度 '+row.semester,...subjects.map(key=>row['rp_'+key]),total(row,'rp_',5),total(row,'rp_',9)]),grid);
+    const records=make('section',null,'academicPanel academicCombined');
+    const head=make('div',null,'academicHead');head.append(make('h3','📋 データ一覧'));
+    const controls=make('div',null,'academicControls');head.append(controls);records.append(head);
+    const area=make('div',null,'academicBody');area.setAttribute('aria-live','polite');records.append(area);wrap.append(records);
+    const states=[{rows:[],status:'loading'},{rows:[],status:'loading'}];
+    const grade=Number(String(student.grade||'').normalize('NFKC').match(/^中([123])/)?.[1]||0);
+    const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tokyo',year:'numeric',month:'numeric'}).formatToParts(new Date());
+    const yearNow=Number(parts.find(p=>p.type==='year').value)-(Number(parts.find(p=>p.type==='month').value)<4?1:0);
+    const gradeLabel=year=>{const n=grade+Number(year)-yearNow;return grade&&n>=1&&n<=3?'（中'+n+'）':'';};
+    function drawRecords() {
+      area.replaceChildren();
+      const table=make('table',null,'academicTable academicCompareTable');
+      const thead=make('thead'),groups=make('tr');
+      for(const [label,count,cls] of [['テスト成績',10,'academicScoreTitle'],['通知表評定',12,'academicReportTitle']]) {
+        const th=make('th',label,cls);th.colSpan=count;th.scope='colgroup';groups.append(th);
+      }
+      thead.append(groups);
+      const columns=make('tr');
+      for(const label of ['年度・回次','国','社','数','理','英','5科計','5科順','9科計','9科順','年度・学期','国','社','数','理','英','音','美','体','技','5計','9計']) {
+        const th=make('th',label);th.scope='col';columns.append(th);
+      }
+      thead.append(columns);table.append(thead);
+      const body=make('tbody');
+      const count=Math.max(states[0].rows.length,states[1].rows.length,1);
+      for(let i=0;i<count;i++) {
+        const tr=make('tr');
+        for(let side=0;side<2;side++) {
+          const state=states[side],row=state.rows[i],span=side===0?10:12;
+          if(!row) {
+            const message=i?'':state.status==='loading'?'読み込み中…':state.status==='error'?'読み込めませんでした：'+state.error:state.rows.length?'':'登録されたデータはありません。';
+            const td=make('td',message,state.status==='error'?'error':'muted');td.colSpan=span;tr.append(td);continue;
+          }
+          const values=side===0
+            ? [row.year+'年度 第'+row.term+'回'+gradeLabel(row.year),...subjects.slice(0,5).map(key=>row[key]),total(row,'',5,row.total5),row.rank5,total(row,'',9,row.total9),row.rank9]
+            : [row.year+'年度 '+row.semester+gradeLabel(row.year),...subjects.map(key=>row['rp_'+key]),total(row,'rp_',5),total(row,'rp_',9)];
+          values.forEach((value,index)=>{
+            const td=make('td',present(value)?value:'－');
+            if(side===1&&index>=1&&index<=9&&present(value))td.className='academicRating academicRating'+Number(value);
+            if((side===0&&index===6)||(side===1&&index>=10))td.className='academicTotal';
+            tr.append(td);
+          });
+        }
+        body.append(tr);
+      }
+      table.append(body);area.append(table);
+      records.dataset.state=states.some(s=>s.status==='loading')?'loading':states.some(s=>s.status==='error')?'error':'loaded';
+    }
+    for(const [side,title,action] of [[0,'テスト成績','getStudentScores'],[1,'通知表','getReports']]) {
+      const update=make('button',title+'を再取得','btn secondary small');update.type='button';update.setAttribute('aria-label',title+'を再取得');controls.append(update);
+      async function load(force=false) {
+        update.disabled=true;states[side]={rows:[],status:'loading'};drawRecords();
+        try {
+          const rows=await read(action,id,session,force);if(!live())return;
+          const sorted=rows.slice().sort(side===0
+            ? (a,b)=>Number(a.year)-Number(b.year)||Number(a.term)-Number(b.term)
+            : (a,b)=>Number(b.year)-Number(a.year)||String(b.semester).localeCompare(String(a.semester),'ja',{numeric:true}));
+          states[side]={rows:sorted,status:'loaded'};
+        }catch(error){if(!live())return;states[side]={rows:[],status:'error',error:error.message};}
+        finally{if(live()){update.disabled=false;drawRecords();}}
+      }
+      update.onclick=()=>load(true);load();
+    }
+    const memoBox=panel('🗒️ 面談・メモ','getMeetingMemos',(area,rows)=>{
+      if(!rows.length){area.closest('.academicPanel').hidden=true;return;}
+      const sorted=rows.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+      for(const memo of sorted.slice(0,5)) {
+        const item=make('article',null,'academicMemo');
+        item.append(make('div',String(memo.date||'').slice(0,10)+'　相手: '+(memo.counterpart||'－')+'　担当: '+(memo.staff||'－'),'academicMemoMeta'));
+        item.append(make('div',memo.content||'','academicMemoContent'));area.append(item);
+      }
+      if(sorted.length>5)area.append(make('p','他 '+(sorted.length-5)+' 件は面談メモアプリで確認できます。','muted'));
+    },wrap,true);
+    const memoLink=make('a','この生徒にメモを追加','btn secondary small');
+    memoLink.href='meeting_memo.html?studentId='+encodeURIComponent(id);memoLink.target='_blank';memoLink.rel='noopener';
+    memoBox.children[0].append(memoLink);
   }
   return {mount,clear};
 })();
