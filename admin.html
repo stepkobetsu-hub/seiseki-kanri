@@ -4256,6 +4256,8 @@ async function loadCompare(overrideSid) {
   updateCmpEntryButton(sid);
   updateCmpAdmissionDate(sid);
   if (!sid) return;
+  document.getElementById('cmpBody').innerHTML='<tr><td colspan="22" class="noData">選択した生徒の成績を読み込み中…</td></tr>';
+  const meetingCard=document.getElementById('cmpMeetingCard');if(meetingCard)meetingCard.style.display='none';
   const profileRequest=api({action:'getStudentGradeProfile',studentId:sid});
   // 志望校を取得して表示
   const wishCard = document.getElementById('cmpWishCard');
