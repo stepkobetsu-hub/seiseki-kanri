@@ -1290,6 +1290,7 @@ function removeMeetingDraft_(){
 }
 
 async function saveMemo(sendEmail){
+  const updating=!!editingId;
   const staff = buildStaff();
   const payload = {
     action:'saveMeetingMemo',
@@ -1332,9 +1333,14 @@ async function saveMemo(sendEmail){
   $('saveBtn').disabled = true;
   if ($('mailSaveBtn')) $('mailSaveBtn').disabled = true;
   try {
-    const r = await api(payload);
+    const r = meetingSaveAttempt_.response || await api(payload);
     if (!r.success||!r.memo||String(r.memo.id)!==String(payload.id)) throw new Error(r.error || '保存結果を確認できませんでした');
     const saved=r.memo;
+    editingId=String(saved.id);
+    meetingSaveAttempt_.response=r;
+    const retryPayload={...payload,id:editingId};delete retryPayload.mutationId;
+    meetingSaveAttempt_.fingerprint=JSON.stringify(retryPayload);
+    saveMeetingDraft_();
     allMemos=[saved,...allMemos.filter(m=>String(m.id)!==String(saved.id))];
     $('searchName').value=saved.name||students.find(s=>String(s.id)===String(payload.studentId))?.name||'';
     renderMemos();
@@ -1346,7 +1352,7 @@ async function saveMemo(sendEmail){
     if (sendEmail) {
       showToast(r.email && r.email.sent ? '保存し、メール送信しました' : '保存しました（メール送信なし）');
     } else {
-      showToast(editingId ? '更新しました' : '保存しました');
+      showToast(updating ? '更新しました' : '保存しました');
     }
     clearForm(true);
   } catch (e) {
