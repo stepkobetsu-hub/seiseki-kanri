@@ -84,7 +84,7 @@ function storage(){return localStorage}
 function token(){return storage().getItem(TOKEN)||''}
 function setStatus(text,error=false){el('status').textContent=text;el('status').classList.toggle('error',error)}
 async function api(action,extra={},signal){const response=await fetch(GAS,{signal,method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action,...extra})});if(!response.ok)throw Error('通信に失敗しました。もう一度お試しください。');return response.json()}
-function clearSession(){resetDetails();request++;listRequest++;localStorage.removeItem(INDEX_CACHE_KEY);for(const store of [localStorage,sessionStorage])for(const key of [TOKEN,EXPIRY,'adminLoggedIn','adminStaffCode','adminStaffName','adminDeviceMode'])store.removeItem(key);mode='';students=[];ready=false;editable=null;selectedId='';detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').replaceChildren();el('detail').classList.add('hidden')}
+function clearSession(){sessionStorage.removeItem('stepDirectoryGradeProfilesV1');resetDetails();request++;listRequest++;localStorage.removeItem(INDEX_CACHE_KEY);for(const store of [localStorage,sessionStorage])for(const key of [TOKEN,EXPIRY,'adminLoggedIn','adminStaffCode','adminStaffName','adminDeviceMode'])store.removeItem(key);mode='';students=[];ready=false;editable=null;selectedId='';detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').replaceChildren();el('detail').classList.add('hidden')}
 function showLogin(message=''){el('app').classList.add('hidden');el('logout').classList.add('hidden');el('login').classList.remove('hidden');el('loginError').textContent=message;el('password').value='';}
 function showApp(){el('login').classList.add('hidden');el('app').classList.remove('hidden');el('logout').classList.remove('hidden');loadList()}
 async function logout(){const t=token();clearSession();showLogin();if(t)api('logoutSystemPortal',{systemPortalSessionToken:t}).catch(()=>{})}
@@ -360,7 +360,9 @@ function renderStudentGrades(card,student){
   const link=document.createElement('a');link.className='btn secondary directoryGradeLink';
   link.href=`admin.html?studentId=${encodeURIComponent(student.id)}&v=20261008-admin-restored#compare`;
   link.target='_blank';link.rel='noopener';link.textContent='📊 この生徒の成績・志望校をみる';
-  head.append(info,link);card.append(head);
+  const refreshGrades=document.createElement('button');refreshGrades.type='button';refreshGrades.className='btn secondary small';refreshGrades.textContent='最新の成績を取得';
+  refreshGrades.onclick=()=>{invalidateDirectoryGradeCache_(student.id);wishCard.replaceChildren();wishCard.style.display='none';area.textContent='成績・通知表を読み込み中…';loadDirectoryWish(String(student.id),wishCard);loadStudentGrades(String(student.id),area,student);};
+  head.append(info,refreshGrades,link);card.append(head);
   const wishCard=document.createElement('div');wishCard.style.display='none';card.append(wishCard);
   loadDirectoryWish(String(student.id),wishCard);
   const area=document.createElement('div');area.textContent='成績・通知表を読み込み中…';card.append(area);
@@ -392,23 +394,50 @@ function renderDirectoryWish(card,wish){
   card.append(head,body);
 }
 const directoryGradeProfiles_=new Map();
+const DIRECTORY_GRADE_CACHE_KEY_='stepDirectoryGradeProfilesV1';
+function readDirectoryGradeCache_(id,session){
+  try{
+    const rows=JSON.parse(sessionStorage.getItem(DIRECTORY_GRADE_CACHE_KEY_)||'[]');
+    const item=rows.find(row=>row.studentId===String(id)&&row.session===session&&Date.now()-row.time<300000);
+    return item?.profile?.success===true?item.profile:null;
+  }catch(e){return null;}
+}
+function saveDirectoryGradeCache_(id,session,profile){
+  try{
+    const rows=JSON.parse(sessionStorage.getItem(DIRECTORY_GRADE_CACHE_KEY_)||'[]').filter(row=>row.session===session&&row.studentId!==String(id)&&Date.now()-row.time<300000);
+    rows.push({studentId:String(id),session,profile,time:Date.now()});
+    sessionStorage.setItem(DIRECTORY_GRADE_CACHE_KEY_,JSON.stringify(rows.slice(-20)));
+  }catch(e){}
+}
+function invalidateDirectoryGradeCache_(id){
+  const session=token();
+  directoryGradeProfiles_.delete(session+':'+String(id));
+  try{
+    const rows=JSON.parse(sessionStorage.getItem(DIRECTORY_GRADE_CACHE_KEY_)||'[]').filter(row=>!(row.session===session&&row.studentId===String(id)));
+    sessionStorage.setItem(DIRECTORY_GRADE_CACHE_KEY_,JSON.stringify(rows));
+  }catch(e){}
+}
 async function fetchDirectoryGradeProfile_(id){
   const session=token(),key=session+':'+String(id);
+  const requestTrace='directory-'+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
   const cached=directoryGradeProfiles_.get(key);
   if(cached&&Date.now()-cached.time<60000)return cached.promise;
+  const saved=readDirectoryGradeCache_(id,session);
+  if(saved)return saved;
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),45000);
   let deadline;
   const promise=Promise.race([
     (async()=>{
-      const response=await StepStaffAuth.fetchRuntime({action:'getStudentGradeProfile',studentId:String(id),token:session},controller.signal);
+      const response=await StepStaffAuth.fetchRuntime({action:'getStudentGradeProfile',studentId:String(id),token:session,requestTrace},controller.signal);
       const data=await response.json();
       if(!response.ok||data.success!==true)throw Error(data.error||'成績情報を取得できませんでした。');
       if(token()!==session)throw Error('ログイン状態が変更されました。');
+      saveDirectoryGradeCache_(id,session,data);
       return data;
     })(),
     new Promise((_,reject)=>{deadline=setTimeout(()=>reject(Error('成績情報の通信が時間内に完了しませんでした。')),46000);})
-  ]).catch(error=>{if(directoryGradeProfiles_.get(key)?.promise===promise)directoryGradeProfiles_.delete(key);throw error;})
+  ]).catch(error=>{error.requestTrace=requestTrace;if(directoryGradeProfiles_.get(key)?.promise===promise)directoryGradeProfiles_.delete(key);throw error;})
     .finally(()=>{clearTimeout(timer);clearTimeout(deadline);});
   if(directoryGradeProfiles_.size>=20)directoryGradeProfiles_.delete(directoryGradeProfiles_.keys().next().value);
   directoryGradeProfiles_.set(key,{promise,time:Date.now()});
@@ -424,8 +453,8 @@ async function loadDirectoryWish(id,card){
   }catch(error){
     if(String(selectedId)!==id||!card.isConnected)return;
     card.style.cssText='margin-bottom:14px';
-    const message=document.createElement('p');message.className='error';message.textContent='志望校を読み込めませんでした：'+(error.name==='AbortError'?'通信に時間がかかっています。':error.message);
-    const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';retry.onclick=()=>{card.replaceChildren();card.style.display='none';loadDirectoryWish(id,card)};
+    const message=document.createElement('p');message.className='error';message.textContent='志望校を読み込めませんでした：'+((error.name==='AbortError'?'通信に時間がかかっています。':error.message)+(error.requestTrace?'　通信確認番号：'+error.requestTrace:''));
+    const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';retry.onclick=()=>{invalidateDirectoryGradeCache_(id);card.replaceChildren();card.style.display='none';loadDirectoryWish(id,card)};
     card.replaceChildren(message,retry);
   }finally{clearTimeout(timer)}
 }
@@ -444,8 +473,8 @@ async function loadStudentGrades(id,area,student){
     renderDirectoryCompare(area,Array.isArray(scores.scores)?scores.scores:[],Array.isArray(reports.data)?reports.data:[],student);
   }catch(error){
     if(String(selectedId)!==id||!area.isConnected)return;
-    area.replaceChildren();const message=document.createElement('p');message.className='error';message.textContent='成績・通知表を読み込めませんでした：'+(error.name==='AbortError'?'通信に時間がかかっています。':error.message);area.append(message);
-    const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';retry.onclick=()=>loadStudentGrades(id,area,student);area.append(retry);
+    area.replaceChildren();const message=document.createElement('p');message.className='error';message.textContent='成績・通知表を読み込めませんでした：'+((error.name==='AbortError'?'通信に時間がかかっています。':error.message)+(error.requestTrace?'　通信確認番号：'+error.requestTrace:''));area.append(message);
+    const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';retry.onclick=()=>{invalidateDirectoryGradeCache_(id);loadStudentGrades(id,area,student)};area.append(retry);
   }finally{clearTimeout(timer)}
 }
 function normalizeDirectoryAdmission_(value){
