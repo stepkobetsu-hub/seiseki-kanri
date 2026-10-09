@@ -245,6 +245,7 @@ function renderStudentPreview_(s){
   }
   card.append(actions);
   const status=document.createElement('p');status.id='detailFetchStatus';status.className='muted';status.textContent='連絡先・時間割などの詳細を取得しています…';card.append(status);
+  renderStudentGrades(card,s);
 }
 
 async function requestDetail(id){
