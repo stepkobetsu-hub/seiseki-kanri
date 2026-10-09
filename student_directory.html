@@ -67,7 +67,7 @@ header #logout{color:#175443;background:#fff;border-color:#def5e7}.card{backgrou
 </main>
 <dialog id="zoom"><h2 id="zoomLabel"></h2><p id="zoomValue" style="font-size:1.6rem;overflow-wrap:anywhere;white-space:pre-wrap"></p><button class="btn" type="button" data-close="zoom">閉じる</button></dialog>
 <dialog id="editor"><h2>☆マスタを編集</h2><p class="muted">数式の項目は変更できません。保存すると原本を書き換えます。</p><div id="editFields"></div><p id="editStatus" role="alert"></p><div class="actions"><button class="btn" id="save" type="button">変更を確認</button><button class="btn secondary" type="button" data-close="editor">キャンセル</button></div></dialog>
-<script src="assets/js/staff-auth.js?v=20261009-session-recovery"></script>
+<script src="assets/js/staff-auth.js?v=20261009-unified-bootstrap"></script>
 <script>
 'use strict';
 const GAS='https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
@@ -141,6 +141,13 @@ async function fastIndex(seq){
     students=prepareSearch(data.students.map(s=>({id:String(s.id),flag:String(s.flag??''),name:String(s.name||''),kana:String(s.kana||s.nameKana||''),campus:String(s.campus||''),grade:String(s.grade||''),admissionDate:String(s.admissionDate||''),admissionDateText:String(s.admissionDateText||'')})));
 
     saveCachedIndex(students);ready=true;if(!detailView)renderCandidates();
+    else {
+      const current=students.find(s=>String(s.id)===String(selectedId));
+      if(current&&(current.admissionDate||current.admissionDateText)){
+        const labels=el('detail').querySelectorAll('[data-admission-student-id]');
+        labels.forEach(label=>loadDirectoryAdmission(String(selectedId),label,current));
+      }
+    }
   }finally{clearTimeout(timer)}
 }
 async function loadList(){
@@ -159,7 +166,8 @@ async function loadList(){
     students=prepareSearch(r.students.map(s=>{const saved=admissionRows.find(row=>String(row.id)===String(s.id));return {...s,admissionDate:s.admissionDate||saved?.admissionDate||'',admissionDateText:s.admissionDateText||saved?.admissionDateText||''}}));ready=true;saveCachedIndex(students);
   }catch(e){
     if(seq!==listRequest)return;
-    if(/ログイン情報|ログインしてください|管理権限/.test(e.message)){clearSession();showLogin('再ログインしてください。');return}
+    // A legacy GAS session may expire while the runtime session is persistent.
+    // Only an explicit logout clears the shared personal browser session.
     listRefreshing=false;
     if(ready){renderCandidates();setStatus('候補は表示中です。原本の最新情報は取得できませんでした。更新ボタンで再取得してください。',true)}
     else setStatus('一覧を取得できませんでした：'+e.message,true);
