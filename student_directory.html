@@ -67,6 +67,7 @@ header #logout{color:#175443;background:#fff;border-color:#def5e7}.card{backgrou
 </main>
 <dialog id="zoom"><h2 id="zoomLabel"></h2><p id="zoomValue" style="font-size:1.6rem;overflow-wrap:anywhere;white-space:pre-wrap"></p><button class="btn" type="button" data-close="zoom">閉じる</button></dialog>
 <dialog id="editor"><h2>☆マスタを編集</h2><p class="muted">数式の項目は変更できません。保存すると原本を書き換えます。</p><div id="editFields"></div><p id="editStatus" role="alert"></p><div class="actions"><button class="btn" id="save" type="button">変更を確認</button><button class="btn secondary" type="button" data-close="editor">キャンセル</button></div></dialog>
+<script src="assets/js/staff-auth.js?v=20261009-dual-endpoint"></script>
 <script>
 'use strict';
 const GAS='https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
@@ -88,7 +89,7 @@ function showLogin(message=''){el('app').classList.add('hidden');el('logout').cl
 function showApp(){el('login').classList.add('hidden');el('app').classList.remove('hidden');el('logout').classList.remove('hidden');loadList()}
 async function logout(){const t=token();clearSession();showLogin();if(t)api('logoutSystemPortal',{systemPortalSessionToken:t}).catch(()=>{})}
 async function start(){if(!token()){showLogin();return}showApp()}
-async function login(){const code=el('code').value.trim(),password=el('password').value;if(!code||!password){el('loginError').textContent='講師番号とパスワードを入力してください。';return}el('loginButton').disabled=true;el('loginError').textContent='確認しています…';try{const r=await api('staffLogin',{code,password});if(!r.success||!r.systemPortalSessionToken)throw Error(r.error||'この画面には管理権限が必要です。');const store=storage();store.setItem('adminDeviceMode',mode);store.setItem('adminLoggedIn','1');store.setItem('adminStaffCode',r.code||code);store.setItem('adminStaffName',r.name||'');store.setItem(TOKEN,r.systemPortalSessionToken);store.setItem(EXPIRY,r.systemPortalExpiresAt||'');el('password').value='';showApp()}catch(e){el('loginError').textContent=e.message}finally{el('loginButton').disabled=false}}
+async function login(){const code=el('code').value.trim(),password=el('password').value;if(!code||!password){el('loginError').textContent='講師番号とパスワードを入力してください。';return}el('loginButton').disabled=true;el('loginError').textContent='確認しています…';try{const r=await StepStaffAuth.login(code,password);if(!r.success||!r.systemPortalSessionToken)throw Error(r.error||'この画面には管理権限が必要です。');const store=storage();store.setItem('adminDeviceMode',mode);store.setItem('adminLoggedIn','1');store.setItem('adminStaffCode',r.code||code);store.setItem('adminStaffName',r.name||'');store.setItem(TOKEN,r.systemPortalSessionToken);store.setItem(EXPIRY,r.systemPortalExpiresAt||'');el('password').value='';showApp()}catch(e){el('loginError').textContent=e.message}finally{el('loginButton').disabled=false}}
 function normalize(v){return String(v||'').normalize('NFKC').toLowerCase().replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-96)).replace(/[\s　]+/g,'')}
 const PAIRS = {
   'きゃ':'kya','きゅ':'kyu','きょ':'kyo','ぎゃ':'gya','ぎゅ':'gyu','ぎょ':'gyo',
@@ -132,9 +133,10 @@ function saveCachedIndex(list){
 async function fastIndex(seq){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
   try{
-    const response=await fetch(MEETING_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action:'getStudentList',permissionAppId:'student-directory',token:token(),limit:1000}),cache:'no-store',signal:controller.signal});
+    const response=await StepStaffAuth.fetchRuntime({action:'getStudentList',permissionAppId:'student-directory',token:token(),limit:1000},controller.signal);
     const data=await response.json().catch(()=>({}));
-    if(!response.ok||data.success!==true||!Array.isArray(data.students)||!data.students.length)return;
+    if(!response.ok||data.success!==true)throw Error(data.error||'DBの一覧を取得できませんでした。');
+    if(!Array.isArray(data.students)||!data.students.length)return;
     if(seq!==listRequest||!token())return;
     students=prepareSearch(data.students.map(s=>({id:String(s.id),flag:String(s.flag??''),name:String(s.name||''),kana:String(s.kana||s.nameKana||''),campus:String(s.campus||''),grade:String(s.grade||''),admissionDate:String(s.admissionDate||''),admissionDateText:String(s.admissionDateText||'')})));
 
@@ -256,7 +258,7 @@ const MEETING_API='https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki
 
 let directorySyncBusy=false,directorySyncedAt=0;
 async function mirrorApi(action,extra={},signal){
-  const response=await fetch(MEETING_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action,permissionAppId:'student-directory',token:token(),...extra}),cache:'no-store',signal});
+  const response=await StepStaffAuth.fetchRuntime({action,permissionAppId:'student-directory',token:token(),...extra},signal);
   const data=await response.json().catch(()=>({}));
   if(!response.ok)throw Error(data.error||'生徒情報の通信に失敗しました。');
   return data;
@@ -331,7 +333,7 @@ function renderDirectoryWish(card,wish){
 async function loadDirectoryWish(id,card){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
   try{
-    const response=await fetch(MEETING_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action:'getWish',studentId:id,token:token()}),cache:'no-store',signal:controller.signal});
+    const response=await StepStaffAuth.fetchRuntime({action:'getWish',studentId:id,token:token()},controller.signal);
     const data=await response.json();
     if(String(selectedId)!==id||!card.isConnected)return;
     if(!response.ok||data.success!==true)throw Error(data.error||'志望校を取得できませんでした。');
@@ -347,7 +349,7 @@ async function loadDirectoryWish(id,card){
 async function loadStudentGrades(id,area,student){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
   const request=async action=>{
-    const response=await fetch(MEETING_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action,studentId:id,token:token()}),cache:'no-store',signal:controller.signal});
+    const response=await StepStaffAuth.fetchRuntime({action,studentId:id,token:token()},controller.signal);
     const data=await response.json();
     if(!response.ok||data.success!==true)throw Error(data.error||'成績を取得できませんでした。');return data;
   };
@@ -382,7 +384,7 @@ async function loadDirectoryAdmission(id,label,student){
       date=String(result.student.admissionDate||'');raw=String(result.student.admissionDateText||'');
     }catch(error){
       if(String(selectedId)!==String(id)||!label.isConnected)return;
-      label.textContent='入塾日を取得できませんでした。';
+      label.textContent='入塾日を取得できませんでした：'+(error.name==='AbortError'?'通信が時間切れになりました。':error.message)+' ';
       const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';
       retry.onclick=()=>{label.replaceChildren();loadDirectoryAdmission(id,label,student)};label.append(retry);
       const top=el('detail').querySelector('.admissionTop');if(top)top.textContent='入塾日: 取得できませんでした';
@@ -446,7 +448,7 @@ function renderMeetingSection(card,id){
 async function loadMeetingRecords(id,area){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
   try{
-    const response=await fetch(MEETING_API,{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action:'getMeetingMemos',studentId:String(id),token:token()}),cache:'no-store',signal:controller.signal});
+    const response=await StepStaffAuth.fetchRuntime({action:'getMeetingMemos',studentId:String(id),token:token()},controller.signal);
     const data=await response.json().catch(()=>({}));
     if(!response.ok||data.success!==true)throw Error(data.error||(response.status===401||response.status===403?'ログインし直してください。':'面談記録を取得できませんでした。'));
     if(selectedId!==id||!area.isConnected)return;
