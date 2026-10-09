@@ -1916,6 +1916,8 @@ let adminIdleTimer = null;
 let adminLoginInProgress = false;
 
 function getSavedAdminDevice() {
+  if(localStorage.getItem(ADMIN_SESSION_TOKEN_KEY))return 'personal';
+  if(sessionStorage.getItem(ADMIN_SESSION_TOKEN_KEY))return 'school';
   return localStorage.getItem(ADMIN_DEVICE_KEY) === 'personal'
     ? 'personal'
     : (sessionStorage.getItem(ADMIN_DEVICE_KEY) === 'school' ? 'school' : '');
@@ -2158,43 +2160,36 @@ async function logout(options = {}) {
     document.getElementById('loginErr').textContent = '30分間操作がなかったため、自動でログアウトしました。';
   }
 }
-// ページ読み込み時：ログイン済みなら自動ログイン
+// Restore the same saved staff session used by the directory and memo pages.
+// Every data request still validates its token and permissions on the server.
 (async function() {
-  adminDeviceMode = getSavedAdminDevice();
-  if (adminDeviceMode) selectAdminDevice(adminDeviceMode);
+  adminDeviceMode=getSavedAdminDevice();
+  if(adminDeviceMode)selectAdminDevice(adminDeviceMode);
   restoreAdminLoginInputs();
-  if (adminDeviceMode === 'school' && sessionStorage.getItem('adminLoggedIn') === '1') {
-    const lastActivity = Number(sessionStorage.getItem(ADMIN_IDLE_AT_KEY)) || 0;
-    if (lastActivity && Date.now() - lastActivity >= ADMIN_IDLE_LIMIT_MS) {
-      await logout({ automatic:true });
-      return;
+  const savedToken=getAdminSessionToken();
+  if(savedToken){
+    if(adminDeviceMode==='school'){
+      const lastActivity=Number(sessionStorage.getItem(ADMIN_IDLE_AT_KEY))||Number(sessionStorage.getItem('meetingMemoLastActivityAt'))||0;
+      if(lastActivity&&Date.now()-lastActivity>=ADMIN_IDLE_LIMIT_MS){
+        await logout({automatic:true});return;
+      }
     }
-    if (!hasValidAdminSessionToken()) {
-      sessionStorage.removeItem('adminLoggedIn');
-      document.getElementById('loginErr').textContent = 'Supabase移行後の初回のみ、もう一度ログインしてください。';
-      return;
-    }
-    try { await StepStaffAuth.verify(getAdminSessionToken()); }
-    catch (error) { if(error.authRequired){await logout();document.getElementById('loginErr').textContent=error.message;return;} document.getElementById('loginErr').textContent='保存済みログインで開きます。通信は再試行できます。'; }
+    setAdminState('adminLoggedIn','1');
+    // The server, rather than an old local expiry value, determines validity.
     showMain();
+    StepStaffAuth.verify(savedToken).then(()=>{
+      if(savedToken!==getAdminSessionToken())return;
+      if(adminDeviceMode==='personal'){
+        StepStaffAuth.persist(savedToken).then(()=>{
+          if(savedToken===getAdminSessionToken())setAdminState(ADMIN_SESSION_EXPIRES_KEY,'2100-01-01T00:00:00.000Z');
+        }).catch(()=>{});
+      }
+    }).catch(async error=>{
+      if(savedToken!==getAdminSessionToken()||!error.authRequired)return;
+      await logout();
+      document.getElementById('loginErr').textContent=error.message;
+    });
     return;
-  }
-  if (adminDeviceMode === 'personal' && localStorage.getItem('adminLoggedIn') === '1') {
-    if (hasValidAdminSessionToken()) {
-      try { await StepStaffAuth.verify(getAdminSessionToken()); }
-      catch (error) { if(error.authRequired){await logout();document.getElementById('loginErr').textContent=error.message;return;} document.getElementById('loginErr').textContent='保存済みログインで開きます。通信は再試行できます。'; }
-      localStorage.removeItem('adminPwInput');
-      showMain();
-      return;
-    }
-    const code = localStorage.getItem('adminCodeInput') || '';
-    const password = localStorage.getItem('adminPwInput') || '';
-    if (code && password) {
-      await doAdminLogin();
-    } else {
-      localStorage.removeItem('adminLoggedIn');
-      document.getElementById('loginErr').textContent = 'この端末では初回のみ、もう一度ログインしてください。';
-    }
   }
 })();
 
