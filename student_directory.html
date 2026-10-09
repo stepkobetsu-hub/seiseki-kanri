@@ -298,6 +298,7 @@ function renderStudentGrades(card,student){
   const wishCard=document.createElement('div');wishCard.style.display='none';card.append(wishCard);
   loadDirectoryWish(String(student.id),wishCard);
   const area=document.createElement('div');area.textContent='成績・通知表を読み込み中…';card.append(area);
+  admission.dataset.admissionStudentId=String(student.id);
   loadDirectoryAdmission(String(student.id),admission,student);
   loadStudentGrades(String(student.id),area,student);
 }
@@ -350,6 +351,10 @@ async function loadStudentGrades(id,area,student){
   try{
     const [scores,reports]=await Promise.all([request('getStudentScores'),request('getReports')]);
     if(String(selectedId)!==id||!area.isConnected)return;
+    const admissionLabel=el('detail').querySelector('[data-admission-student-id]');
+    if(admissionLabel&&admissionLabel.dataset.admissionStudentId===id&&(scores.admissionDate||scores.admissionDateText)){
+      loadDirectoryAdmission(id,admissionLabel,{...student,admissionDate:scores.admissionDate,admissionDateText:scores.admissionDateText});
+    }
     area.replaceChildren();
     renderDirectoryCompare(area,Array.isArray(scores.scores)?scores.scores:[],Array.isArray(reports.data)?reports.data:[],student);
   }catch(error){
@@ -359,8 +364,9 @@ async function loadStudentGrades(id,area,student){
   }finally{clearTimeout(timer)}
 }
 function loadDirectoryAdmission(id,label,student){
-  const date=String(student.admissionDate||'');
-  const raw=String(student.admissionDateText||'');
+  const indexed=students.find(s=>String(s.id)===String(id));
+  const date=String(student.admissionDate||indexed?.admissionDate||'');
+  const raw=String(student.admissionDateText||indexed?.admissionDateText||'');
   const duration=calcEnrollmentDuration(date);
   const text=date?'入塾日: '+date+(duration?'（'+duration+'通塾）':''):raw?'入塾日: '+raw+'（日付要確認）':'入塾日: 未登録';
   label.textContent=text;
