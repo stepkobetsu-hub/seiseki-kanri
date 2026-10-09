@@ -567,7 +567,9 @@ const SUPABASE_MEETING_WRITES = new Set([
 ]);
 let students = [];
 let studentsLoadState = 'loading';
+const MEETING_STAFF_FALLBACK_ = ['加瀬','大野','林'];
 let staffMembers = [];
+let meetingLinkedStudentApplied_ = false;
 let memos = [];
 let allMemos = [];
 let memosLoadState='loading';
@@ -1063,6 +1065,7 @@ async function loadMeetingStudents_(){
 async function init(){
   $('date').value=today();selectCampus('');
   if(!meetingUIBound_){
+  $('studentSearch').addEventListener('input',()=>{meetingLinkedStudentApplied_=true;});
   $('studentSearch').addEventListener('input',debounce(renderStudents,150));
   $('searchName').addEventListener('input',debounce(renderMemos,250));
   $('filterStaff').addEventListener('change',renderMemos);
@@ -1071,7 +1074,7 @@ async function init(){
   ['date','counterpart','other','staff','staffOther','content'].forEach(id=>$(id)?.addEventListener('input',saveMeetingDraft_));
   meetingUIBound_=true;
   }
-  renderStaff();
+  staffMembers=readMeetingStaffCache_();renderStaff();
   const cached=readMeetingStudentCache_();if(cached.length)applyMeetingStudents_(cached);
   const session=meetingAdminToken_();
   // Start independent reads immediately: a slow student or staff read must
@@ -1110,17 +1113,19 @@ async function loadMeetingStaff_(){
     const result=await api({action:'getStaffMembers'});
     if(!result.success||!Array.isArray(result.staff))throw Error('担当者を取得できませんでした。');
     if(session!==meetingAdminToken_())return false;
-    staffMembers=result.staff;renderStaff();return true;
+    staffMembers=result.staff.map(String).map(n=>n.trim()).filter(Boolean);
+    saveMeetingStaffCache_();renderStaff();return true;
   }catch(error){
     handleMeetingReadAuth_(error,session);
     renderStaff();
-    $('formError').textContent='担当者一覧を取得できませんでした。「他」を選ぶと担当者を入力できます。';
+    $('formError').textContent='担当者一覧の更新ができませんでした。保存済みの担当者名で入力できます。';
     $('formError').classList.add('show');
     return false;
   }
 }
 
 function selectLinkedStudent_(){
+  if(meetingLinkedStudentApplied_)return;
   const id = new URLSearchParams(location.search).get('studentId') || '';
   if (!/^\d{1,10}$/.test(id)) return;
   const student = students.find(s => String(s.id) === id);
@@ -1240,6 +1245,14 @@ function renderStudents(){
   renderSelectedStudent_();
 }
 function selectStudent(id){
+  meetingLinkedStudentApplied_=true;
+  const selected=students.find(s=>String(s.id)===String(id||''));
+  $('searchName').value=selected?.name||'';
+  const url=new URL(location.href);
+  if(selected)url.searchParams.set('studentId',String(selected.id));else url.searchParams.delete('studentId');
+  history.replaceState(null,'',url.href);
+  if(filterCampus&&selected&&selected.campus!==filterCampus)selectFilterCampus('');
+  renderMemos();
   $('student').value = String(id || '');
   $('studentSearch').value = '';
   $('studentList').classList.remove('invalid');
@@ -1248,12 +1261,23 @@ function selectStudent(id){
   renderStudents();
 }
 function clearStudentSelection(){
-  $('student').value = '';
-  $('studentSearch').value = '';
-  renderStudents();
+  selectStudent('');
   $('studentSearch').focus();
 }
 
+function readMeetingStaffCache_(){
+  try{
+    const cached=JSON.parse(localStorage.getItem('stepMeetingStaffNamesV1')||'null');
+    if(cached&&Array.isArray(cached.names)&&Date.now()-cached.time<7*86400000){
+      const names=cached.names.filter(n=>typeof n==='string'&&n.trim()&&n.length<=100);
+      if(names.length)return names;
+    }
+  }catch(e){}
+  return MEETING_STAFF_FALLBACK_.slice();
+}
+function saveMeetingStaffCache_(){
+  try{localStorage.setItem('stepMeetingStaffNamesV1',JSON.stringify({names:staffMembers,time:Date.now()}));}catch(e){}
+}
 function renderStaff(){
   const selected=$('staff').value;
   $('staff').innerHTML = '<option value="">担当を選択</option>' + staffMembers.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('') + '<option value="他">他</option>';
