@@ -26,9 +26,17 @@
       }finally{clearTimeout(timer);signal?.removeEventListener('abort',abort);}
     }
     if(readOnly){
-      try{return await Promise.any([send(first),send(1-first)]);}
+      // Start one request. Hedge only when it has not completed in five seconds.
+      let hedgeTimer,finished=false,alternateStarted=false;
+      const primary=send(first);
+      const alternate=new Promise((resolve,reject)=>{
+        const start=()=>{if(finished||alternateStarted)return;alternateStarted=true;send(1-first).then(resolve,reject);};
+        hedgeTimer=setTimeout(start,5000);
+        primary.catch(()=>{clearTimeout(hedgeTimer);start();});
+      });
+      try{return await Promise.any([primary,alternate]);}
       catch(error){if(signal?.aborted)throw new DOMException('Aborted','AbortError');throw error.errors?.[0]||error;}
-      finally{controllers.forEach(controller=>controller.abort());}
+      finally{finished=true;clearTimeout(hedgeTimer);controllers.forEach(controller=>controller.abort());}
     }
     // Writes carry one stable mutation ID; do not send concurrent duplicate writes.
     try{return await send(first);}
