@@ -60,7 +60,7 @@ header #logout{color:#175443;background:#fff;border-color:#def5e7}.card{backgrou
 .recordsGradeGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:12px}.recordPanel{margin:14px 0;min-width:0}.recordPanelHead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.recordPanelHead h3{margin:0 auto 8px 0}.recordBody{overflow-x:auto}.recordsTable{border-collapse:collapse;width:100%;font-size:.75rem;white-space:nowrap;color:#14345e}.recordsTable th,.recordsTable td{padding:4px 5px;border-bottom:1px solid #e0e8f2;text-align:center}.recordsTable th{background:#f7f9fc}.recordsGradeGrid .recordPanel:first-child h3{color:#4f46e5}.recordsGradeGrid .recordPanel:last-child h3{color:#9a6700}.directoryRecords{margin:12px 0}
 
 /* Read-only academic records added from the 2026-10-08 registry contract. */
-.directoryAcademic{margin:20px 0}.academicGrid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}.academicPanel{min-width:0;border:1px solid #d7ede2;border-radius:12px;padding:12px 14px;background:#fbfdfb}.academicPanel[hidden]{display:none}.academicHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.academicHead h3{margin:0!important}.academicBody{overflow-x:auto}.academicTable{border-collapse:collapse;width:100%;font-size:.85rem;white-space:nowrap}.academicTable th,.academicTable td{text-align:center;padding:8px 9px;border-bottom:1px solid #dce9e1}.academicTable th{background:#eaf7ef;color:#235c44}.academicTable tbody tr:first-child{background:#f1fbf5;font-weight:650}.academicCaption{text-align:left;font-size:.76rem;color:#627683;margin-bottom:6px}.academicWishes{display:grid;gap:7px}.academicWish{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:8px;background:#eff8f2;border-radius:8px}.academicWishLabel{font-size:.8rem;color:#456c5a}.directoryAcademic>.academicPanel{margin-bottom:14px}@media(max-width:600px){.academicPanel{padding:11px 9px}.academicTable{font-size:.8rem}.academicTable th,.academicTable td{padding:7px}.academicHead h3{font-size:1rem}}
+.directoryAcademic{margin:20px 0}.academicGrid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}.academicPanel{min-width:0;border:1px solid #d7ede2;border-radius:12px;padding:12px 14px;background:#fbfdfb}.academicPanel[hidden]{display:none}.academicHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.academicHead h3{margin:0!important}.academicBody{overflow-x:auto}.academicTable{border-collapse:collapse;width:100%;font-size:.85rem;white-space:nowrap}.academicTable th,.academicTable td{text-align:center;padding:8px 9px;border-bottom:1px solid #dce9e1}.academicTable th{background:#eaf7ef;color:#235c44}.academicTable tbody tr:first-child{background:#f1fbf5;font-weight:650}.academicCaption{text-align:left;font-size:.76rem;color:#627683;margin-bottom:6px}.academicWishPanel{background:linear-gradient(135deg,#eef2ff,#fef9ee);border:1px solid #e2e8f0;padding:24px}.academicWishPanel .academicHead{margin-bottom:6px}.academicWishPanel .academicHead h3{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:.9rem;color:#1e293b}.academicWishDate{font-size:.68rem;font-weight:400;color:#94a3b8}.academicWishes{font-size:.8rem;color:#475569;line-height:2}.academicWishLabel{font-weight:600;color:#6366f1}.academicWishLabel.private{color:#f59e0b}.academicWishBadge{display:inline-block;font-size:.7rem;line-height:normal;margin-left:4px;border-radius:4px;vertical-align:baseline}.academicWishType{color:#1a56a0;background:#dbeafe;padding:1px 5px}.academicWishResult{font-weight:700;color:#ef4444;background:#fee2e2;padding:1px 6px}.academicWishResult.accepted{color:#10b981;background:#dcfce7}.academicWishEnroll{font-weight:700;color:#ef4444;border:1.5px solid #ef4444;border-radius:3px;padding:0 4px}.directoryAcademic>.academicPanel{margin-bottom:14px}@media(max-width:600px){.academicPanel{padding:11px 9px}.academicTable{font-size:.8rem}.academicTable th,.academicTable td{padding:7px}.academicHead h3{font-size:1rem}}
 
 .academicCombined{margin-bottom:14px}.academicControls{display:flex;flex-wrap:wrap;gap:6px}.academicCompareTable{font-size:.72rem;min-width:920px}.academicCompareTable th,.academicCompareTable td{padding:4px 3px}.academicCompareTable th{background:#f7f9fc;color:#14345e;font-weight:500}.academicCompareTable th.academicScoreTitle{background:#eef2ff}.academicCompareTable th.academicReportTitle{background:#fef9ee}.academicCompareTable tbody tr:first-child{background:transparent;font-weight:400}.academicRating{font-weight:700}.academicRating5{color:#059669}.academicRating4{color:#1a56a0}.academicRating3{color:#d97706}.academicRating2,.academicRating1{color:#dc2626}.academicTotal{font-weight:700;color:#1a56a0}.academicMemo{border-bottom:1px solid #edf2f7;padding:8px 0}.academicMemoMeta{font-size:.76rem;color:#64748b;margin-bottom:3px}.academicMemoContent{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;font-size:.82rem}@media(max-width:600px){.academicCombined .academicHead{flex-wrap:wrap}.academicControls .btn{font-size:.7rem;padding:5px 8px}}
 
@@ -402,18 +402,21 @@ const DirectoryAcademic = (() => {
   }
   function renderWishes(area,rows) {
     const wish=rows[0],result=wish?.results || {};
+    const box=area.closest('.academicPanel');
+    const date=box.querySelector('.academicWishDate');
+    if (date) date.textContent=wish?.updatedAt ? '更新: '+String(wish.updatedAt).slice(0,10) : '';
     const list=make('div',null,'academicWishes');
     for (const [key,label] of [['pub1','公立1'],['pub2','公立2'],['pub3','公立3'],['pri1','私立1'],['pri2','私立2'],['pri3','私立3']]) {
       if (!String(wish?.[key+'name'] || '').trim()) continue;
       const item=make('div',null,'academicWish');
-      item.append(make('span',label,'academicWishLabel'),make('strong',wish[key+'name']));
-      if (wish[key+'dept']) item.append(make('span',wish[key+'dept']));
-      for (const value of [result[key+'type'],result[key] === '-' ? '' : result[key],result[key+'enroll'] ? '進学先' : '']) {
-        if (present(value)) item.append(make('span',value));
-      }
+      item.append(make('span',label,'academicWishLabel'+(key.startsWith('pri')?' private':'')),
+        document.createTextNode(' '+wish[key+'name']+(wish[key+'dept']?'／'+wish[key+'dept']:'')));
+      if (result[key+'type']) item.append(make('span',result[key+'type'],'academicWishBadge academicWishType'));
+      if (result[key] && result[key] !== '-') item.append(make('span',result[key],'academicWishBadge academicWishResult'+(result[key]==='合格'?' accepted':'')));
+      if (result[key+'enroll']) item.append(make('span','進学先','academicWishBadge academicWishEnroll'));
       list.append(item);
     }
-    if (!list.childElementCount) area.closest('.academicPanel').hidden=true;
+    if (!list.childElementCount) box.hidden=true;
     else area.append(list);
   }
   function mount(card,student) {
@@ -429,11 +432,14 @@ const DirectoryAcademic = (() => {
       box.hidden=hidden;
       const update=make('button','再取得','btn secondary small');update.type='button';
       update.setAttribute('aria-label',title+'を再取得');
-      head.append(make('h3',title),update);
+      const heading=make('h3',title);
+      if (action === 'getWish') {box.classList.add('academicWishPanel');heading.append(make('span','','academicWishDate'));}
+      head.append(heading,update);
       const area=make('div',null,'academicBody');area.setAttribute('aria-live','polite');
       box.append(head,area);parent.append(box);
       async function load(force=false) {
         update.disabled=true;area.replaceChildren(make('p','読み込み中…','muted'));
+        const date=box.querySelector('.academicWishDate');if(date)date.textContent='';
         box.dataset.state='loading';
         try {
           const rows=await read(action,id,session,force);
@@ -447,7 +453,7 @@ const DirectoryAcademic = (() => {
       }
       update.onclick=()=>load(true);load();return box;
     }
-    panel('志望校','getWish',renderWishes,wrap,true);
+    panel('🏫 志望校','getWish',renderWishes,wrap,true);
     const records=make('section',null,'academicPanel academicCombined');
     const head=make('div',null,'academicHead');head.append(make('h3','📋 データ一覧'));
     const controls=make('div',null,'academicControls');head.append(controls);records.append(head);
