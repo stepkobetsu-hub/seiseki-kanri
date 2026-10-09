@@ -57,6 +57,7 @@ header #logout{color:#175443;background:#fff;border-color:#def5e7}.card{backgrou
 .directoryGradesHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:25px 0 12px}.directoryGradesInfo{min-width:0}.directoryGradesInfo h3{margin:0 0 8px!important}.directoryGradesInfo p{margin:0;line-height:1.6}.directoryGradesHead .detailGrades{white-space:nowrap}.meetingHead .meetingAdd{font-size:1rem;font-weight:750;padding:11px 17px;min-height:44px}@media(max-width:600px){.directoryGradesHead{gap:8px}.directoryGradesHead .btn.small.detailGrades{font-size:.78rem;padding:10px 9px}.meetingHead .meetingAdd{font-size:.95rem;padding:10px 14px}}
 .admissionTop{display:inline-block;font-size:1rem;font-weight:650;color:#456c5a;line-height:1.6;background:#f1fbf5;border:1px solid #d7ede2;border-radius:9px;padding:7px 10px;margin-right:12px}.detailTop h2{flex-wrap:wrap}@media(max-width:600px){.admissionTop{font-size:.95rem;max-width:100%}}
 .directoryGradeLink{font-size:1rem;font-weight:650;padding:10px 15px;border-radius:9px;white-space:nowrap}.admissionTop{margin-right:0;margin-left:12px}.directoryGradesHead .directoryGradeLink{flex:none}@media(max-width:600px){.directoryGradeLink{font-size:.85rem;padding:10px 12px}.directoryGradesHead{flex-wrap:wrap}.directoryGradesHead .directoryGradeLink{margin-left:auto}}
+.recordsGradeGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:12px}.recordPanel{margin:14px 0;min-width:0}.recordPanelHead{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.recordPanelHead h3{margin:0 auto 8px 0}.recordBody{overflow-x:auto}.recordsTable{border-collapse:collapse;width:100%;font-size:.75rem;white-space:nowrap;color:#14345e}.recordsTable th,.recordsTable td{padding:4px 5px;border-bottom:1px solid #e0e8f2;text-align:center}.recordsTable th{background:#f7f9fc}.recordsGradeGrid .recordPanel:first-child h3{color:#4f46e5}.recordsGradeGrid .recordPanel:last-child h3{color:#9a6700}.directoryRecords{margin:12px 0}
 </style>
 </head>
 <body>
@@ -68,6 +69,7 @@ header #logout{color:#175443;background:#fff;border-color:#def5e7}.card{backgrou
 <dialog id="zoom"><h2 id="zoomLabel"></h2><p id="zoomValue" style="font-size:1.6rem;overflow-wrap:anywhere;white-space:pre-wrap"></p><button class="btn" type="button" data-close="zoom">閉じる</button></dialog>
 <dialog id="editor"><h2>☆マスタを編集</h2><p class="muted">数式の項目は変更できません。保存すると原本を書き換えます。</p><div id="editFields"></div><p id="editStatus" role="alert"></p><div class="actions"><button class="btn" id="save" type="button">変更を確認</button><button class="btn secondary" type="button" data-close="editor">キャンセル</button></div></dialog>
 <script src="assets/js/staff-auth.js?v=20261009-single-read"></script>
+<script src="assets/js/directory-records-v2.js?v=20261009-rebuilt"></script>
 <script>
 'use strict';
 const GAS='https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
@@ -84,7 +86,7 @@ function storage(){return localStorage}
 function token(){return storage().getItem(TOKEN)||''}
 function setStatus(text,error=false){el('status').textContent=text;el('status').classList.toggle('error',error)}
 async function api(action,extra={},signal){const response=await fetch(GAS,{signal,method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify({action,...extra})});if(!response.ok)throw Error('通信に失敗しました。もう一度お試しください。');return response.json()}
-function clearSession(){sessionStorage.removeItem('stepDirectoryGradeProfilesV1');resetDetails();request++;listRequest++;localStorage.removeItem(INDEX_CACHE_KEY);for(const store of [localStorage,sessionStorage])for(const key of [TOKEN,EXPIRY,'adminLoggedIn','adminStaffCode','adminStaffName','adminDeviceMode'])store.removeItem(key);mode='';students=[];ready=false;editable=null;selectedId='';detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').replaceChildren();el('detail').classList.add('hidden')}
+function clearSession(){StepDirectoryRecords.clear();sessionStorage.removeItem('stepDirectoryGradeProfilesV1');resetDetails();request++;listRequest++;localStorage.removeItem(INDEX_CACHE_KEY);for(const store of [localStorage,sessionStorage])for(const key of [TOKEN,EXPIRY,'adminLoggedIn','adminStaffCode','adminStaffName','adminDeviceMode'])store.removeItem(key);mode='';students=[];ready=false;editable=null;selectedId='';detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').replaceChildren();el('detail').classList.add('hidden')}
 function showLogin(message=''){el('app').classList.add('hidden');el('logout').classList.add('hidden');el('login').classList.remove('hidden');el('loginError').textContent=message;el('password').value='';}
 function showApp(){el('login').classList.add('hidden');el('app').classList.remove('hidden');el('logout').classList.remove('hidden');loadList()}
 async function logout(){const t=token();clearSession();showLogin();if(t)api('logoutSystemPortal',{systemPortalSessionToken:t}).catch(()=>{})}
@@ -230,14 +232,8 @@ async function directoryDetailRuntime_(id,signal){
   };
   return Promise.any(endpoints.map(read));
 }
-const DIRECTORY_DEFAULT_STAGE_='none';
-const directoryStage_=new URLSearchParams(location.search).get('sections')||DIRECTORY_DEFAULT_STAGE_;
-const directorySections_={
- scores:['test','test-report','all'].includes(directoryStage_),
- reports:['report','test-report','all'].includes(directoryStage_),
- memos:['memo','all'].includes(directoryStage_),
- wishes:directoryStage_==='all'
-};
+const DIRECTORY_RECORDS_DEFAULT_='none';
+function mountStudentRecords_(card,s){StepDirectoryRecords.mount(card,s,{session:token(),active:()=>String(selectedId),stage:new URLSearchParams(location.search).get('sections')||DIRECTORY_RECORDS_DEFAULT_});}
 function renderStudentPreview_(s){
   const card=el('detail');card.replaceChildren();
   const title=document.createElement('h2');title.textContent=s.name;
@@ -253,7 +249,7 @@ function renderStudentPreview_(s){
   }
   card.append(actions);
   const status=document.createElement('p');status.id='detailFetchStatus';status.className='muted';status.textContent='連絡先・時間割などの詳細を取得しています…';card.append(status);
-  renderStudentGrades(card,s);
+  mountStudentRecords_(card,s);
 }
 
 async function requestDetail(id){
@@ -323,7 +319,7 @@ async function loadDetail(id){
   }
 }
 
-function renderDetail(s){const card=el('detail');card.replaceChildren();const title=document.createElement('h2');title.textContent=s.name||'氏名未入力';const admissionTop=document.createElement('span');admissionTop.className='admissionTop';admissionTop.textContent='入塾日・通塾期間を読み込み中…';title.append(admissionTop);const enrollment=statusBadge(s.flag);const detailTop=document.createElement('div');detailTop.className='detailTop';const detailMeta=document.createElement('div');detailMeta.className='detailMeta';const identity=document.createElement('div');identity.className='detailIdentity';identity.append(document.createTextNode(`No.${s.id}`));if(enrollment)identity.append(enrollment);const topGrades=document.createElement('a');topGrades.className='btn small detailGrades';topGrades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261008-admin-restored#compare`;topGrades.target='_blank';topGrades.rel='noopener';topGrades.textContent='📊 この生徒の成績・志望校をみる';const topMaster=document.createElement('a');topMaster.className='btn secondary small masterShortcut';topMaster.href=MASTER_SHEET;topMaster.target='_blank';topMaster.rel='noopener';topMaster.textContent='★生徒マスタへ';const detailLinks=document.createElement('div');detailLinks.className='detailLinks';detailLinks.append(topMaster);detailMeta.append(identity,detailLinks);detailTop.append(title,detailMeta);card.append(detailTop);section(card,'基本情報',[['生徒氏名',s.name],['フリガナ',s.kana],['学年',s.grade],['学校名',s.school]],{big:true});loadDirectoryAdmission(String(s.id),admissionTop,s);section(card,'連絡先',[['保護者携帯',s.guardianPhone,{phone:true}],['保護者自宅電話',s.homePhone,{phone:true}],['第2保護者携帯',s.secondPhone,{phone:true}]],{big:true});renderStudentGrades(card,s);renderMeetingSection(card,s.id);const h=document.createElement('h3');h.textContent='通塾時間割';card.append(h);if(s.lessons?.length){for(const v of s.lessons){const p=document.createElement('div');p.className='lesson';p.textContent=`${v.weekday} ${v.time} ${v.subject}`;card.append(p)}}else{const p=document.createElement('p');p.className='muted';p.textContent='登録されている授業枠はありません。';card.append(p)}if(s.course||s.options||s.note)section(card,'コース・備考',[['コース・オプション',[s.course,s.options].filter(Boolean).join('＋')],['時間割の備考',s.note]],{small:true});renderDebitSection(card,s);section(card,'その他の情報（タップで拡大）',[['保護者氏名',s.guardian],['第2保護者氏名',s.secondGuardian],['郵便番号',s.postcode],['住所',s.address],['保護者メール',s.guardianEmail],['第2保護者メール',s.secondEmail],['生徒ログインPASS（L列）',s.loginPassword,{secret:true}],['成績パス（AW列）',s.gradePassword,{secret:true}]],{small:true});const actions=document.createElement('div');actions.className='actions';const edit=document.createElement('button');edit.className='btn';edit.type='button';edit.textContent='✏️ 生徒マスタを編集';edit.onclick=openEditor;const sheet=document.createElement('a');sheet.className='btn secondary';sheet.href=SHEET;sheet.target='_blank';sheet.rel='noopener';sheet.textContent='時間割の変更はシートへ';const grades=document.createElement('a');grades.className='btn secondary directoryGradeLink';grades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261008-admin-restored#compare`;grades.target='_blank';grades.rel='noopener';grades.textContent='📊 この生徒の成績・志望校をみる';actions.append(edit,sheet,grades);card.append(actions)}
+function renderDetail(s){const card=el('detail');card.replaceChildren();const title=document.createElement('h2');title.textContent=s.name||'氏名未入力';const admissionTop=document.createElement('span');admissionTop.className='admissionTop';admissionTop.textContent='入塾日・通塾期間を読み込み中…';title.append(admissionTop);const enrollment=statusBadge(s.flag);const detailTop=document.createElement('div');detailTop.className='detailTop';const detailMeta=document.createElement('div');detailMeta.className='detailMeta';const identity=document.createElement('div');identity.className='detailIdentity';identity.append(document.createTextNode(`No.${s.id}`));if(enrollment)identity.append(enrollment);const topGrades=document.createElement('a');topGrades.className='btn small detailGrades';topGrades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261008-admin-restored#compare`;topGrades.target='_blank';topGrades.rel='noopener';topGrades.textContent='📊 この生徒の成績・志望校をみる';const topMaster=document.createElement('a');topMaster.className='btn secondary small masterShortcut';topMaster.href=MASTER_SHEET;topMaster.target='_blank';topMaster.rel='noopener';topMaster.textContent='★生徒マスタへ';const detailLinks=document.createElement('div');detailLinks.className='detailLinks';detailLinks.append(topMaster);detailMeta.append(identity,detailLinks);detailTop.append(title,detailMeta);card.append(detailTop);section(card,'基本情報',[['生徒氏名',s.name],['フリガナ',s.kana],['学年',s.grade],['学校名',s.school]],{big:true});loadDirectoryAdmission(String(s.id),admissionTop,s);section(card,'連絡先',[['保護者携帯',s.guardianPhone,{phone:true}],['保護者自宅電話',s.homePhone,{phone:true}],['第2保護者携帯',s.secondPhone,{phone:true}]],{big:true});mountStudentRecords_(card,s);const h=document.createElement('h3');h.textContent='通塾時間割';card.append(h);if(s.lessons?.length){for(const v of s.lessons){const p=document.createElement('div');p.className='lesson';p.textContent=`${v.weekday} ${v.time} ${v.subject}`;card.append(p)}}else{const p=document.createElement('p');p.className='muted';p.textContent='登録されている授業枠はありません。';card.append(p)}if(s.course||s.options||s.note)section(card,'コース・備考',[['コース・オプション',[s.course,s.options].filter(Boolean).join('＋')],['時間割の備考',s.note]],{small:true});renderDebitSection(card,s);section(card,'その他の情報（タップで拡大）',[['保護者氏名',s.guardian],['第2保護者氏名',s.secondGuardian],['郵便番号',s.postcode],['住所',s.address],['保護者メール',s.guardianEmail],['第2保護者メール',s.secondEmail],['生徒ログインPASS（L列）',s.loginPassword,{secret:true}],['成績パス（AW列）',s.gradePassword,{secret:true}]],{small:true});const actions=document.createElement('div');actions.className='actions';const edit=document.createElement('button');edit.className='btn';edit.type='button';edit.textContent='✏️ 生徒マスタを編集';edit.onclick=openEditor;const sheet=document.createElement('a');sheet.className='btn secondary';sheet.href=SHEET;sheet.target='_blank';sheet.rel='noopener';sheet.textContent='時間割の変更はシートへ';const grades=document.createElement('a');grades.className='btn secondary directoryGradeLink';grades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261008-admin-restored#compare`;grades.target='_blank';grades.rel='noopener';grades.textContent='📊 この生徒の成績・志望校をみる';actions.append(edit,sheet,grades);card.append(actions)}
 const MEETING_API='https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
 
 let directorySyncBusy=false,directorySyncedAt=0;
@@ -359,145 +355,6 @@ async function refreshDirectoryMirror(force=false){
 }
 // The server's scheduled master sync maintains the mirror. Searching does not trigger a full sync.
 
-function renderStudentGrades(card,student){
-  if(!directorySections_.scores&&!directorySections_.reports)return;
-  const head=document.createElement('div');head.className='directoryGradesHead';
-  const info=document.createElement('div');info.className='directoryGradesInfo';
-  const title=document.createElement('h3');title.textContent='📊 成績・通知表';
-  const admission=document.createElement('p');admission.className='muted';admission.textContent='入塾日・通塾期間を読み込み中…';
-  info.append(title,admission);
-  const link=document.createElement('a');link.className='btn secondary directoryGradeLink';
-  link.href=`admin.html?studentId=${encodeURIComponent(student.id)}&v=20261008-admin-restored#compare`;
-  link.target='_blank';link.rel='noopener';link.textContent='📊 この生徒の成績・志望校をみる';
-  const refreshGrades=document.createElement('button');refreshGrades.type='button';refreshGrades.className='btn secondary small';refreshGrades.textContent='最新の成績を取得';
-  refreshGrades.onclick=()=>{invalidateDirectoryGradeCache_(student.id);wishCard.replaceChildren();wishCard.style.display='none';area.textContent='成績・通知表を読み込み中…';loadDirectoryWish(String(student.id),wishCard);loadStudentGrades(String(student.id),area,student);};
-  head.append(info,refreshGrades,link);card.append(head);
-  const wishCard=document.createElement('div');wishCard.style.display='none';card.append(wishCard);
-  loadDirectoryWish(String(student.id),wishCard);
-  const area=document.createElement('div');area.textContent='成績・通知表を読み込み中…';card.append(area);
-  admission.dataset.admissionStudentId=String(student.id);
-  loadDirectoryAdmission(String(student.id),admission,student);
-  loadStudentGrades(String(student.id),area,student);
-}
-function renderDirectoryWish(card,wish){
-  card.replaceChildren();card.style.display='none';
-  if(!wish)return;
-  const entries=[['公立1','#6366f1','pub1'],['公立2','#6366f1','pub2'],['公立3','#6366f1','pub3'],['私立1','#f59e0b','pri1'],['私立2','#f59e0b','pri2'],['私立3','#f59e0b','pri3']]
-    .filter(([, ,key])=>String(wish[key+'name']||'').trim());
-  if(!entries.length)return;
-  card.style.cssText='background:linear-gradient(135deg,#eef2ff,#fef9ee);border:1px solid #e2e8f0;border-radius:8px;padding:14px;margin-bottom:14px';
-  const head=document.createElement('div');head.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:6px';
-  const title=document.createElement('span');title.textContent='🏫 志望校';title.style.cssText='font-size:.9rem;font-weight:700;color:#1e293b';head.append(title);
-  if(wish.updatedAt){const date=document.createElement('span');date.textContent='更新: '+String(wish.updatedAt).slice(0,10);date.style.cssText='font-size:.68rem;color:#94a3b8';head.append(date)}
-  const body=document.createElement('div');body.style.cssText='font-size:.8rem;color:#475569;line-height:2';
-  const results=wish.results||{};
-  for(const [label,color,key] of entries){
-    const line=document.createElement('div'),tag=document.createElement('span');tag.textContent=label;tag.style.cssText='font-weight:600;color:'+color;
-    line.append(tag,document.createTextNode(' '+wish[key+'name']+(wish[key+'dept']?'／'+wish[key+'dept']:'')));
-    const badge=(text,style)=>{const span=document.createElement('span');span.textContent=text;span.style.cssText='font-size:.7rem;margin-left:4px;border-radius:4px;padding:1px 6px;'+style;line.append(span)};
-    if(results[key+'type'])badge(results[key+'type'],'color:#1a56a0;background:#dbeafe');
-    if(results[key]&&results[key]!=='-')badge(results[key],'font-weight:700;'+(results[key]==='合格'?'color:#10b981;background:#dcfce7':'color:#ef4444;background:#fee2e2'));
-    if(results[key+'enroll'])badge('進学先','font-weight:700;color:#ef4444;border:1.5px solid #ef4444;padding:0 4px');
-    body.append(line);
-  }
-  card.append(head,body);
-}
-const directoryGradeProfiles_=new Map();
-const DIRECTORY_GRADE_CACHE_KEY_='stepDirectoryGradeProfilesV1';
-function readDirectoryGradeCache_(id,session){
-  try{
-    const rows=JSON.parse(sessionStorage.getItem(DIRECTORY_GRADE_CACHE_KEY_)||'[]');
-    const item=rows.find(row=>row.studentId===String(id)&&row.session===session&&Date.now()-row.time<300000);
-    return item?.profile?.success===true?item.profile:null;
-  }catch(e){return null;}
-}
-function saveDirectoryGradeCache_(id,session,profile){
-  try{
-    const rows=JSON.parse(sessionStorage.getItem(DIRECTORY_GRADE_CACHE_KEY_)||'[]').filter(row=>row.session===session&&row.studentId!==String(id)&&Date.now()-row.time<300000);
-    rows.push({studentId:String(id),session,profile,time:Date.now()});
-    sessionStorage.setItem(DIRECTORY_GRADE_CACHE_KEY_,JSON.stringify(rows.slice(-20)));
-  }catch(e){}
-}
-function invalidateDirectoryGradeCache_(id){
-  const session=token();
-  directoryGradeProfiles_.delete(session+':'+String(id)+':'+directoryStage_);
-  try{
-    const rows=JSON.parse(sessionStorage.getItem(DIRECTORY_GRADE_CACHE_KEY_)||'[]').filter(row=>!(row.session===session&&row.studentId===String(id)));
-    sessionStorage.setItem(DIRECTORY_GRADE_CACHE_KEY_,JSON.stringify(rows));
-  }catch(e){}
-}
-async function fetchDirectoryGradeProfile_(id){
-  const session=token(),key=session+':'+String(id)+':'+directoryStage_;
-  const cached=directoryGradeProfiles_.get(key);
-  if(cached&&Date.now()-cached.time<60000)return cached.promise;
-  const saved=directoryStage_==='all'?readDirectoryGradeCache_(id,session):null;
-  if(saved)return saved;
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
-  const requestTrace='directory-'+crypto.randomUUID();
-  const read=async action=>{
-    const response=await StepStaffAuth.fetchRuntime({action,studentId:String(id),token:session,requestTrace},controller.signal);
-    const data=await response.json();
-    if(!response.ok||data.success!==true)throw Error(data.error||'取得できませんでした。');
-    if(token()!==session)throw Error('ログイン状態が変更されました。');
-    return data;
-  };
-  const promise=(async()=>{
-    const [scoreResult,reportResult]=await Promise.allSettled([
-      directorySections_.scores?read('getStudentScores'):Promise.resolve({scores:[]}),
-      directorySections_.reports?read('getReports'):Promise.resolve({data:[]})
-    ]);
-    const scores=scoreResult.status==='fulfilled'?scoreResult.value:{scores:[]};
-    const reports=reportResult.status==='fulfilled'?reportResult.value:{data:[]};
-    const profile={success:true,scores:scores.scores,reports:reports.data,admissionDate:scores.admissionDate,admissionDateText:scores.admissionDateText,scoreError:scoreResult.status==='rejected'?scoreResult.reason.message:'',reportError:reportResult.status==='rejected'?reportResult.reason.message:''};
-    if(!profile.scoreError&&!profile.reportError&&directoryStage_==='all')saveDirectoryGradeCache_(id,session,profile);
-    else if(profile.scoreError||profile.reportError)directoryGradeProfiles_.delete(key);
-    return profile;
-  })().catch(error=>{error.requestTrace=requestTrace;directoryGradeProfiles_.delete(key);throw error}).finally(()=>clearTimeout(timer));
-  directoryGradeProfiles_.set(key,{promise,time:Date.now()});
-  return promise;
-}
-async function loadDirectoryWish(id,card){
-  if(!directorySections_.wishes)return;
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
-  try{
-    const response=await StepStaffAuth.fetchRuntime({action:'getWish',studentId:String(id),token:token()},controller.signal);
-    const data=await response.json();
-    if(!response.ok||data.success!==true)throw Error(data.error||'志望校を取得できませんでした。');
-    if(String(selectedId)!==id||!card.isConnected)return;
-
-    renderDirectoryWish(card,data.wish);
-  }catch(error){
-    if(String(selectedId)!==id||!card.isConnected)return;
-    card.style.cssText='margin-bottom:14px';
-    const message=document.createElement('p');message.className='error';message.textContent='志望校を読み込めませんでした：'+((error.name==='AbortError'?'通信に時間がかかっています。':error.message)+(error.requestTrace?'　通信確認番号：'+error.requestTrace:''));
-    const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';retry.onclick=()=>{invalidateDirectoryGradeCache_(id);card.replaceChildren();card.style.display='none';loadDirectoryWish(id,card)};
-    card.replaceChildren(message,retry);
-  }finally{clearTimeout(timer)}
-}
-async function loadStudentGrades(id,area,student){
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
-  try{
-    const profile=await fetchDirectoryGradeProfile_(id);
-    const scores={scores:profile.scores,admissionDate:profile.admissionDate,admissionDateText:profile.admissionDateText};
-    const reports={data:profile.reports};
-    if(String(selectedId)!==id||!area.isConnected)return;
-    const admissionLabel=el('detail').querySelector('[data-admission-student-id]');
-    if(admissionLabel&&admissionLabel.dataset.admissionStudentId===id&&(scores.admissionDate||scores.admissionDateText)){
-      loadDirectoryAdmission(id,admissionLabel,{...student,admissionDate:scores.admissionDate,admissionDateText:scores.admissionDateText});
-    }
-    area.replaceChildren();
-    renderDirectoryCompare(area,Array.isArray(scores.scores)?scores.scores:[],Array.isArray(reports.data)?reports.data:[],student);
-    if(profile.scoreError||profile.reportError){
-      const message=document.createElement('p');message.className='error';
-      message.textContent=[profile.scoreError?'テスト成績：'+profile.scoreError:'',profile.reportError?'通知表：'+profile.reportError:''].filter(Boolean).join(' ／ ');
-      area.prepend(message);
-    }
-  }catch(error){
-    if(String(selectedId)!==id||!area.isConnected)return;
-    area.replaceChildren();const message=document.createElement('p');message.className='error';message.textContent='成績・通知表を読み込めませんでした：'+((error.name==='AbortError'?'通信に時間がかかっています。':error.message)+(error.requestTrace?'　通信確認番号：'+error.requestTrace:''));area.append(message);
-    const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';retry.onclick=()=>{invalidateDirectoryGradeCache_(id);loadStudentGrades(id,area,student)};area.append(retry);
-  }finally{clearTimeout(timer)}
-}
 function normalizeDirectoryAdmission_(value){
   const raw=String(value||'').trim();if(!raw)return '';
   let year,month,day;
@@ -577,37 +434,6 @@ async function loadDirectoryAdmission(id,label,student){
   const top=el('detail').querySelector('.admissionTop');
   if(String(selectedId)===id&&top)top.textContent=text;
 }
-function renderDirectoryCompare(area,scores,reports,student){
-  const sort=(rows,report)=>rows.slice().sort((a,b)=>Number(a.year)-Number(b.year)||String(report?b.semester:a.term).localeCompare(String(report?a.semester:b.term),'ja',{numeric:true}));
-  scores=sort(scores,false);reports=reports.slice().sort((a,b)=>Number(b.year)-Number(a.year)||String(b.semester).localeCompare(String(a.semester),'ja',{numeric:true}));
-  const wrap=document.createElement('div');wrap.style.cssText='overflow-x:auto;border:1px solid #e0e8f2;border-radius:8px';
-  const table=document.createElement('table');table.style.cssText='border-collapse:collapse;width:100%;font-size:.75rem;white-space:nowrap;color:#14345e';
-  const row=(values,header=false)=>{const tr=document.createElement('tr');for(let i=0;i<values.length;i++){const cell=document.createElement(header?'th':'td');cell.textContent=values[i]==null||values[i]===''?'-':String(values[i]);cell.style.cssText='padding:4px 5px;text-align:center;border-bottom:1px solid #e0e8f2;'+(header?'background:#f7f9fc;font-weight:600':'');if(!header&&i>=11&&i<=19){const value=Number(values[i]);cell.style.color=value<=3&&value>=1?'#ea6500':'#155aa5';}if(!header&&[6,8,20,21].includes(i))cell.style.fontWeight='800';tr.append(cell)}return tr};
-  const head=document.createElement('thead'),group=document.createElement('tr');
-  for(const [text,span,color] of [['テスト成績',10,'#eef2ff'],['通知表評定',12,'#fef9ee']]){const th=document.createElement('th');th.textContent=text;th.colSpan=span;th.style.cssText='background:'+color+';padding:5px;text-align:center';group.append(th)}
-  head.append(group,row(['年度・回次','国','社','数','理','英','5科計','5科順','9科計','9科順','年度・学期','国','社','数','理','英','音','美','体','技','5計','9計'],true));table.append(head);
-  const body=document.createElement('tbody'),subjects=['jpn','soc','math','sci','eng','mus','art','pe','tech'];
-  const sum=(r,prefix,n)=>subjects.slice(0,n).every(k=>r[prefix+k]!==''&&r[prefix+k]!=null&&Number.isFinite(Number(r[prefix+k])))?subjects.slice(0,n).reduce((v,k)=>v+Number(r[prefix+k]),0):'';
-  const total=(r,key,n)=>r[key]!==''&&r[key]!=null?r[key]:sum(r,'',n);
-  const grade=String(student?.grade||'').normalize('NFKC').match(/^中([123])/);
-  const now=new Date();const schoolYear=now.getMonth()<3?now.getFullYear()-1:now.getFullYear();
-  const labelGrade=year=>{const n=grade?Number(grade[1])-(schoolYear-Number(year)):0;return n>=1&&n<=3?'（中'+n+'）':''};
-  const length=Math.max(scores.length,reports.length);
-  for(let i=0;i<length;i++){const sc=scores[i]||{},rp=reports[i]||{};
-    body.append(row([sc.year?sc.year+'年度 第'+sc.term+'回'+labelGrade(sc.year):'',sc.jpn,sc.soc,sc.math,sc.sci,sc.eng,total(sc,'total5',5),sc.rank5,total(sc,'total9',9),sc.rank9,rp.year?rp.year+'年度 '+rp.semester+labelGrade(rp.year):'',...subjects.map(k=>rp['rp_'+k]),sum(rp,'rp_',5),sum(rp,'rp_',9)]));
-  }
-  if(!length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=22;td.textContent='登録された成績・通知表はありません。';td.style.padding='12px';tr.append(td);body.append(tr)}
-  table.append(body);
-  if(!directorySections_.scores||!directorySections_.reports){
-    for(const tr of table.querySelectorAll('tr')){
-      const cells=Array.from(tr.children);
-      if(tr===group){cells[directorySections_.scores?1:0]?.remove();}
-      else if(cells.length>1)for(const cell of cells.filter((_,i)=>directorySections_.scores?i>=10:i<10))cell.remove();
-    }
-    const empty=body.querySelector('td[colspan]');if(empty)empty.colSpan=directorySections_.scores?10:12;
-  }
-  wrap.append(table);area.append(wrap);
-}
 function calcEnrollmentDuration(value) {
   const s = String(value || '').trim();
   const m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
@@ -625,35 +451,6 @@ function calcEnrollmentDuration(value) {
   return `${rest}ヶ月`;
 }
 
-function meetingDate(value){const raw=String(value||'');if(/^\d{4}-\d{2}-\d{2}/.test(raw))return raw.slice(0,10);const d=new Date(raw);return Number.isNaN(d.valueOf())?raw:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
-function renderMeetingSection(card,id){
-  if(!directorySections_.memos)return;
-  const head=document.createElement('div');head.className='meetingHead';
-  const title=document.createElement('h3');title.textContent='🗒️ 面談記録';
-  const add=document.createElement('a');add.href=`meeting_memo.html?studentId=${encodeURIComponent(id)}`;add.target='_blank';add.rel='noopener';add.className='btn secondary meetingAdd';add.textContent='＋ 面談メモを登録';
-  head.append(title,add);card.append(head);
-  const area=document.createElement('div');area.className='meetingStatus';area.textContent='面談記録を読み込み中…';card.append(area);
-  loadMeetingRecords(id,area);
-}
-async function loadMeetingRecords(id,area){
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
-  try{
-    const response=await StepStaffAuth.fetchRuntime({action:'getMeetingMemos',studentId:String(id),token:token()},controller.signal);
-    const data=await response.json().catch(()=>({}));
-    if(!response.ok||data.success!==true)throw Error(data.error||(response.status===401||response.status===403?'ログインし直してください。':'面談記録を取得できませんでした。'));
-    if(selectedId!==id||!area.isConnected)return;
-    area.replaceChildren();area.className='';
-    const memos=(Array.isArray(data.memos)?data.memos:[]).filter(m=>String(m.studentId)===String(id)).sort((a,b)=>Date.parse(b.date||0)-Date.parse(a.date||0)||Date.parse(b.updatedAt||0)-Date.parse(a.updatedAt||0));
-    if(!memos.length){area.className='meetingStatus';area.textContent='この生徒の面談記録はまだありません。';return}
-    const count=document.createElement('p');count.className='muted';count.textContent=`${memos.length}件の面談記録（新しい順）`;area.append(count);
-    for(const memo of memos){
-      const article=document.createElement('article');article.className='meetingMemo';
-      const meta=document.createElement('div');meta.className='meetingMeta';meta.textContent=`${meetingDate(memo.date)}　相手: ${memo.counterpart||'-'}　担当: ${memo.staff||'-'}`;
-      const content=document.createElement('div');content.className='meetingContent';content.textContent=memo.content||'';
-      article.append(meta,content);area.append(article);
-    }
-  }catch(e){if(selectedId!==id||!area.isConnected)return;area.replaceChildren();area.className='meetingStatus error';area.append(document.createTextNode('面談記録を読み込めませんでした：'+(e.name==='AbortError'?'時間がかかっています。':e.message)+' '));const retry=document.createElement('button');retry.type='button';retry.className='btn secondary small';retry.textContent='再取得';retry.onclick=()=>{area.className='meetingStatus';area.textContent='面談記録を読み込み中…';loadMeetingRecords(id,area)};area.append(retry)}finally{clearTimeout(timer)}
-}
 function openEditor(){if(!selectedId||!editable)return;const body=el('editFields');body.replaceChildren();for(const [letter,label] of Object.entries(LABELS)){const source=editable[letter];if(!source||source.formula)continue;const wrap=document.createElement('label');wrap.className='edit-field';wrap.textContent=`${label}（${letter}列）`;const input=document.createElement('input');input.dataset.letter=letter;if(['M','N'].includes(letter)){wrap.classList.add('checkboxEdit');input.type='checkbox';input.checked=checkboxChecked(source.value);wrap.append(input)}else{input.type=['L','AW'].includes(letter)?'password':'text';input.autocomplete='off';input.value=source.value??'';wrap.append(input)}body.append(wrap)}el('editStatus').textContent='';el('editor').showModal()}
 async function save(){const changes={},lines=[];for(const input of el('editFields').querySelectorAll('input')){const letter=input.dataset.letter,before=String(editable[letter].value??''),isCheckbox=['M','N'].includes(letter),after=isCheckbox?(input.checked?'TRUE':'FALSE'):input.value;if(isCheckbox?checkboxChecked(before)===input.checked:before===after)continue;changes[letter]={before,after};lines.push(`${LABELS[letter]}：${isCheckbox?`${checkboxChecked(before)?'☑':'□'} → ${input.checked?'☑':'□'}`:['L','AW'].includes(letter)?'（変更前後の値は非表示）':`「${before||'空欄'}」→「${after||'空欄'}」`}`)}if(!lines.length){el('editStatus').textContent='変更はありません。';return}if(!confirm(`この変更を保存しますか？\n生徒番号：${selectedId}\n\n${lines.join('\n')}`))return;el('save').disabled=true;el('editStatus').textContent='原本に保存しています…';try{resetDetails();const id=selectedId,r=await mirrorApi('saveStudentDirectory',{studentId:id,changes,mutationId:crypto.randomUUID()});if(!r.success)throw Error(r.error||'保存できませんでした。');el('editor').close();await showSavedDetail(id,r);directorySyncedAt=0;setStatus('☆マスタへ保存し、最新の内容を読み直しました。')}catch(e){el('editStatus').textContent=e.message}finally{el('save').disabled=false}}
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>el(b.dataset.close).close());el('loginButton').onclick=login;el('password').onkeydown=e=>{if(e.key==='Enter')login()};el('refresh').onclick=loadList;el('search').oninput=()=>{if(detailView){request++;selectedId='';editable=null;detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').replaceChildren();el('detail').classList.add('hidden')}renderCandidates()};el('save').onclick=save;el('logout').onclick=()=>logout();start();
