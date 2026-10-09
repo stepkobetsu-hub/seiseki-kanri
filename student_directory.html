@@ -148,9 +148,8 @@ async function loadList(){
   const seq=++listRequest;request++;editable=null;selectedId='';detailView=false;document.querySelector('.searchCard').classList.remove('viewingDetail');el('detail').classList.add('hidden');
   const cached=readCachedIndex();students=prepareSearch(cached);ready=!!cached.length;listRefreshing=true;el('refresh').disabled=true;
   admissionIndexPromise=fastIndex(seq).catch(()=>{});
-  if(ready){renderCandidates();refreshDirectoryMirror()}else{el('candidates').replaceChildren();setStatus('生徒の検索候補を準備しています…')}
-  if(!ready){await admissionIndexPromise; if(seq!==listRequest)return;if(ready)refreshDirectoryMirror()}
-  if(!ready)setStatus('生徒マスタから最新の候補を取得しています…');
+  if(ready){renderCandidates()}else{el('candidates').replaceChildren();setStatus('生徒の検索候補を準備しています…')}
+    if(!ready)setStatus('生徒マスタから最新の候補を取得しています…');
   try{
     const r=await api('getStudentDirectoryList',{systemPortalSessionToken:token()});
     if(seq!==listRequest)return;
@@ -166,7 +165,7 @@ async function loadList(){
     else setStatus('一覧を取得できませんでした：'+e.message,true);
     return;
   }finally{if(seq===listRequest)el('refresh').disabled=false}
-  if(seq!==listRequest)return;listRefreshing=false;renderCandidates();refreshDirectoryMirror();
+  if(seq!==listRequest)return;listRefreshing=false;renderCandidates();
 }
 function renderCandidates(){clearTimeout(prefetchTimer);if(!ready||detailView)return;const updating=listRefreshing?' ／ 原本の最新情報を確認中…':'';const q=normalize(el('search').value);const box=el('candidates');box.replaceChildren();if(!q){setStatus(`${students.length}人を読み込みました。名前・かな・ローマ字・番号を入力してください。${updating}`);return}const matches=students.filter(s=>searchKeys(s).some(v=>v.includes(q)));prefetchDetails(matches);setStatus(matches.length?`${matches.length}人が該当します。生徒を選んでください。${updating}`:`「${el('search').value}」に一致する生徒はいません。${updating}`);const fragment=document.createDocumentFragment();for(const s of matches.slice(0,40)){const b=document.createElement('button');b.type='button';b.className='candidate';const name=document.createElement('strong');name.textContent=`${s.name}（${s.kana||'フリガナなし'}）`;const line=document.createElement('small');line.textContent=`No.${s.id} `;const candidateStatus=statusBadge(s.flag);if(candidateStatus)line.append(candidateStatus);line.append(document.createTextNode(` ／ ${s.grade||''} ／ ${s.campus||''}`));const badge=document.createElement('span');badge.className='candidateBadge';badge.textContent='✦';badge.setAttribute('aria-hidden','true');const inner=document.createElement('span');inner.className='candidateText';inner.append(name,line);const arrow=document.createElement('span');arrow.className='candidateArrow';arrow.textContent='›';arrow.setAttribute('aria-hidden','true');b.append(badge,inner,arrow);b.addEventListener('click',()=>loadDetail(s.id));fragment.append(b)}box.append(fragment);if(matches.length>40)setStatus(`${matches.length}人が該当します。先頭40人を表示しています。`)}
 function field(parent,label,value,opts={}){const wrap=document.createElement('div'),b=document.createElement('button');b.type='button';b.className='field'+(opts.big?' big':'')+(opts.small?' small':'');const l=document.createElement('span'),v=document.createElement('span');l.className='label';l.textContent=label;v.className='value';const shown=String(value??'').trim()||'未入力';v.textContent=opts.secret&&shown!=='未入力'?'••••（タップして確認）':shown;b.append(l,v);b.onclick=()=>{el('zoomLabel').textContent=label;el('zoomValue').textContent=shown;el('zoom').showModal()};wrap.append(b);if(opts.phone&&shown!=='未入力'){const digits=shown.replace(/[^+0-9]/g,'');if(/^\+?\d{9,15}$/.test(digits)){const a=document.createElement('a');a.href='tel:'+digits;a.className='phone';a.textContent='📞 電話をかける';wrap.append(a)}}parent.append(wrap)}
@@ -208,7 +207,7 @@ function section(parent,title,values,opts={}){const h=document.createElement('h3
 
 const detailCache=new Map(),detailPending=new Map();
 let detailEpoch=0,prefetchTimer=0;
-const DETAIL_REUSE_MS=15000;
+const DETAIL_REUSE_MS=300000;
 // Detail data stays only in this page's memory, never in browser storage.
 function resetDetails(){detailEpoch++;clearTimeout(prefetchTimer);detailCache.clear();for(const entry of detailPending.values())entry.controller.abort();detailPending.clear()}
 function validDetail(r,id){return r?.success===true&&String(r.student?.id)===String(id)}
@@ -232,7 +231,7 @@ async function requestDetail(id){
     if(epoch!==detailEpoch||session!==token())throw Error('情報を更新しました。もう一度選択してください。');
     if(!validDetail(r,id))throw Error(r.error||'取得できませんでした。');
     detailCache.set(id,{session,at:Date.now(),data:r});
-    while(detailCache.size>3)detailCache.delete(detailCache.keys().next().value);
+    while(detailCache.size>20)detailCache.delete(detailCache.keys().next().value);
     return r;
   }).catch(e=>{if(e.name==='AbortError')throw Error('通信に時間がかかっています。もう一度選択してください。');throw e}).finally(()=>{clearTimeout(timer);if(detailPending.get(id)===entry)detailPending.delete(id)});
   detailPending.set(id,entry);
@@ -292,8 +291,7 @@ async function refreshDirectoryMirror(force=false){
   }catch(e){console.warn('生徒情報の同期を後で再試行します。',e)}
   finally{directorySyncBusy=false}
 }
-setInterval(()=>{if(!document.hidden&&ready&&token())refreshDirectoryMirror()},60000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&ready&&token())refreshDirectoryMirror()});
+// The server's scheduled master sync maintains the mirror. Searching does not trigger a full sync.
 
 function renderStudentGrades(card,student){
   const head=document.createElement('div');head.className='directoryGradesHead';
@@ -374,19 +372,22 @@ async function loadStudentGrades(id,area,student){
   }finally{clearTimeout(timer)}
 }
 async function loadDirectoryAdmission(id,label,student){
-  if(!student.admissionDate&&!student.admissionDateText)await admissionIndexPromise;
   if(String(selectedId)!==String(id)||!label.isConnected)return;
   const indexed=students.find(s=>String(s.id)===String(id));
   let date=String(student.admissionDate||indexed?.admissionDate||'');
   let raw=String(student.admissionDateText||indexed?.admissionDateText||'');
   if(!date&&!raw){
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
     try{
       label.textContent='入塾日・通塾期間を確認中…';
-      const result=await mirrorApi('getStudentDirectoryDetail',{studentId:String(id)},controller.signal);
-      if(!result.success||String(result.student?.id)!==String(id))throw Error(result.error||'生徒情報を取得できませんでした。');
+      const result=await mirrorApi('getStudentList',{q:String(id),limit:10},controller.signal);
+      const found=result.students?.find(row=>String(row.id)===String(id));
+      if(!result.success||!found)throw Error(result.error||'DBの入塾日を取得できませんでした。');
       if(String(selectedId)!==String(id)||!label.isConnected)return;
-      date=String(result.student.admissionDate||'');raw=String(result.student.admissionDateText||'');
+      date=String(found.admissionDate||'');raw=String(found.admissionDateText||'');
+      student.admissionDate=date;student.admissionDateText=raw;
+      if(indexed){indexed.admissionDate=date;indexed.admissionDateText=raw;saveCachedIndex(students);}
+      const cached=detailCache.get(String(id));if(cached){cached.data.student.admissionDate=date;cached.data.student.admissionDateText=raw;}
     }catch(error){
       if(String(selectedId)!==String(id)||!label.isConnected)return;
       label.textContent='入塾日を取得できませんでした：'+(error.name==='AbortError'?'通信が時間切れになりました。':error.message)+' ';
