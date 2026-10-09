@@ -391,7 +391,7 @@ function renderDirectoryWish(card,wish){
   card.append(head,body);
 }
 async function loadDirectoryWish(id,card){
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
   try{
     const response=await StepStaffAuth.fetchRuntime({action:'getWish',studentId:id,token:token()},controller.signal);
     const data=await response.json();
@@ -407,7 +407,7 @@ async function loadDirectoryWish(id,card){
   }finally{clearTimeout(timer)}
 }
 async function loadStudentGrades(id,area,student){
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
   const request=async action=>{
     const response=await StepStaffAuth.fetchRuntime({action,studentId:id,token:token()},controller.signal);
     const data=await response.json();
