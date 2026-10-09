@@ -230,6 +230,14 @@ async function directoryDetailRuntime_(id,signal){
   };
   return Promise.any(endpoints.map(read));
 }
+const DIRECTORY_DEFAULT_STAGE_='none';
+const directoryStage_=new URLSearchParams(location.search).get('sections')||DIRECTORY_DEFAULT_STAGE_;
+const directorySections_={
+ scores:['test','test-report','all'].includes(directoryStage_),
+ reports:['report','test-report','all'].includes(directoryStage_),
+ memos:['memo','all'].includes(directoryStage_),
+ wishes:directoryStage_==='all'
+};
 function renderStudentPreview_(s){
   const card=el('detail');card.replaceChildren();
   const title=document.createElement('h2');title.textContent=s.name;
@@ -315,7 +323,7 @@ async function loadDetail(id){
   }
 }
 
-function renderDetail(s){const card=el('detail');card.replaceChildren();const title=document.createElement('h2');title.textContent=s.name||'氏名未入力';const admissionTop=document.createElement('span');admissionTop.className='admissionTop';admissionTop.textContent='入塾日・通塾期間を読み込み中…';title.append(admissionTop);const enrollment=statusBadge(s.flag);const detailTop=document.createElement('div');detailTop.className='detailTop';const detailMeta=document.createElement('div');detailMeta.className='detailMeta';const identity=document.createElement('div');identity.className='detailIdentity';identity.append(document.createTextNode(`No.${s.id}`));if(enrollment)identity.append(enrollment);const topGrades=document.createElement('a');topGrades.className='btn small detailGrades';topGrades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261008-admin-restored#compare`;topGrades.target='_blank';topGrades.rel='noopener';topGrades.textContent='📊 この生徒の成績・志望校をみる';const topMaster=document.createElement('a');topMaster.className='btn secondary small masterShortcut';topMaster.href=MASTER_SHEET;topMaster.target='_blank';topMaster.rel='noopener';topMaster.textContent='★生徒マスタへ';const detailLinks=document.createElement('div');detailLinks.className='detailLinks';detailLinks.append(topMaster);detailMeta.append(identity,detailLinks);detailTop.append(title,detailMeta);card.append(detailTop);section(card,'基本情報',[['生徒氏名',s.name],['フリガナ',s.kana],['学年',s.grade],['学校名',s.school]],{big:true});section(card,'連絡先',[['保護者携帯',s.guardianPhone,{phone:true}],['保護者自宅電話',s.homePhone,{phone:true}],['第2保護者携帯',s.secondPhone,{phone:true}]],{big:true});renderStudentGrades(card,s);renderMeetingSection(card,s.id);const h=document.createElement('h3');h.textContent='通塾時間割';card.append(h);if(s.lessons?.length){for(const v of s.lessons){const p=document.createElement('div');p.className='lesson';p.textContent=`${v.weekday} ${v.time} ${v.subject}`;card.append(p)}}else{const p=document.createElement('p');p.className='muted';p.textContent='登録されている授業枠はありません。';card.append(p)}if(s.course||s.options||s.note)section(card,'コース・備考',[['コース・オプション',[s.course,s.options].filter(Boolean).join('＋')],['時間割の備考',s.note]],{small:true});renderDebitSection(card,s);section(card,'その他の情報（タップで拡大）',[['保護者氏名',s.guardian],['第2保護者氏名',s.secondGuardian],['郵便番号',s.postcode],['住所',s.address],['保護者メール',s.guardianEmail],['第2保護者メール',s.secondEmail],['生徒ログインPASS（L列）',s.loginPassword,{secret:true}],['成績パス（AW列）',s.gradePassword,{secret:true}]],{small:true});const actions=document.createElement('div');actions.className='actions';const edit=document.createElement('button');edit.className='btn';edit.type='button';edit.textContent='✏️ 生徒マスタを編集';edit.onclick=openEditor;const sheet=document.createElement('a');sheet.className='btn secondary';sheet.href=SHEET;sheet.target='_blank';sheet.rel='noopener';sheet.textContent='時間割の変更はシートへ';const grades=document.createElement('a');grades.className='btn secondary directoryGradeLink';grades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261008-admin-restored#compare`;grades.target='_blank';grades.rel='noopener';grades.textContent='📊 この生徒の成績・志望校をみる';actions.append(edit,sheet,grades);card.append(actions)}
+function renderDetail(s){const card=el('detail');card.replaceChildren();const title=document.createElement('h2');title.textContent=s.name||'氏名未入力';const admissionTop=document.createElement('span');admissionTop.className='admissionTop';admissionTop.textContent='入塾日・通塾期間を読み込み中…';title.append(admissionTop);const enrollment=statusBadge(s.flag);const detailTop=document.createElement('div');detailTop.className='detailTop';const detailMeta=document.createElement('div');detailMeta.className='detailMeta';const identity=document.createElement('div');identity.className='detailIdentity';identity.append(document.createTextNode(`No.${s.id}`));if(enrollment)identity.append(enrollment);const topGrades=document.createElement('a');topGrades.className='btn small detailGrades';topGrades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261008-admin-restored#compare`;topGrades.target='_blank';topGrades.rel='noopener';topGrades.textContent='📊 この生徒の成績・志望校をみる';const topMaster=document.createElement('a');topMaster.className='btn secondary small masterShortcut';topMaster.href=MASTER_SHEET;topMaster.target='_blank';topMaster.rel='noopener';topMaster.textContent='★生徒マスタへ';const detailLinks=document.createElement('div');detailLinks.className='detailLinks';detailLinks.append(topMaster);detailMeta.append(identity,detailLinks);detailTop.append(title,detailMeta);card.append(detailTop);section(card,'基本情報',[['生徒氏名',s.name],['フリガナ',s.kana],['学年',s.grade],['学校名',s.school]],{big:true});loadDirectoryAdmission(String(s.id),admissionTop,s);section(card,'連絡先',[['保護者携帯',s.guardianPhone,{phone:true}],['保護者自宅電話',s.homePhone,{phone:true}],['第2保護者携帯',s.secondPhone,{phone:true}]],{big:true});renderStudentGrades(card,s);renderMeetingSection(card,s.id);const h=document.createElement('h3');h.textContent='通塾時間割';card.append(h);if(s.lessons?.length){for(const v of s.lessons){const p=document.createElement('div');p.className='lesson';p.textContent=`${v.weekday} ${v.time} ${v.subject}`;card.append(p)}}else{const p=document.createElement('p');p.className='muted';p.textContent='登録されている授業枠はありません。';card.append(p)}if(s.course||s.options||s.note)section(card,'コース・備考',[['コース・オプション',[s.course,s.options].filter(Boolean).join('＋')],['時間割の備考',s.note]],{small:true});renderDebitSection(card,s);section(card,'その他の情報（タップで拡大）',[['保護者氏名',s.guardian],['第2保護者氏名',s.secondGuardian],['郵便番号',s.postcode],['住所',s.address],['保護者メール',s.guardianEmail],['第2保護者メール',s.secondEmail],['生徒ログインPASS（L列）',s.loginPassword,{secret:true}],['成績パス（AW列）',s.gradePassword,{secret:true}]],{small:true});const actions=document.createElement('div');actions.className='actions';const edit=document.createElement('button');edit.className='btn';edit.type='button';edit.textContent='✏️ 生徒マスタを編集';edit.onclick=openEditor;const sheet=document.createElement('a');sheet.className='btn secondary';sheet.href=SHEET;sheet.target='_blank';sheet.rel='noopener';sheet.textContent='時間割の変更はシートへ';const grades=document.createElement('a');grades.className='btn secondary directoryGradeLink';grades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261008-admin-restored#compare`;grades.target='_blank';grades.rel='noopener';grades.textContent='📊 この生徒の成績・志望校をみる';actions.append(edit,sheet,grades);card.append(actions)}
 const MEETING_API='https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
 
 let directorySyncBusy=false,directorySyncedAt=0;
@@ -352,6 +360,7 @@ async function refreshDirectoryMirror(force=false){
 // The server's scheduled master sync maintains the mirror. Searching does not trigger a full sync.
 
 function renderStudentGrades(card,student){
+  if(!directorySections_.scores&&!directorySections_.reports)return;
   const head=document.createElement('div');head.className='directoryGradesHead';
   const info=document.createElement('div');info.className='directoryGradesInfo';
   const title=document.createElement('h3');title.textContent='📊 成績・通知表';
@@ -411,39 +420,38 @@ function saveDirectoryGradeCache_(id,session,profile){
 }
 function invalidateDirectoryGradeCache_(id){
   const session=token();
-  directoryGradeProfiles_.delete(session+':'+String(id));
+  directoryGradeProfiles_.delete(session+':'+String(id)+':'+directoryStage_);
   try{
     const rows=JSON.parse(sessionStorage.getItem(DIRECTORY_GRADE_CACHE_KEY_)||'[]').filter(row=>!(row.session===session&&row.studentId===String(id)));
     sessionStorage.setItem(DIRECTORY_GRADE_CACHE_KEY_,JSON.stringify(rows));
   }catch(e){}
 }
 async function fetchDirectoryGradeProfile_(id){
-  const session=token(),key=session+':'+String(id);
-  const requestTrace='directory-'+(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
+  const session=token(),key=session+':'+String(id)+':'+directoryStage_;
   const cached=directoryGradeProfiles_.get(key);
   if(cached&&Date.now()-cached.time<60000)return cached.promise;
-  const saved=readDirectoryGradeCache_(id,session);
-  if(saved)return saved;
-  const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),45000);
-  let deadline;
-  const promise=Promise.race([
-    (async()=>{
-      const response=await StepStaffAuth.fetchRuntime({action:'getStudentGradeProfile',studentId:String(id),token:session,requestTrace},controller.signal);
-      const data=await response.json();
-      if(!response.ok||data.success!==true)throw Error(data.error||'成績情報を取得できませんでした。');
-      if(token()!==session)throw Error('ログイン状態が変更されました。');
-      saveDirectoryGradeCache_(id,session,data);
-      return data;
-    })(),
-    new Promise((_,reject)=>{deadline=setTimeout(()=>reject(Error('成績情報の通信が時間内に完了しませんでした。')),46000);})
-  ]).catch(error=>{error.requestTrace=requestTrace;if(directoryGradeProfiles_.get(key)?.promise===promise)directoryGradeProfiles_.delete(key);throw error;})
-    .finally(()=>{clearTimeout(timer);clearTimeout(deadline);});
-  if(directoryGradeProfiles_.size>=20)directoryGradeProfiles_.delete(directoryGradeProfiles_.keys().next().value);
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
+  const requestTrace='directory-'+crypto.randomUUID();
+  const read=async action=>{
+    const response=await StepStaffAuth.fetchRuntime({action,studentId:String(id),token:session,requestTrace},controller.signal);
+    const data=await response.json();
+    if(!response.ok||data.success!==true)throw Error(data.error||'取得できませんでした。');
+    if(token()!==session)throw Error('ログイン状態が変更されました。');
+    return data;
+  };
+  const promise=(async()=>{
+    const [scores,reports,wish]=await Promise.all([
+      directorySections_.scores?read('getStudentScores'):Promise.resolve({scores:[]}),
+      directorySections_.reports?read('getReports'):Promise.resolve({data:[]}),
+      directorySections_.wishes?read('getWish'):Promise.resolve({wish:null})
+    ]);
+    return {success:true,scores:scores.scores,reports:reports.data,wish:wish.wish,admissionDate:scores.admissionDate,admissionDateText:scores.admissionDateText};
+  })().catch(error=>{error.requestTrace=requestTrace;directoryGradeProfiles_.delete(key);throw error}).finally(()=>clearTimeout(timer));
   directoryGradeProfiles_.set(key,{promise,time:Date.now()});
   return promise;
 }
 async function loadDirectoryWish(id,card){
+  if(!directorySections_.wishes)return;
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
   try{
     const data=await fetchDirectoryGradeProfile_(id);
@@ -576,7 +584,16 @@ function renderDirectoryCompare(area,scores,reports,student){
     body.append(row([sc.year?sc.year+'年度 第'+sc.term+'回'+labelGrade(sc.year):'',sc.jpn,sc.soc,sc.math,sc.sci,sc.eng,total(sc,'total5',5),sc.rank5,total(sc,'total9',9),sc.rank9,rp.year?rp.year+'年度 '+rp.semester+labelGrade(rp.year):'',...subjects.map(k=>rp['rp_'+k]),sum(rp,'rp_',5),sum(rp,'rp_',9)]));
   }
   if(!length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=22;td.textContent='登録された成績・通知表はありません。';td.style.padding='12px';tr.append(td);body.append(tr)}
-  table.append(body);wrap.append(table);area.append(wrap);
+  table.append(body);
+  if(!directorySections_.scores||!directorySections_.reports){
+    for(const tr of table.querySelectorAll('tr')){
+      const cells=Array.from(tr.children);
+      if(tr===group){cells[directorySections_.scores?1:0]?.remove();}
+      else for(const cell of cells.filter((_,i)=>directorySections_.scores?i>=10:i<10))cell.remove();
+    }
+    const empty=body.querySelector('td[colspan]');if(empty)empty.colSpan=directorySections_.scores?10:12;
+  }
+  wrap.append(table);area.append(wrap);
 }
 function calcEnrollmentDuration(value) {
   const s = String(value || '').trim();
@@ -597,6 +614,7 @@ function calcEnrollmentDuration(value) {
 
 function meetingDate(value){const raw=String(value||'');if(/^\d{4}-\d{2}-\d{2}/.test(raw))return raw.slice(0,10);const d=new Date(raw);return Number.isNaN(d.valueOf())?raw:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
 function renderMeetingSection(card,id){
+  if(!directorySections_.memos)return;
   const head=document.createElement('div');head.className='meetingHead';
   const title=document.createElement('h3');title.textContent='🗒️ 面談記録';
   const add=document.createElement('a');add.href=`meeting_memo.html?studentId=${encodeURIComponent(id)}`;add.target='_blank';add.rel='noopener';add.className='btn secondary meetingAdd';add.textContent='＋ 面談メモを登録';
