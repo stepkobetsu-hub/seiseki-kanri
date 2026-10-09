@@ -4056,7 +4056,7 @@ function readDirectoryStudentIndexForCompare_(){
   try{
     const cache=JSON.parse(localStorage.getItem('stepStudentDirectorySearchIndexV1')||'null');
     if(!cache||cache.staffCode!==getAdminState('adminStaffCode')||Date.now()-cache.time>7*86400000||!Array.isArray(cache.students))return [];
-    return cache.students.filter(row=>row&&/^\\d+$/.test(String(row.id))&&typeof row.name==='string')
+    return cache.students.filter(row=>row&&/^[0-9]+$/.test(String(row.id))&&typeof row.name==='string')
       .map(row=>({id:String(row.id),name:row.name,nameKana:String(row.kana||''),kana:String(row.kana||''),grade:String(row.grade||''),campus:String(row.campus||''),flag:row.flag,admissionDate:String(row.admissionDate||''),admissionDateText:String(row.admissionDateText||'')}));
   }catch(e){return [];}
 }
