@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>管理者メニュー｜成績管理システム</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js" defer></script>
+<script src="assets/vendor/chart-4.4.1.umd.min.js" defer></script>
+<script src="assets/vendor/chartjs-plugin-datalabels-2.2.0.min.js" defer></script>
 <style>
 :root {
   --bg: #f0f4f8;
@@ -1866,7 +1866,7 @@ async function adminSupabaseApi(data) {
   if (!token) {
     return { success: false, authRequired: true, code: 'AUTH_REQUIRED', error: '管理者セッションがありません。再ログインしてください。' };
   }
-  const payload = { ...data, token };
+  const payload = { ...data, token, requestTrace: 'admin-' + crypto.randomUUID() };
   if (SUPABASE_WRITE_ACTIONS.has(data.action) && !payload.mutationId) {
     payload.mutationId = newAdminMutationId();
   }
@@ -2805,7 +2805,20 @@ const SUBJ_MAP = {
   total9:{ label:'9科合計', max:900 },
 };
 
+let speedChartLibraryWaiting = false;
 function redrawSpeedChart() {
+  // Data rendering must continue even while the graph library is loading.
+  if (typeof Chart === 'undefined') {
+    if (!speedChartLibraryWaiting) {
+      speedChartLibraryWaiting = true;
+      const script = document.querySelector('script[src="assets/vendor/chart-4.4.1.umd.min.js"]');
+      script?.addEventListener('load', () => {
+        speedChartLibraryWaiting = false;
+        redrawSpeedChart();
+      }, { once: true });
+    }
+    return;
+  }
   const campus = document.getElementById('chartCampus').value;
   const grade  = document.getElementById('chartGrade').value;
   const subj   = document.getElementById('chartSubj').value;
