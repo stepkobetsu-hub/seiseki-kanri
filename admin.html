@@ -2579,11 +2579,12 @@ async function loadSpeed() {
   const scoreCacheKey = [year, term, campus].join('|');
   if (!_cache.allScores || _cache.allScores.key !== scoreCacheKey) {
     const r = await api({ action: 'getAllScores', year, term, campus });
-    _cache.allScores = { key: scoreCacheKey, rows: r.scores || [] };
-  }
-  if (!students || students.length === 0) {
-    const r = await api({ action: 'getStudents' });
-    students = r.students || [];
+    if (r.success !== true || !Array.isArray(r.scores)) {
+      document.getElementById('speedCount').textContent = '取得失敗';
+      document.getElementById('speedBody').innerHTML = '<tr><td colspan="17" class="noData">' + htmlEsc(r.error || '成績を取得できませんでした。') + '</td></tr>';
+      return;
+    }
+    _cache.allScores = { key: scoreCacheKey, rows: r.scores };
   }
   window._allScoresFull = _cache.allScores.rows;
 
@@ -2643,7 +2644,9 @@ async function loadSpeed() {
   }).join('');
   // studentsが未ロードなら非同期で取得（成績×通知表で名前が出るように）
   if (!students || students.length === 0) {
-    api({ action: 'getStudents' }).then(r => { students = r.students || []; });
+    api({ action: 'getStudents' }).then(r => {
+      if (r.success === true && Array.isArray(r.students)) students = r.students;
+    });
   }
   // 新着バッジ確認
   try {
