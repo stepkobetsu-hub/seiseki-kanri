@@ -390,13 +390,35 @@ function renderDirectoryWish(card,wish){
   }
   card.append(head,body);
 }
+const directoryGradeProfiles_=new Map();
+async function fetchDirectoryGradeProfile_(id){
+  const session=token(),key=session+':'+String(id);
+  const cached=directoryGradeProfiles_.get(key);
+  if(cached&&Date.now()-cached.time<60000)return cached.promise;
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),45000);
+  let deadline;
+  const promise=Promise.race([
+    (async()=>{
+      const response=await StepStaffAuth.fetchRuntime({action:'getStudentGradeProfile',studentId:String(id),token:session},controller.signal);
+      const data=await response.json();
+      if(!response.ok||data.success!==true)throw Error(data.error||'成績情報を取得できませんでした。');
+      if(token()!==session)throw Error('ログイン状態が変更されました。');
+      return data;
+    })(),
+    new Promise((_,reject)=>{deadline=setTimeout(()=>reject(Error('成績情報の通信が時間内に完了しませんでした。')),46000);})
+  ]).catch(error=>{if(directoryGradeProfiles_.get(key)?.promise===promise)directoryGradeProfiles_.delete(key);throw error;})
+    .finally(()=>{clearTimeout(timer);clearTimeout(deadline);});
+  if(directoryGradeProfiles_.size>=20)directoryGradeProfiles_.delete(directoryGradeProfiles_.keys().next().value);
+  directoryGradeProfiles_.set(key,{promise,time:Date.now()});
+  return promise;
+}
 async function loadDirectoryWish(id,card){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
   try{
-    const response=await StepStaffAuth.fetchRuntime({action:'getWish',studentId:id,token:token()},controller.signal);
-    const data=await response.json();
+    const data=await fetchDirectoryGradeProfile_(id);
     if(String(selectedId)!==id||!card.isConnected)return;
-    if(!response.ok||data.success!==true)throw Error(data.error||'志望校を取得できませんでした。');
+
     renderDirectoryWish(card,data.wish);
   }catch(error){
     if(String(selectedId)!==id||!card.isConnected)return;
@@ -408,13 +430,10 @@ async function loadDirectoryWish(id,card){
 }
 async function loadStudentGrades(id,area,student){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
-  const request=async action=>{
-    const response=await StepStaffAuth.fetchRuntime({action,studentId:id,token:token()},controller.signal);
-    const data=await response.json();
-    if(!response.ok||data.success!==true)throw Error(data.error||'成績を取得できませんでした。');return data;
-  };
   try{
-    const [scores,reports]=await Promise.all([request('getStudentScores'),request('getReports')]);
+    const profile=await fetchDirectoryGradeProfile_(id);
+    const scores={scores:profile.scores,admissionDate:profile.admissionDate,admissionDateText:profile.admissionDateText};
+    const reports={data:profile.reports};
     if(String(selectedId)!==id||!area.isConnected)return;
     const admissionLabel=el('detail').querySelector('[data-admission-student-id]');
     if(admissionLabel&&admissionLabel.dataset.admissionStudentId===id&&(scores.admissionDate||scores.admissionDateText)){
