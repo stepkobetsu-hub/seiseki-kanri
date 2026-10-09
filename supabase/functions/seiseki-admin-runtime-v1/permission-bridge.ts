@@ -1,13 +1,14 @@
 // Server-only authorization bridge. Session identity must be verified before calling.
 export function permissionTarget(action:string,requested:unknown){
- const meeting=new Set(['getMeetingMemos','saveMeetingMemo','deleteMeetingMemo','getStaffMembers','addStaffMember','deleteStaffMember']);
+ const meeting=new Set(['getMeetingBootstrap','getMeetingMemos','saveMeetingMemo','deleteMeetingMemo','getStaffMembers','addStaffMember','deleteStaffMember']);
  const directory=new Set(['getStudentDirectoryDetail','saveStudentDirectory','syncStudentDirectory','enableStudentDirectoryAutoSync']);
  const session=new Set(['verifyStaffSession','persistAdminSession']);
  const shared=new Set(['getStudents','getStudentList']);
  let appId=meeting.has(action)?'public-13':directory.has(action)?'student-directory':'public-12';
+ if(action==='verifyStaffSession'&&requested==='public-11')appId='public-11';
  if((shared.has(action)||action==='verifyStaffSession')&&['public-12','public-13','student-directory'].includes(String(requested)))appId=String(requested);
  const settings=new Set(['addSchool','updateSchool','deleteSchool','addStaffMember','deleteStaffMember','reconcileLegacy','syncStudentDirectory','enableStudentDirectoryAutoSync']);
- const mode=action==='verifyStaffSession'&&['public-12','public-13','student-directory'].includes(String(requested))?'enter':session.has(action)?'session':settings.has(action)?'settings':action.startsWith('delete')?'delete':action.startsWith('save')?'write':action==='enter'?'enter':'view';
+ const mode=action==='verifyStaffSession'&&['public-11','public-12','public-13','student-directory'].includes(String(requested))?'enter':session.has(action)?'session':settings.has(action)?'settings':action.startsWith('delete')?'delete':action.startsWith('save')?'write':action==='enter'?'enter':'view';
  return {appId,mode};
 }
 export async function checkPermissionBridge(session:Record<string,unknown>,payload:Record<string,unknown>,read:(path:string)=>Promise<unknown>,campuses:string[]=[]){
@@ -24,3 +25,4 @@ export async function checkPermissionBridge(session:Record<string,unknown>,paylo
  }
  return result;
 }
+
