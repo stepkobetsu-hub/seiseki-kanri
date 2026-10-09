@@ -551,7 +551,7 @@ body.auth-locked > #toast{display:none!important}
 
 <div id="toast" class="toast"></div>
 
-<script src="assets/js/staff-auth.js?v=20261009-google-login-restored"></script>
+<script src="assets/js/staff-auth.js?v=20261009-session-recovery"></script>
 <script>
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 const STUDENT_SEARCH_GAS = 'https://script.google.com/macros/s/AKfycbxIH2VtgwRi50xduXgrkYrjD0yrzNfQ5vCWt1XgOzil6LZSgXNj6MJo9jPYvOkjNHdu/exec';
@@ -697,9 +697,10 @@ async function meetingSupabaseApi_(data){
     const res = await StepStaffAuth.fetchRuntime({...payload,permissionAppId:'public-13'},controller.signal);
     const result = await res.json().catch(() => ({}));
     if (!res.ok || result.success !== true) {
-      throw new Error(result.error || (res.status === 401 || res.status === 403
+      const error=new Error(result.error || (res.status === 401 || res.status === 403
         ? 'ログインの有効期限が切れました。管理画面へ再ログインしてください。'
         : 'Supabaseから取得できませんでした。'));
+      error.authRequired=res.status===401||res.status===403;throw error;
     }
     return result;
   } finally {
@@ -785,7 +786,7 @@ function storeMeetingSession_(staff, fallbackCode){
       'adminStaffCode','adminStaffName','adminDeviceMode','meetingDeviceMode',MEETING_IDLE_KEY_
     ].forEach(key => sessionStorage.removeItem(key));
     localStorage.setItem('adminSystemPortalSessionToken', token);
-    localStorage.setItem('adminSystemPortalExpiresAt', '2100-01-01T00:00:00.000Z');
+    localStorage.setItem('adminSystemPortalExpiresAt', String(staff.gradeExpiresAt || staff.systemPortalExpiresAt || ''));
     localStorage.setItem('adminLoggedIn', '1');
     localStorage.setItem('adminDeviceMode', 'personal');
     localStorage.setItem('adminStaffCode', code);
@@ -858,9 +859,9 @@ async function meetingLogin(event){
     }
     storeMeetingSession_(staff, code);
     if (meetingDeviceMode_ === 'personal') {
-      await meetingSupabaseApi_({ action:'persistAdminSession' });
+      try{await meetingSupabaseApi_({action:'persistAdminSession'});localStorage.setItem('adminSystemPortalExpiresAt','2100-01-01T00:00:00.000Z');}
+      catch(error){if(error.authRequired)throw error;}
     }
-    await meetingSupabaseApi_({ action:'getStaffMembers' });
     $('meetingLoginPassword').value = '';
     await showMeetingApp_();
   } catch(e) {
@@ -908,14 +909,12 @@ async function bootMeetingApp_(){
     }
   }
   try {
-    if (meetingDeviceMode_ === 'personal') {
-      await meetingSupabaseApi_({ action:'persistAdminSession' });
-    }
-    await meetingSupabaseApi_({ action:'getStaffMembers' });
+    await StepStaffAuth.verify(meetingAdminToken_());
     await showMeetingApp_();
   } catch(e) {
-    clearMeetingSession_();
-    showMeetingLogin_('ログインしてください。');
+    if(e.authRequired){clearMeetingSession_();showMeetingLogin_(e.message);return;}
+    // Keep the registered browser session when the server is temporarily unreachable.
+    await showMeetingApp_();
   }
 }
 
