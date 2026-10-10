@@ -480,11 +480,8 @@ body.auth-locked > #toast{display:none!important}
       </div>
       <div class="field">
         <label for="staff">担当</label>
-        <select id="staff" onchange="toggleStaffOther()"></select>
-      </div>
-      <div class="field" id="staffOtherWrap" style="display:none">
-        <label for="staffOther">担当（その他）</label>
-        <input id="staffOther" placeholder="担当者名を入力">
+        <input id="staff" placeholder="担当者名を入力" aria-describedby="staffHelp">
+        <div id="staffHelp" class="studentSearchHint">ログイン中の方の名前が自動で入ります。別の担当者の場合は自由に書き換えてください。</div>
       </div>
       <div class="field full">
         <label for="content">内容</label>
@@ -512,10 +509,6 @@ body.auth-locked > #toast{display:none!important}
       <datalist id="studentNameOptions"></datalist>
       <select id="filterStaff" onchange="renderMemos()">
         <option value="">担当者すべて</option>
-        <option value="加瀬">加瀬</option>
-        <option value="大野">大野</option>
-        <option value="林">林</option>
-        <option value="他">他</option>
       </select>
       <input id="searchContent" placeholder="内容で検索">
       <select id="filterCounterpart">
@@ -567,8 +560,6 @@ const SUPABASE_MEETING_WRITES = new Set([
 ]);
 let students = [];
 let studentsLoadState = 'loading';
-const MEETING_STAFF_FALLBACK_ = ['加瀬','大野','林'];
-let staffMembers = [];
 let meetingLinkedStudentApplied_ = false;
 let memos = [];
 let allMemos = [];
@@ -901,7 +892,7 @@ async function meetingLogout(options = {}){
   }
   clearMeetingSession_();
   students = [];
-  staffMembers = [];
+  $('staff').value = '';
   allMemos = [];
   memos = [];
   showMeetingLogin_(options.automatic
@@ -1071,18 +1062,17 @@ async function init(){
   $('filterStaff').addEventListener('change',renderMemos);
   $('searchContent').addEventListener('input',debounce(renderMemos,250));
   $('filterCounterpart').addEventListener('change',renderMemos);
-  ['date','counterpart','other','staff','staffOther','content'].forEach(id=>$(id)?.addEventListener('input',saveMeetingDraft_));
+  ['date','counterpart','other','staff','content'].forEach(id=>$(id)?.addEventListener('input',saveMeetingDraft_));
   meetingUIBound_=true;
   }
-  staffMembers=readMeetingStaffCache_();renderStaff();
+  resetMeetingStaff_();
   const cached=readMeetingStudentCache_();if(cached.length)applyMeetingStudents_(cached);
   const session=meetingAdminToken_();
-  // Start independent reads immediately: a slow student or staff read must
+  // Start independent reads immediately: a slow student read must
   // never delay displaying saved memos.
   const results=await Promise.allSettled([
     loadMeetingStudents_(),
-    loadMemos(),
-    loadMeetingStaff_()
+    loadMemos()
   ]);
   if(session!==meetingAdminToken_())return;
   restoreMeetingDraft_();
@@ -1104,23 +1094,6 @@ function clearMeetingLoadError_(){
 function handleMeetingReadAuth_(error,session){
   if(error.authRequired&&session===meetingAdminToken_()){
     clearMeetingSession_();showMeetingLogin_(error.message);
-  }
-}
-
-async function loadMeetingStaff_(){
-  const session=meetingAdminToken_();
-  try{
-    const result=await api({action:'getStaffMembers'});
-    if(!result.success||!Array.isArray(result.staff))throw Error('担当者を取得できませんでした。');
-    if(session!==meetingAdminToken_())return false;
-    staffMembers=result.staff.map(String).map(n=>n.trim()).filter(Boolean);
-    saveMeetingStaffCache_();renderStaff();return true;
-  }catch(error){
-    handleMeetingReadAuth_(error,session);
-    renderStaff();
-    $('formError').textContent='担当者一覧の更新ができませんでした。保存済みの担当者名で入力できます。';
-    $('formError').classList.add('show');
-    return false;
   }
 }
 
@@ -1265,24 +1238,9 @@ function clearStudentSelection(){
   $('studentSearch').focus();
 }
 
-function readMeetingStaffCache_(){
-  try{
-    const cached=JSON.parse(localStorage.getItem('stepMeetingStaffNamesV1')||'null');
-    if(cached&&Array.isArray(cached.names)&&Date.now()-cached.time<7*86400000){
-      const names=cached.names.filter(n=>typeof n==='string'&&n.trim()&&n.length<=100);
-      if(names.length)return names;
-    }
-  }catch(e){}
-  return MEETING_STAFF_FALLBACK_.slice();
-}
-function saveMeetingStaffCache_(){
-  try{localStorage.setItem('stepMeetingStaffNamesV1',JSON.stringify({names:staffMembers,time:Date.now()}));}catch(e){}
-}
-function renderStaff(){
-  const selected=$('staff').value;
-  $('staff').innerHTML = '<option value="">担当を選択</option>' + staffMembers.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('') + '<option value="他">他</option>';
-  if(selected&&Array.from($('staff').options).some(option=>option.value===selected))$('staff').value=selected;
-  toggleStaffOther();
+function resetMeetingStaff_(){
+  const store = meetingDeviceMode_ === 'shared' ? sessionStorage : localStorage;
+  $('staff').value = (store.getItem('adminStaffName') || '').trim();
 }
 
 function toggleOther(){
@@ -1297,16 +1255,8 @@ function buildCounterpart(){
   return base === '他' && other ? `他: ${other}` : base;
 }
 
-function toggleStaffOther(){
-  const isOther = $('staff').value === '他';
-  $('staffOtherWrap').style.display = isOther ? '' : 'none';
-  if (!isOther) $('staffOther').value = '';
-}
-
 function buildStaff(){
-  const base = $('staff').value;
-  const other = $('staffOther').value.trim();
-  return base === '他' ? other : base;
+  return $('staff').value.trim();
 }
 
 function meetingDraftStorage_(){return localStorage.getItem('adminSystemPortalSessionToken')?localStorage:sessionStorage;}
@@ -1316,7 +1266,7 @@ function meetingDraftKey_(){
 }
 function saveMeetingDraft_(){
   const key=meetingDraftKey_();if(!key||!$('content').value.trim())return;
-  const draft={time:Date.now(),studentId:$('student').value,date:$('date').value,counterpart:$('counterpart').value,other:$('other').value,staff:$('staff').value,staffOther:$('staffOther').value,content:$('content').value,editingId,attempt:meetingSaveAttempt_};
+  const draft={time:Date.now(),studentId:$('student').value,date:$('date').value,counterpart:$('counterpart').value,other:$('other').value,staff:$('staff').value,content:$('content').value,editingId,attempt:meetingSaveAttempt_};
   try{meetingDraftStorage_().setItem(key,JSON.stringify(draft));}catch(e){}
 }
 function restoreMeetingDraft_(){
@@ -1327,11 +1277,10 @@ function restoreMeetingDraft_(){
     if(linked&&String(draft.studentId)!==linked)return;
     if(!students.some(s=>String(s.id)===String(draft.studentId)))return;
     currentCampus='';currentGradeGroup='';$('gradeGroup').value='';selectCampus('');selectStudent(draft.studentId);
-    for(const id of ['date','counterpart','other','content','staffOther'])$(id).value=draft[id]||'';
-    $('staff').value=staffMembers.includes(draft.staff)?draft.staff:'他';
-    if($('staff').value==='他'&&draft.staff!=='他')$('staffOther').value=draft.staff;
+    for(const id of ['date','counterpart','other','content'])$(id).value=draft[id]||'';
+    $('staff').value=draft.staff==='他'?(draft.staffOther||''):(draft.staff||'');
     editingId=draft.editingId||'';meetingSaveAttempt_=draft.attempt||null;
-    toggleOther();toggleStaffOther();renderStudents();
+    toggleOther();renderStudents();
     showToast('保存確認前の入力内容を復元しました');
   }catch(e){}
 }
@@ -1365,8 +1314,7 @@ async function saveMemo(sendEmail){
   if (!payload.date){ $('date').classList.add('invalid'); errs.push('・日付を入力してください'); }
   if (!payload.staff){
     $('staff').classList.add('invalid');
-    if ($('staff').value==='他') $('staffOther')?.classList.add('invalid');
-    errs.push('・担当者を選択してください');
+    errs.push('・担当者名を入力してください');
   }
   if (!payload.content){ $('content').classList.add('invalid'); errs.push('・内容を入力してください'); }
   if (errs.length){
@@ -1428,14 +1376,12 @@ function clearForm(keepStudent){
   $('date').value = today();
   $('counterpart').value = '母';
   $('other').value = '';
-  $('staff').value = '';
-  $('staffOther').value = '';
+  resetMeetingStaff_();
   $('content').value = '';
   toggleOther();
-  toggleStaffOther();
   const errEl = $('formError');
   if (errEl) errEl.classList.remove('show');
-  [$('studentList'),$('studentSearch'),$('selectedStudentPanel'),$('date'),$('staff'),$('staffOther'),$('content')].forEach(el=>el?.classList.remove('invalid'));
+  [$('studentList'),$('studentSearch'),$('selectedStudentPanel'),$('date'),$('staff'),$('content')].forEach(el=>el?.classList.remove('invalid'));
 }
 
 async function loadMemos(){
@@ -1463,6 +1409,11 @@ function memoTime_(value){
 }
 
 function renderMemos(){
+  const selectedStaff = $('filterStaff').value;
+  const staffNames = [...new Set((allMemos || []).map(m => String(m.staff || '').trim()).filter(Boolean))];
+  if(selectedStaff && !staffNames.includes(selectedStaff))staffNames.push(selectedStaff);
+  $('filterStaff').innerHTML = '<option value="">担当者すべて</option>' + staffNames.sort((a,b)=>a.localeCompare(b,'ja')).map(name=>`<option value="${esc(name)}">${esc(name)}</option>`).join('');
+  $('filterStaff').value = selectedStaff;
   const qName    = normalizeStudentSearch_($('searchName')?.value || '');
   const qStaff   = ($('filterStaff')?.value || '').trim();
   const qContent = ($('searchContent')?.value || '').trim().toLowerCase();
@@ -1471,10 +1422,7 @@ function renderMemos(){
   let filtered = (allMemos || memos).filter(m => {
     if (filterCampus && String(m.campus || '') !== filterCampus) return false;
     if (qName && !getStudentSearchValues_(m).some(value => value.includes(qName))) return false;
-    if (qStaff) {
-      if (qStaff === '他') { if (['加瀬','大野','林'].includes(m.staff || '')) return false; }
-      else if ((m.staff || '') !== qStaff) return false;
-    }
+    if (qStaff && String(m.staff || '').trim() !== qStaff) return false;
     if (qContent && !(m.content || '').toLowerCase().includes(qContent)) return false;
     if (qCounterpart) {
       if (qCounterpart === '他') { if (!String(m.counterpart||'').startsWith('他')) return false; }
@@ -1547,18 +1495,7 @@ function editMemo(id){
     $('other').value = cp.replace(/^他[:：]\s*/, '');
   }
   toggleOther();
-  const staff = String(m.staff || '');
-  if (staff && staffMembers.includes(staff)) {
-    $('staff').value = staff;
-    $('staffOther').value = '';
-  } else if (staff) {
-    $('staff').value = '他';
-    $('staffOther').value = staff;
-  } else {
-    $('staff').value = '';
-    $('staffOther').value = '';
-  }
-  toggleStaffOther();
+  $('staff').value = String(m.staff || '');
   $('content').value = m.content || '';
   window.scrollTo({ top:0, behavior:'smooth' });
 }
