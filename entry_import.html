@@ -17,6 +17,13 @@ h2{font-size:1rem;margin:0 0 12px}.small{font-size:.84rem;color:#64748b;line-hei
 .tableWrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:.82rem;min-width:900px}th{background:#1a56a0;color:#fff;text-align:left;padding:8px;white-space:nowrap}td{border-bottom:1px solid #edf2f7;padding:7px;vertical-align:top}tr:nth-child(even) td{background:#fafafa}
 textarea{width:100%;min-height:120px;border:1px solid #d8e0ea;border-radius:8px;padding:10px;font-family:Consolas,monospace;font-size:.78rem}.hidden{display:none!important}.msg{white-space:pre-wrap;color:#64748b;line-height:1.7;font-size:.9rem}
 @media(max-width:680px){main{margin-top:12px}.btn{width:100%}table{font-size:.78rem}}
+input[type=file]{max-width:100%;font:inherit;font-size:.85rem}
+input[type=file]::file-selector-button{border:1px solid #b8cbe0;border-radius:8px;padding:10px 14px;background:#eaf1fa;color:#345578;font-weight:700;cursor:pointer}
+.btn{background:#eaf1fa;color:#345578;border-color:#b8cbe0}
+.btn.next-step,input.next-step::file-selector-button{background:#124f99;color:#fff;border-color:#124f99;box-shadow:0 0 0 3px #bad7fc}
+.btn:focus-visible,input[type=file]:focus-visible{outline:3px solid #60a5fa;outline-offset:3px}
+.edit-actions{display:flex;gap:10px;flex-wrap:nowrap}.edit-actions .btn{flex:1}
+#stepHint{color:#124f99;font-weight:700;margin:12px 0}
 </style>
 </head>
 <body>
@@ -24,7 +31,7 @@ textarea{width:100%;min-height:120px;border:1px solid #d8e0ea;border-radius:8px;
 <main>
   <div class="card">
     <h2>表面・裏面をアップロード</h2>
-    <p class="small">表面だけでも読み取れます。裏面に中学生成績・志望校がある場合は、裏面も選んでから下のボタンを1回押してください。</p>
+    <p class="small">濃い青色のボタンが次の操作です。裏面がない場合は「裏面スキップ」を押してください。</p>
     <div class="row">
       <div style="flex:1;min-width:260px">
         <label class="small">表面用（エントリーシート）</label>
@@ -33,16 +40,23 @@ textarea{width:100%;min-height:120px;border:1px solid #d8e0ea;border-radius:8px;
       <div style="flex:1;min-width:260px">
         <label class="small">裏面用（成績・志望校）</label>
         <input id="backInput" type="file" accept="image/*,.pdf" onchange="setSideFile('back', this.files[0])">
+        <button id="backSkipBtn" class="btn" onclick="skipBack()" style="margin-top:8px">裏面スキップ</button>
       </div>
     </div>
     <div id="queue" class="queue"></div>
+    <p id="stepHint" role="status" aria-live="polite"></p>
     <div class="row" style="margin-top:12px">
-      <button id="readBtn" class="btn primary" onclick="startRead()">読み取り</button>
-      <button id="saveBtn" class="btn success" onclick="saveAll()" disabled>成績管理にアップロード</button>
+      <button id="readBtn" class="btn" onclick="startRead()" disabled>読み取り</button>
+    </div>
+    <div class="edit-actions" style="margin-top:12px">
       <button id="editBtn" class="btn" onclick="toggleEdit()" disabled>編集</button>
+      <button id="editSkipBtn" class="btn" onclick="skipEdit()" disabled>編集スキップ</button>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="saveBtn" class="btn" onclick="saveAll()" disabled>成績管理にアップロード</button>
     </div>
     <div id="msg" class="msg" style="margin-top:10px"></div>
-    <div class="row" style="margin-top:12px"><button id="nextBtn" class="btn primary hidden" onclick="nextEntry()">次の人のエントリーシートを読み取る</button></div>
+    <div class="row" style="margin-top:12px"><button id="nextBtn" class="btn hidden" onclick="nextEntry()">次の人のエントリーシートを読み取る</button></div>
   </div>
 
   <div id="resultCard" class="card hidden">
@@ -71,17 +85,59 @@ let results = [];
 let editMode = false;
 let busy = false;
 let entrySaved = false;
+let backSkipped = false;
+let readFinished = false;
+let reviewed = false;
+
+function updateNavigation(){
+  const hasResult=results.some(r=>r && !r.error);
+  const canSave=results.some(r=>r && !r.error && r.studentId);
+  const ready=!!sideFiles.front && (!!sideFiles.back || backSkipped);
+  let active=[],hint='';
+  if(busy)hint='処理中です。完了までお待ちください。';
+  else if(entrySaved){active=['nextBtn'];hint='アップロード完了。次の人のエントリーシートへ進めます。';}
+  else if(!sideFiles.front){active=['frontInput'];hint='① 表面の「ファイルを選択」を押してください。';}
+  else if(!ready){active=['backInput','backSkipBtn'];hint='② 裏面を選択してください。裏面がなければスキップできます。';}
+  else if(!readFinished || !hasResult){active=['readBtn'];hint='③ 「読み取り」を押してください。';}
+  else if(editMode){active=['editBtn'];hint='④ 内容を編集し、「編集完了」を押してください。';}
+  else if(!reviewed){active=['editBtn','editSkipBtn'];hint='④ 「編集」または「編集スキップ」を押してください。';}
+  else if(!canSave){active=['editBtn'];hint='生徒番号を入力するため「編集」を押してください。';}
+  else{active=['saveBtn'];hint='⑤ 「成績管理にアップロード」を押してください。';}
+  ['frontInput','backInput','backSkipBtn','readBtn','editBtn','editSkipBtn','saveBtn','nextBtn'].forEach(id=>{
+    $(id).classList.toggle('next-step',active.includes(id));
+  });
+  $('frontInput').disabled=busy;
+  $('backInput').disabled=busy || !sideFiles.front;
+  $('backSkipBtn').disabled=busy || !sideFiles.front || !!sideFiles.back;
+  $('readBtn').disabled=busy || !ready;
+  $('editBtn').disabled=busy || !hasResult;
+  $('editSkipBtn').disabled=busy || !hasResult || editMode;
+  $('saveBtn').disabled=busy || !reviewed || editMode || !canSave || entrySaved;
+  $('nextBtn').disabled=busy;
+  $('nextBtn').classList.toggle('hidden',!readFinished && !entrySaved);
+  $('stepHint').textContent=hint;
+}
+function skipBack(){
+  if(busy || !sideFiles.front)return;
+  sideFiles.back=null;$('backInput').value='';backSkipped=true;
+  makeGroupFromSides();
+}
+function skipEdit(){
+  if(busy || editMode || !results.some(r=>r && !r.error))return;
+  reviewed=true;updateNavigation();
+}
+
 
 function setBusy(value){
   busy=value;
-  ['frontInput','backInput','readBtn','editBtn','nextBtn'].forEach(id=>$(id).disabled=value);
+  updateNavigation();
 }
 function nextEntry(){
   if(busy)return;
   if(!entrySaved && results.some(r=>r && !r.error) && !window.confirm('まだ成績管理にアップロードしていません。読み取り結果を消して、次の人に進みますか？'))return;
   sideFiles={front:null,back:null};
   $('frontInput').value='';$('backInput').value='';
-  editMode=false;entrySaved=false;
+  editMode=false;entrySaved=false;backSkipped=false;readFinished=false;reviewed=false;
   $('editBtn').textContent='編集';$('jsonBox').readOnly=true;
   makeGroupFromSides();
   $('nextBtn').classList.add('hidden');
@@ -94,30 +150,34 @@ function $(id){return document.getElementById(id)}
 function say(t, cls){$('msg').className='msg '+(cls||'');$('msg').textContent=t}
 async function api(data){const r=await fetch(GAS,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(data)});return await r.json()}
 function handleDrop(e){e.preventDefault()}
-function setSideFile(side,file){if(busy)return;entrySaved=false;sideFiles[side]=file||null;makeGroupFromSides()}
+function setSideFile(side,file){if(busy)return;entrySaved=false;if(side==='back')backSkipped=false;sideFiles[side]=file||null;makeGroupFromSides()}
 function makeGroupFromSides(){
   const files=[
     sideFiles.front ? { side:'front', label:'表面', file:sideFiles.front } : null,
     sideFiles.back ? { side:'back', label:'裏面', file:sideFiles.back } : null
   ].filter(Boolean);
   fileGroups=files.length?[{files,status:'待機中',data:null,error:''}]:[];
-  renderQueue();$('saveBtn').disabled=true;$('editBtn').disabled=true;results=[];renderResults();
+  entrySaved=false;readFinished=false;reviewed=false;editMode=false;
+  $('editBtn').textContent='編集';$('jsonBox').readOnly=true;
+  renderQueue();results=[];renderResults();updateNavigation();
 }
 function renderQueue(){const q=$('queue');q.innerHTML=fileGroups.map((g,i)=>`<div class="q"><span>${g.files.map(x=>x.label+': '+x.file.name).join(' / ')}</span><span class="badge ${g.status==='完了'?'done':g.status==='エラー'?'err':g.status==='読み取り中'?'doing':''}">${g.status}</span></div>`).join('')}
 
 async function startRead(){
   if(busy)return;
+  if(!sideFiles.front || (!sideFiles.back && !backSkipped))return;
   if(!fileGroups.length){say('先に画像またはPDFを選択してください','err');return}
-  setBusy(true);entrySaved=false;$('saveBtn').disabled=true;results=[];
+  entrySaved=false;readFinished=false;reviewed=false;editMode=false;results=[];
+  $('editBtn').textContent='編集';$('jsonBox').readOnly=true;renderResults();setBusy(true);
   for(let i=0;i<fileGroups.length;i++){
     const group=fileGroups[i];group.status='読み取り中';renderQueue();say('AIで読み取っています。少し時間がかかります。');
     try{group.data=await readEntrySheets(group.files);group.status='完了';results[i]=group.data}
     catch(e){group.status='エラー';group.error=e.message;results[i]={error:e.message}}
     renderQueue();renderResults();
   }
-  setBusy(false);$('nextBtn').classList.remove('hidden');$('saveBtn').disabled=!results.some(r=>r && !r.error && r.studentId);
-  $('editBtn').disabled=$('saveBtn').disabled;
-  say('読み取りが終わりました。内容は管理画面で確認できます。保存する場合は「成績管理にアップロード」を押してください。','ok');
+  readFinished=true;setBusy(false);
+  say(results.some(r=>r && !r.error)?'読み取りが終わりました。「編集」または「編集スキップ」へ進んでください。':'読み取りに失敗しました。もう一度「読み取り」を押してください。',results.some(r=>r && !r.error)?'ok':'err');
+
 }
 
 async function readEntrySheets(files){
@@ -213,19 +273,19 @@ function renderResults(){
 
 function toggleEdit(){
   if(busy)return;
-  entrySaved=false;
+  entrySaved=false;reviewed=false;
   editMode=!editMode;
-  $('editBtn').textContent=editMode?'編集終了':'編集';
+  $('editBtn').textContent=editMode?'編集完了':'編集';
   $('jsonBox').readOnly=!editMode;
   if(!editMode){
     try{results=JSON.parse($('jsonBox').value);results.forEach(r=>r&&!r.error&&normalizeResult(r));}
     catch(e){say('AI JSONの形式が正しくありません: '+e.message,'err');editMode=true;$('editBtn').textContent='編集終了';$('jsonBox').readOnly=false;return}
   }
-  renderResults();
+  reviewed=!editMode;renderResults();updateNavigation();
 }
 
 async function saveAll(){
-  if(busy)return;
+  if(busy || !reviewed || editMode || entrySaved)return;
   if(editMode){
     try{results=JSON.parse($('jsonBox').value);results.forEach(r=>r&&!r.error&&normalizeResult(r));editMode=false;$('editBtn').textContent='編集';$('jsonBox').readOnly=true;renderResults();}
     catch(e){say('AI JSONの形式が正しくありません: '+e.message,'err');return}
@@ -250,7 +310,7 @@ async function saveAll(){
   $('editBtn').disabled=!results.some(r=>r && !r.error && r.studentId);
   renderResults();
   say(`保存しました。成功 ${ok} 件 / 失敗 ${ng} 件。\n管理画面の「入塾時情報」で確認してください。${gradeWarnings.length?'\n'+gradeWarnings.join('\n'):''}`,ok?'ok':'err');
-  $('saveBtn').disabled=false;
+  updateNavigation();
 }
 
 function buildPayload(r,pdfUrl,imageUrls){
@@ -331,6 +391,7 @@ async function resizeImage(file){
 function loadImage(src){return new Promise((res,rej)=>{const img=new Image();img.onload=()=>res(img);img.onerror=rej;img.src=src})}
 function toBase64(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(file)})}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+updateNavigation();
 </script>
 </body>
 </html>
