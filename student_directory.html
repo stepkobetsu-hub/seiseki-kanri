@@ -463,7 +463,7 @@ const DirectoryAcademic = (() => {
     select(id,session);
     const wrap=make('section',null,'directoryAcademic');
     wrap.dataset.studentId=id;wrap.setAttribute('aria-label','志望校・テスト成績・通知表・面談メモ');
-    card.append(wrap);
+    card.append(wrap);wrap.reloadGrades=[];
     const live=()=>wrap.isConnected && selectedId === id && token() === session;
     function panel(title,action,render,parent=wrap,hidden=false) {
       const box=make('section',null,'academicPanel'),head=make('div',null,'academicHead');
@@ -563,7 +563,7 @@ const DirectoryAcademic = (() => {
         }catch(error){if(!live())return;states[side]={rows:[],status:'error',error:error.message};}
         finally{if(live()){update.disabled=false;drawRecords();}}
       }
-      update.onclick=()=>load(true);load();
+      update.onclick=()=>load(true);wrap.reloadGrades.push(()=>load(true));load();
     }
     const memoBox=panel('🗒️ 面談・メモ','getMeetingMemos',(area,rows)=>{
       if(!rows.length){area.closest('.academicPanel').hidden=true;return;}
@@ -579,14 +579,15 @@ const DirectoryAcademic = (() => {
     memoLink.href='meeting_memo.html?studentId='+encodeURIComponent(id);memoLink.target='_blank';memoLink.rel='noopener';
     memoBox.children[0].append(memoLink);
   }
-  return {mount,clear};
+  function refreshGrades(card){const wrap=card.querySelector('.directoryAcademic');for(const reload of wrap?.reloadGrades||[])reload();}
+  return {mount,clear,refreshGrades};
 })();
 
 const DirectoryEntry = (() => {
-  const reads=new Map();
+  const reads=new Map(),gradeImports=new Map();
   const make=(tag,text,cls)=>{const n=document.createElement(tag);if(text!=null)n.textContent=String(text);if(cls)n.className=cls;return n;};
   const has=v=>v!=null&&String(v).trim()!=='';
-  function clear(){for(const e of reads.values())e.controller.abort();reads.clear();}
+  function clear(){for(const e of reads.values())e.controller.abort();reads.clear();gradeImports.clear();}
   function read(id,session,force){
     const key=session+':'+id,old=reads.get(key);
     if(!force&&old&&Date.now()-old.at<60000)return old.promise;
@@ -615,13 +616,12 @@ const DirectoryEntry = (() => {
     }
     if(has(ai?.notes)){const row=make('div',null,'entrySummaryRow wide');row.append(make('strong','シートのメモ'),make('span',ai.notes));grid.append(row);}
     if(grid.childNodes.length)body.append(grid);
-    const known=new Set([s.name,s.guardian,s.secondGuardian].filter(has).map(normalize));
     const family=(Array.isArray(ai?.family)?ai.family:Array.isArray(d?.family)?d.family:[]).filter(f=>f&&[f.name,f.relation,f.job,f.workplace,f.grade].some(has));
-    const rows=family.map(f=>[known.has(normalize(f.name))?'':f.name,f.relation,f.job,f.workplace,f.grade]).filter(r=>has(r[0])||r.slice(2).some(has));
+    const rows=family.map(f=>[f.name,f.relation,f.job,f.workplace,f.grade]);
     if(rows.length){body.append(make('p','家族情報（入塾時）','muted'));const wrap=make('div',null,'entryFamilyWrap'),table=make('table',null,'entryFamily'),head=make('thead'),tr=make('tr');
-      const columns=['氏名','続柄','職業','勤務先・学校','学年'].map((label,index)=>({label,index})).filter(c=>rows.some(row=>has(row[c.index])));
+      const columns=['氏名','続柄','職業','勤務先・学校','学年'].map((label,index)=>({label,index}));
       for(const c of columns)tr.append(make('th',c.label));head.append(tr);table.append(head);const tbody=make('tbody');
-      for(const values of rows){const row=make('tr');for(const c of columns)row.append(make('td',values[c.index]||''));tbody.append(row);}table.append(tbody);wrap.append(table);body.append(wrap);
+      for(const values of rows){const row=make('tr');for(const c of columns)row.append(make('td',has(values[c.index])?values[c.index]:'－'));tbody.append(row);}table.append(tbody);wrap.append(table);body.append(wrap);
     }
     if(!body.childNodes.length)body.append(make('p','追加の入塾時情報は登録されていません。','muted'));
   }
@@ -629,7 +629,19 @@ const DirectoryEntry = (() => {
     const id=String(s.id),session=token(),area=make('section',null,'entrySummary');area.setAttribute('aria-label','エントリーシートの追加情報');
     const head=make('div',null,'entrySummaryHead'),button=make('button','再取得','btn secondary small');button.type='button';head.append(make('h3','📝 入塾時情報'),button);const body=make('div');area.append(head,body);card.append(area);
     const active=()=>area.isConnected&&String(selectedId)===id&&token()===session;
-    const load=async force=>{button.disabled=true;body.replaceChildren(make('p','読み込み中…','muted'));try{const d=await read(id,session,force);if(active())render(body,d,s);}catch(error){if(active())body.replaceChildren(make('p','取得できませんでした。再取得してください。','muted'));}finally{if(active())button.disabled=false;}};
+    const load=async force=>{button.disabled=true;body.replaceChildren(make('p','読み込み中…','muted'));try{
+      const d=await read(id,session,force);if(!active())return;render(body,d,s);
+      const memo=String(d?.ocrMemo||''),pos=memo.indexOf('AI_JSON:');let ai=null;try{if(pos>=0)ai=JSON.parse(memo.slice(pos+8));}catch{}
+      if(ai&&[...(Array.isArray(ai.scores)?ai.scores:[]),...(Array.isArray(ai.reports)?ai.reports:[])].length){
+        const status=make('p','成績の未登録分を確認中…','muted');body.append(status);
+        const key=session+':'+id+':'+memo;let pending=gradeImports.get(key);
+        if(force||!pending){pending=mirrorApi('importMissingEntryGrades',{studentId:id,mutationId:crypto.randomUUID()});gradeImports.set(key,pending);pending.catch(()=>{if(gradeImports.get(key)===pending)gradeImports.delete(key);});}
+        try{const result=await pending;if(!active())return;if(!result.success)throw Error(result.error||'補完できませんでした。');
+          status.textContent='既存の成績は保持しました。'+(result.addedScores||result.addedReports?'未登録分を追加：テスト '+result.addedScores+'件・通知表 '+result.addedReports+'件。':'追加が必要な成績はありません。')+(result.warnings?.length?' '+result.warnings.join(' '):'');
+          if(result.addedScores||result.addedReports)DirectoryAcademic.refreshGrades(card);
+        }catch(error){if(active())status.textContent='成績の補完を完了できませんでした。再取得で再試行してください。';}
+      }
+    }catch(error){if(active())body.replaceChildren(make('p','取得できませんでした。再取得してください。','muted'));}finally{if(active())button.disabled=false;}};
     button.onclick=()=>load(true);void load(false);
   }
   return {clear,mount};
