@@ -1,0 +1,26 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert'),path=require('path');
+let stripTypeScriptTypes;try{const ts=require('typescript');stripTypeScriptTypes=s=>ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;}catch{stripTypeScriptTypes=require('node:module').stripTypeScriptTypes;}
+const root=path.join(__dirname,'..');
+const source=fs.readFileSync(path.join(root,'entry-grade-import.ts'),'utf8');
+const code=stripTypeScriptTypes(source.replace(/export /g,''),{mode:'transform'})+'\nthis.normalize=entryGradeRows;this.missing=missingEntryRows;';
+const c={};vm.createContext(c);vm.runInContext(code,c);
+const st={id:'test-student',grade:'中3'};
+let r=c.normalize({scores:[{grade:'1年',term:1,jpn:0,soc:80,math:70,sci:60,eng:50}],reports:[{year:2025,grade:'中2',semester:'１学期',rp_jpn:4}]},st,2026);
+assert.equal(r.scores[0].school_year,2024);assert.equal(r.scores[0].japanese,0);assert.equal(r.scores[0].total_5,260);assert.equal(r.reports[0].term,'1学期');
+assert.equal(c.missing(r.scores,[{school_year:2024,test_number:1}],[],false).length,0);
+assert.equal(c.missing(r.scores,[],[{year:2024,term:1}],false).length,0);
+assert.equal(c.missing(r.scores,[],[{year:2025,term:1}],false).length,1);
+assert.equal(c.missing(r.reports,[{school_year:2025,term:'1学期'}],[],true).length,0);
+for(const raw of [{jpn:80},{grade:'中1',term:1,jpn:101},{year:2026,grade:'中1',term:1,jpn:80},{grade:'中1',jpn:80}])assert.equal(c.normalize({scores:[raw]},st,2026).scores.length,0);
+assert.equal(c.normalize({reports:[{year:2026,grade:'中3',semester:'1学期',rp_jpn:6}]},st,2026).reports.length,0);
+assert.equal(c.normalize({scores:[{grade:'中1',term:1,jpn:70},{grade:'中1',term:1,jpn:80}]},st,2026).scores.length,1);
+console.log('PASS: historical year, fullwidth, zero, totals, existing database/legacy rows, invalid values and ambiguous rows protected');
+const main=fs.readFileSync(path.join(root,'index.ts'),'utf8');
+const imp=stripTypeScriptTypes(main.slice(main.indexOf('async function importMissingEntryGrades('),main.indexOf('async function saveScore(')),{mode:'transform'})+'\nthis.run=importMissingEntryGrades;';
+const writes=[];
+c.ResponseError=class extends Error{constructor(status,code,message){super(message);this.status=status;this.code=code;}};
+c.query=(p,args)=>p+'?'+new URLSearchParams(args).toString();
+c.pg=async(path,init={})=>{if(init.method){writes.push({path,init});assert.equal(init.method,'POST');assert.equal(init.headers.Prefer,'resolution=ignore-duplicates,return=representation');assert.equal(JSON.parse(init.body)[0].test_number,2);return [];}if(path.startsWith('students?'))return[{id:'student',grade:'中1'}];if(path.startsWith('test_scores?'))return[{school_year:2026,test_number:1}];return[];};
+c.gas=async action=> action==='getEntrySheetData'?{success:true,data:{studentId:'1321',ocrMemo:'AI_JSON:'+JSON.stringify({scores:[{year:2026,grade:'中1',term:1,jpn:10},{year:2026,grade:'中1',term:2,jpn:20}],reports:[{year:2026,grade:'中1',semester:'1学期',rp_jpn:3}]})}}:action==='getReports'?{success:true,data:[{year:2026,semester:'1学期'}]}:{success:true,scores:[]};
+vm.runInContext(imp,c);
+(async()=>{const result=await c.run({studentId:'1321',token:'test'});assert.equal(result.addedScores,0);assert.equal(result.protectedScores,2);assert.equal(result.protectedReports,1);assert.equal(writes.length,1);writes.length=0;c.gas=async()=>{throw Error('legacy offline')};await assert.rejects(()=>c.run({studentId:'1321',token:'test'}));assert.equal(writes.length,0);console.log('PASS: existing rows excluded, race ignores duplicates, legacy failure never writes');})().catch(e=>{console.error(e);process.exitCode=1});
