@@ -616,8 +616,9 @@ const DirectoryEntry = (() => {
     const family=(Array.isArray(ai?.family)?ai.family:Array.isArray(d?.family)?d.family:[]).filter(f=>f&&[f.name,f.relation,f.job,f.workplace,f.grade].some(has));
     const rows=family.map(f=>[known.has(normalize(f.name))?'':f.name,f.relation,f.job,f.workplace,f.grade]).filter(r=>has(r[0])||r.slice(2).some(has));
     if(rows.length){body.append(make('p','家族情報（入塾時）','muted'));const wrap=make('div',null,'entryFamilyWrap'),table=make('table',null,'entryFamily'),head=make('thead'),tr=make('tr');
-      for(const label of ['氏名','続柄','職業','勤務先・学校','学年'])tr.append(make('th',label));head.append(tr);table.append(head);const tbody=make('tbody');
-      for(const values of rows){const row=make('tr');for(const value of values)row.append(make('td',value||''));tbody.append(row);}table.append(tbody);wrap.append(table);body.append(wrap);
+      const columns=['氏名','続柄','職業','勤務先・学校','学年'].map((label,index)=>({label,index})).filter(c=>rows.some(row=>has(row[c.index])));
+      for(const c of columns)tr.append(make('th',c.label));head.append(tr);table.append(head);const tbody=make('tbody');
+      for(const values of rows){const row=make('tr');for(const c of columns)row.append(make('td',values[c.index]||''));tbody.append(row);}table.append(tbody);wrap.append(table);body.append(wrap);
     }
     if(!body.childNodes.length)body.append(make('p','追加の入塾時情報は登録されていません。','muted'));
   }
