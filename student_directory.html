@@ -177,6 +177,7 @@ function readCachedIndex(){
 function saveCachedIndex(list){
   try{localStorage.setItem(INDEX_CACHE_KEY,JSON.stringify({staffCode:localStorage.getItem('adminStaffCode'),time:Date.now(),students:list.map(s=>({id:s.id,flag:s.flag,name:s.name,kana:s.kana,campus:s.campus,grade:s.grade,admissionDate:s.admissionDate||'',admissionDateText:s.admissionDateText||''}))}))}catch{}
 }
+let masterIndexRequest=0;
 async function fastIndex(seq){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),60000);
   try{
@@ -184,7 +185,7 @@ async function fastIndex(seq){
     const data=await response.json().catch(()=>({}));
     if(!response.ok||data.success!==true)throw Error(data.error||'DBの一覧を取得できませんでした。');
     if(!Array.isArray(data.students)||!data.students.length)return;
-    if(seq!==listRequest||!token())return;
+    if(seq!==listRequest||!token()||masterIndexRequest===seq)return;
     students=prepareSearch(data.students.map(s=>({id:String(s.id),flag:String(s.flag??''),name:String(s.name||''),kana:String(s.kana||s.nameKana||''),campus:String(s.campus||''),grade:String(s.grade||''),admissionDate:String(s.admissionDate||''),admissionDateText:String(s.admissionDateText||'')})));
 
     saveCachedIndex(students);ready=true;if(!detailView)renderCandidates();
@@ -209,6 +210,7 @@ async function loadList(){
     if(seq!==listRequest)return;
     if(!r.success)throw Error(r.error||'取得できませんでした。');
     if(!Array.isArray(r.students)||!r.students.length)throw Error('原本から生徒を取得できませんでした。');
+    masterIndexRequest=seq;
     const admissionRows=students;
     students=prepareSearch(r.students.map(s=>{const saved=admissionRows.find(row=>String(row.id)===String(s.id));return {...s,admissionDate:s.admissionDate||saved?.admissionDate||'',admissionDateText:s.admissionDateText||saved?.admissionDateText||''}}));ready=true;saveCachedIndex(students);
   }catch(e){
