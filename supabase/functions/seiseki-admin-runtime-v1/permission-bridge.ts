@@ -3,7 +3,7 @@ export function permissionTarget(action:string,requested:unknown){
  const meeting=new Set(['getMeetingBootstrap','getMeetingMemos','saveMeetingMemo','deleteMeetingMemo','getStaffMembers','addStaffMember','deleteStaffMember']);
  const directory=new Set(['getStudentDirectoryDetail','saveStudentDirectory','syncStudentDirectory','enableStudentDirectoryAutoSync']);
  const session=new Set(['verifyStaffSession','persistAdminSession']);
- const shared=new Set(['getStudents','getStudentList']);
+ const shared=new Set(['getEntrySheetData','saveEntrySheetInfo','getStudents','getStudentList']);
  let appId=meeting.has(action)?'public-13':directory.has(action)?'student-directory':'public-12';
  if(action==='verifyStaffSession'&&requested==='public-11')appId='public-11';
  if((shared.has(action)||action==='verifyStaffSession')&&['public-12','public-13','student-directory'].includes(String(requested)))appId=String(requested);
@@ -25,4 +25,3 @@ export async function checkPermissionBridge(session:Record<string,unknown>,paylo
  }
  return result;
 }
-
