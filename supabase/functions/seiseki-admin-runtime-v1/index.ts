@@ -1,4 +1,5 @@
 import {entryGradeRows,missingEntryRows} from './entry-grade-import.ts';
+import {cleanEntryEdit,mergeEntryEdit} from './entry-info-edit.ts';
 import { CORS_HEADERS, preflightResponse } from './storage.ts';
 import {checkPermissionBridge} from './permission-bridge.ts';
 
@@ -12,9 +13,9 @@ const ADMIN_ACTIONS = new Set([
   'getMeetingBootstrap', 'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
   'getStaffMembers', 'addStaffMember', 'deleteStaffMember',
   'reconcileLegacy', 'persistAdminSession', 'logoutAdmin',
-  'importMissingEntryGrades', 'syncStudentDirectory', 'getStudentDirectoryDetail', 'saveStudentDirectory', 'enableStudentDirectoryAutoSync',
+  'getEntrySheetData', 'saveEntrySheetInfo', 'importMissingEntryGrades', 'syncStudentDirectory', 'getStudentDirectoryDetail', 'saveStudentDirectory', 'enableStudentDirectoryAutoSync',
 ]);
-const WRITE_ACTIONS = new Set(['importMissingEntryGrades', 'saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember', 'saveStudentDirectory']);
+const WRITE_ACTIONS = new Set(['saveEntrySheetInfo', 'importMissingEntryGrades', 'saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember', 'saveStudentDirectory']);
 const ADMIN_PERMISSION_LEVELS = new Set(['2', '3', '4']);
 const STAFF_PERMISSION_LEVELS = new Set(['1', '2', '3', '4']);
 // Grade-only sessions never authorize the directory or other management apps.
@@ -85,7 +86,7 @@ function requireActionPermission(session: JsonObject, token: unknown, action: st
     throw new ResponseError(403, 'APP_FORBIDDEN', 'このアプリには権限2以上が必要です。');
   }
   const level = String(session.permission_level ?? session.permissionLevel ?? '');
-  if (action === 'saveStudentDirectory' && level !== '4') {
+  if (['saveStudentDirectory','saveEntrySheetInfo'].includes(action) && level !== '4') {
     throw new ResponseError(403, 'DIRECTORY_EDITOR_REQUIRED', '生徒マスタの保存には権限4でログインしてください。');
   }
   const allowed = GRADE_ACTIONS.has(action) ? STAFF_PERMISSION_LEVELS : ADMIN_PERMISSION_LEVELS;
@@ -312,6 +313,42 @@ async function readWishes(payload: JsonObject, all: boolean): Promise<JsonObject
   const rows = await pg(query('school_preferences_with_students', params)) as JsonObject[];
   const wishes = rows.map(wish);
   return all ? { success: true, wishes, source: 'supabase' } : { success: true, wish: wishes[0] ?? null, source: 'supabase' };
+}
+
+async function entryInfoState(payload:JsonObject) {
+ const code=String(payload.studentId||'');
+ if(!/^\d{1,10}$/.test(code))throw new ResponseError(400,'STUDENT_REQUIRED','生徒番号が必要です。');
+ const students=await pg(query('students',{select:'id',student_code:`eq.${code}`,limit:1})) as JsonObject[];
+ if(!students[0])throw new ResponseError(404,'STUDENT_NOT_FOUND','生徒が見つかりません。');
+ const [source,edits]=await Promise.all([
+  gas('getEntrySheetData',{studentId:code,systemPortalSessionToken:payload.token}),
+  pg(query('student_entry_info_edits',{student_id:`eq.${students[0].id}`,limit:1})) as Promise<JsonObject[]>
+ ]);
+ const original=(source.data||null) as JsonObject|null;
+ if(original&&String(original.studentId)!==code)throw new ResponseError(400,'STUDENT_MISMATCH','生徒番号が一致しません。');
+ // Master info is unrelated to entry-sheet edits; only original entry fields form the version.
+ const versionData={...original};delete versionData.masterInfo;
+ const sourceVersion=await sha256Text(JSON.stringify(versionData));
+ const edit=edits[0],revision=String(edit?.revision||'');
+ const data=edit&&edit.source_version===sourceVersion?mergeEntryEdit(original,edit.values as JsonObject):original;
+ return {studentUuid:String(students[0].id),code,sourceVersion,revision,data,editedAt:edit?.source_version===sourceVersion?edit.updated_at:null};
+}
+async function readEntryInfo(payload:JsonObject):Promise<JsonObject> {
+ const s=await entryInfoState(payload);
+ return {success:true,data:s.data?{...s.data,studentId:s.code}:null,sourceVersion:s.sourceVersion,revision:s.revision,editedAt:s.editedAt};
+}
+async function saveEntryInfo(payload:JsonObject):Promise<JsonObject> {
+ let values:JsonObject;try{values=cleanEntryEdit(payload.values);}catch(e){throw new ResponseError(400,'ENTRY_INVALID',String((e as Error).message));}
+ const state=await entryInfoState(payload);
+ if(state.sourceVersion!==payload.sourceVersion||state.revision!==String(payload.revision||''))throw new ResponseError(409,'ENTRY_CHANGED','他の変更があります。再取得してから編集してください。');
+ // Validate original AI without changing any grades, master fields or image references.
+ mergeEntryEdit(state.data,values);
+ const row={student_id:state.studentUuid,source_version:state.sourceVersion,values,revision:crypto.randomUUID(),updated_at:new Date().toISOString()};
+ const written=state.revision
+  ?await pg(query('student_entry_info_edits',{student_id:`eq.${state.studentUuid}`,revision:`eq.${state.revision}`}),{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify(row)}) as JsonObject[]
+  :await pg(query('student_entry_info_edits',{on_conflict:'student_id'}),{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=representation'},body:JSON.stringify(row)}) as JsonObject[];
+ if(!written.length)throw new ResponseError(409,'ENTRY_CHANGED','他の変更があります。再取得してから編集してください。');
+ return {success:true,data:{...mergeEntryEdit(state.data,values),studentId:state.code},sourceVersion:state.sourceVersion,revision:row.revision,editedAt:row.updated_at};
 }
 
 async function importMissingEntryGrades(payload: JsonObject): Promise<JsonObject> {
@@ -828,6 +865,8 @@ async function ingestDirectorySnapshot(payload: JsonObject): Promise<JsonObject>
 
 async function dispatch(payload: JsonObject): Promise<JsonObject> {
   switch (payload.action) {
+    case 'getEntrySheetData': return readEntryInfo(payload);
+    case 'saveEntrySheetInfo': return saveEntryInfo(payload);
     case 'importMissingEntryGrades': return importMissingEntryGrades(payload);
     case 'getStudents': case 'getStudentList': return getStudents(payload);
     case 'syncStudentDirectory': return syncDirectory(payload);
