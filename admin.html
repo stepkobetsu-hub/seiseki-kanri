@@ -2219,7 +2219,11 @@ function reloadData() {
   if (visibleTab === 'speed') loadSpeed();
   else if (visibleTab === 'compare') {
     const sid = document.getElementById('cmpStudent').value;
-    if (sid) loadCompare(sid); else initCompare();
+    if (sid) {
+      prepareCompareStudentSelection_(sid);
+      initCompare().catch(()=>{});
+      loadCompare(sid);
+    } else initCompare();
   }
   else if (visibleTab === 'students') loadStudents();
   else if (visibleTab === 'meetings') initMeetings();
