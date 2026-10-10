@@ -1,4 +1,4 @@
-Warning: truncated output (original token count: 101462)
+Warning: truncated output (original token count: 101467)
 Total output lines: 5819
 
 ﻿<!DOCTYPE html>
@@ -315,7 +315,2712 @@ tr:hover td{background:#f8fafc}
       </svg>
       </div>
       <h2>管理者ログイン</h2>
-      <p>…36462 tokens truncated…, false);
+      <p>成績管理システム 管理画面</p>
+    </div>
+    <p class="devicePrompt">この端末を選んでください</p>
+    <div class="deviceChoices" role="group" aria-label="使用する端末">
+      <button type="button" id="devicePersonal" class="deviceChoice" onclick="selectAdminDevice('personal')">
+        <strong>自分・家族の端末</strong>
+        <span>ID・パスワードを保存し、ログアウトするまで次回から自動ログイン</span>
+      </button>
+      <button type="button" id="deviceSchool" class="deviceChoice" onclick="selectAdminDevice('school')">
+        <strong>塾のタブレット</strong>
+        <span>ID・パスワードは保存せず、30分操作がないと自動ログアウト</span>
+      </button>
+    </div>
+    <p id="deviceWarning" class="deviceWarning hidden" role="alert">⚠️「自分・家族の端末」か「塾のタブレット」を選んでください。</p>
+    <div class="fld"><label>講師コード</label><input type="text" id="adminCodeIn" placeholder="講師マスターA列のコード" onkeydown="if(event.key==='Enter')doAdminLogin()"></div>
+    <input type="hidden" id="adminEmailIn" value="stepkobetsu@gmail.com">
+    <div class="fld"><label>パスワード</label><input type="password" id="adminPwIn" placeholder="講師マスターAJ列のパスワード" onkeydown="if(event.key==='Enter')doAdminLogin()"></div>
+    <div class="errMsg" id="loginErr"></div>
+    <button class="btn btn-primary btn-full" onclick="doAdminLogin()">🔑 ログイン</button>
+  </div>
+</div>
+
+<!-- ===== MAIN LAYOUT ===== -->
+<div id="mainLayout" class="layout" style="display:none">
+  <div id="sideOverlay" class="sideOverlay" onclick="closeSidebar()"></div>
+  <button class="sideToggleBtn" id="sideToggleBtn" onclick="toggleSidebar()">☰</button>
+  <!-- サイドバー -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sideSection">分析</div>
+    <div class="sideItem on" onclick="aNav('speed',this)"><span class="ico">⚡</span> 速報</div>
+    <div class="sideItem" onclick="aNav('compare',this)"><span class="ico">📊</span> 成績×通知表</div>
+    <div class="sideSection">管理</div>
+    <div class="sideItem" onclick="aNav('students',this)"><span class="ico">👥</span> 生徒一覧</div>
+    <div class="sideItem" onclick="aNav('meetings',this)"><span class="ico">🗒️</span> 面談・メモ</div>
+    <div class="sideItem" onclick="aNav('schools',this)"><span class="ico">🏫</span> 学校</div>
+    <div class="sideItem" onclick="aNav('scores',this)"><span class="ico">🧾</span> テスト成績</div>
+    <div class="sideItem" onclick="aNav('report',this)"><span class="ico">📒</span> 通知表</div>
+    <div class="sideItem" onclick="aNav('wish',this)"><span class="ico">🏫</span> 志望校</div>
+    <div class="sideSection">システム</div>
+    <div class="sideItem" onclick="aNav('entry',this)"><span class="ico">📝</span> 入塾書類</div>
+    <div class="sideItem" onclick="openStudentSyncPreview()"><span class="ico">🔄</span> 同期</div>
+    <a class="sideItem" href="https://script.google.com/macros/s/AKfycbxqxQOmtwe9lfB0Pt7dKzY3mC2sSRRVG9haDTMvOvrzyQNxhOYQLMTbnxAm9Im3LlXj/exec" target="_blank" rel="noopener" style="text-decoration:none">
+      <span class="ico">📚</span>
+      <span><span>過去問DB</span><span style="display:block;font-size:.72rem;color:#64748b;margin-top:2px">Pass: step123</span></span>
+    </a>
+    <a class="sideItem" href="https://stepkobetsu-hub.github.io/student-QR/points_manager.html" target="_blank" rel="noopener" style="text-decoration:none">
+      <span class="ico">⭐</span> ポイント付与
+    </a>
+    <div class="sideItem" onclick="aNav('settings',this)"><span class="ico">⚙️</span> 設定</div>
+  </nav>
+
+  <!-- メインエリア -->
+  <main class="mainArea">
+
+    <!-- 速報 -->
+    <div id="aTab_speed">
+      <div class="card">
+        <div class="cardHead">⚡ 成績速報 <span class="badge" id="speedCount"></span></div>
+        <div class="filterRow">
+          <select id="spYear" onchange="loadSpeed();if(_speedTab==='report')renderSpeedReport();if(_speedTab==='result')renderSpeedResult()"></select>
+          <select id="spTerm" onchange="loadSpeed()"></select>
+          <select id="spCampus" onchange="loadSpeed();if(_speedTab==='report')renderSpeedReport();if(_speedTab==='result')renderSpeedResult()">
+            <option value="">全校舎</option>
+            <option>神領</option>
+            <option>大手</option>
+          </select>
+          <select id="spGrade" onchange="loadSpeed();if(_speedTab==='report')renderSpeedReport();if(_speedTab==='result')renderSpeedResult()">
+            <option value="">全学年</option>
+            <option>中1</option><option>中2</option><option>中3</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="loadSpeed()">🔄 更新</button>
+        </div>
+        <div class="statGrid" id="speedStats"></div>
+      </div>
+      <div class="card">
+        <div class="cardHead" style="flex-wrap:wrap;gap:8px">
+          📊 <span id="chartTitle">5科目合計</span> 分布グラフ
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;align-items:center">
+            <select id="chartSubj" onchange="redrawSpeedChart()" style="font-size:.76rem;padding:3px 6px;border:1px solid #e2e8f0;border-radius:6px;color:#1e293b">
+              <option value="total5">5科合計</option>
+              <option value="jpn">国語</option>
+              <option value="soc">社会</option>
+              <option value="math">数学</option>
+              <option value="sci">理科</option>
+              <option value="eng">英語</option>
+              <option value="total9">9科合計</option>
+            </select>
+            <select id="chartCampus" onchange="redrawSpeedChart()" style="font-size:.76rem;padding:3px 6px;border:1px solid #e2e8f0;border-radius:6px;color:#1e293b">
+              <option value="">全校舎</option><option>神領</option><option>大手</option>
+            </select>
+            <select id="chartGrade" onchange="redrawSpeedChart()" style="font-size:.76rem;padding:3px 6px;border:1px solid #e2e8f0;border-radius:6px;color:#1e293b">
+              <option value="">全学年</option>
+              <option>中1</option><option>中2</option><option>中3</option>
+            </select>
+            <button id="prevToggleBtn" onclick="togglePrevBar()" class="btn btn-outline btn-sm" style="font-size:.74rem;padding:4px 10px">📊 前回を表示</button>
+          </div>
+        </div>
+        <div class="chartWrapLg"><canvas id="speedChart"></canvas></div>
+      </div>
+      <div class="card">
+        <!-- 切替ボタン -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;justify-content:flex-start;flex-wrap:wrap">
+          <button id="speedTabScore" onclick="switchSpeedTab('score')" class="btn btn-primary btn-sm" style="padding:6px 16px;position:relative">📝 定期テスト結果速報<span id="newDotScore" style="display:none;position:absolute;top:-8px;right:-8px;min-width:18px;height:18px;background:#ef4444;border-radius:999px;border:2px solid #fff;font-size:.6rem;color:#fff;font-weight:800;line-height:14px;text-align:center;padding:0 3px">NEW</span></button>
+          <button id="speedTabReport" onclick="switchSpeedTab('report')" class="btn btn-outline btn-sm" style="padding:6px 16px;position:relative">📒 通知表評価速報<span id="newDotReport" style="display:none;position:absolute;top:-8px;right:-8px;min-width:18px;height:18px;background:#ef4444;border-radius:999px;border:2px solid #fff;font-size:.6rem;color:#fff;font-weight:800;line-height:14px;text-align:center;padding:0 3px">NEW</span></button>
+          <button id="speedTabResult" onclick="switchSpeedTab('result')" class="btn btn-outline btn-sm" style="padding:6px 16px;position:relative">🏫 志望校登録速報<span id="newDotResult" style="display:none;position:absolute;top:-8px;right:-8px;min-width:18px;height:18px;background:#ef4444;border-radius:999px;border:2px solid #fff;font-size:.6rem;color:#fff;font-weight:800;line-height:14px;text-align:center;padding:0 3px">NEW</span></button>
+        </div>
+
+        <!-- 定期テスト結果速報 -->
+        <div id="speedPanelScore">
+          <div class="cardHead" style="margin-bottom:8px">📋 定期テスト結果速報</div>
+          <div style="overflow-x:auto;overflow-y:auto;max-height:60vh;-webkit-overflow-scrolling:touch">
+            <table style="min-width:700px;border-collapse:collapse">
+              <thead style="position:sticky;top:0;z-index:2;background:#fff"><tr>
+                <th style="min-width:100px">氏名</th><th>回次</th><th>学年</th><th>校舎</th>
+                <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th>
+                <th>5科計</th><th>5科順</th>
+                <th>音</th><th>美</th><th>体</th><th>技</th>
+                <th>9科計</th><th>9科順</th>
+              </tr></thead>
+              <tbody id="speedBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 通知表評価速報 -->
+        <div id="speedPanelReport" style="display:none">
+          <div class="cardHead" style="margin-bottom:8px">📒 通知表評価速報</div>
+          <div style="overflow-x:auto;overflow-y:auto;max-height:60vh;-webkit-overflow-scrolling:touch">
+            <table style="min-width:700px;border-collapse:collapse">
+              <thead style="position:sticky;top:0;z-index:2;background:#fff"><tr>
+                <th style="min-width:100px">氏名</th><th>学年</th><th>校舎</th><th>学期</th>
+                <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>5計</th>
+                <th>音</th><th>美</th><th>体</th><th>技</th><th>9計</th>
+              </tr></thead>
+              <tbody id="speedReportBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 志望校登録速報 -->
+        <div id="speedPanelResult" style="display:none">
+          <div class="cardHead" style="margin-bottom:8px">🏫 志望校登録速報</div>
+          <div style="overflow-x:auto;overflow-y:auto;max-height:60vh;-webkit-overflow-scrolling:touch">
+            <table style="min-width:1200px;border-collapse:collapse">
+              <thead style="position:sticky;top:0;z-index:2;background:#fff">
+                <tr>
+                  <th rowspan="2" style="min-width:80px">氏名</th>
+                  <th rowspan="2">学年</th>
+                  <th colspan="4" style="background:#eef2ff;border-left:3px solid #4f46e5">公立 第1志望</th>
+                  <th colspan="4" style="background:#eef2ff;border-left:3px solid #4f46e5">公立 第2志望</th>
+                  <th colspan="4" style="background:#eef2ff;border-left:3px solid #4f46e5">公立 第3志望</th>
+                  <th colspan="4" style="background:#fef5d0;border-left:3px solid #d97706">私立 第1志望</th>
+                  <th colspan="4" style="background:#fef5d0;border-left:3px solid #d97706">私立 第2志望</th>
+                  <th colspan="4" style="background:#fef5d0;border-left:3px solid #d97706">私立 第3志望</th>
+                  <th rowspan="2">更新日</th>
+                </tr>
+                <tr>
+                  <th style="background:#dde8ff;border-left:3px solid #4f46e5">高校名</th><th style="background:#dde8ff">入試</th><th style="background:#dde8ff">合否</th><th style="background:#dde8ff">進学</th>
+                  <th style="background:#dde8ff;border-left:3px solid #4f46e5">高校名</th><th style="background:#dde8ff">入試</th><th style="background:#dde8ff">合否</th><th style="background:#dde8ff">進学</th>
+                  <th style="background:#dde8ff;border-left:3px solid #4f46e5">高校名</th><th style="background:#dde8ff">入試</th><th style="background:#dde8ff">合否</th><th style="background:#dde8ff">進学</th>
+                  <th style="background:#fef5d0;border-left:3px solid #d97706">高校名</th><th style="background:#fef5d0">入試</th><th style="background:#fef5d0">合否</th><th style="background:#fef5d0">進学</th>
+                  <th style="background:#fef5d0;border-left:3px solid #d97706">高校名</th><th style="background:#fef5d0">入試</th><th style="background:#fef5d0">合否</th><th style="background:#fef5d0">進学</th>
+                  <th style="background:#fef5d0;border-left:3px solid #d97706">高校名</th><th style="background:#fef5d0">入試</th><th style="background:#fef5d0">合否</th><th style="background:#fef5d0">進学</th>
+                </tr>
+              </thead>
+              <tbody id="speedResultBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 成績×通知表 比較 -->
+    <div id="aTab_compare" style="display:none">
+      <!-- 生徒選択 -->
+      <div class="card" style="padding:14px 16px">
+        <div class="filterRow" style="margin-bottom:10px">
+          <select id="cmpCampus" onchange="filterCmpStudents()">
+            <option value="">全校舎</option><option>神領</option><option>大手</option>
+          </select>
+          <select id="cmpGrade" onchange="filterCmpStudents()">
+            <option value="">全学年</option>
+            <option>中1</option><option>中2</option><option>中3</option>
+          </select>
+          <div class="cmpStudentSearchWrap">
+            <input id="cmpStudentSearch" class="cmpStudentSearchInput" placeholder="生徒コード・氏名・フリガナ・ローマ字で検索" autocomplete="off" oninput="renderCmpStudentCandidates_()">
+            <select id="cmpStudent" onchange="loadCompare()" style="display:none" aria-hidden="true">
+              <option value="">生徒を選択</option>
+            </select>
+            <div id="cmpStudentSearchHint" class="cmpStudentSearchHint">文字を入力すると、一致する生徒だけ表示されます。</div>
+            <div id="cmpStudentList" class="cmpStudentPicker" role="listbox" aria-label="生徒を選択"></div>
+            <div id="cmpSelectedStudentPanel" class="cmpSelectedStudentPanel" aria-live="polite">
+              <div class="cmpSelectedStudentInfo">
+                <span class="cmpSelectedStudentTitle">現在選択中の生徒</span>
+                <span id="cmpSelectedStudentText" class="cmpSelectedStudentText empty">まだ選択されていません。</span>
+              </div>
+              <button id="cmpSelectedStudentClear" class="cmpSelectedStudentClear" type="button" onclick="clearCmpStudentSelection()" style="display:none">選択解除</button>
+            </div>
+          </div>
+          <select id="cmpYear" onchange="loadCompare()"></select>
+          <button id="cmpEntryBtn" class="btn btn-ghost btn-sm" onclick="openEntryInfoModal()" disabled>入塾時情報</button>
+        </div>
+      </div>
+      <!-- 志望校 -->
+      <div id="cmpWishCard" class="card" style="display:none;background:linear-gradient(135deg,#eef2ff,#fef9ee);border:1px solid #e2e8f0">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <span onclick="goToWishForCurrentStudent()" title="志望校一覧でこの生徒を見る" style="font-size:.9rem;font-weight:700;color:#1e293b;cursor:pointer;text-decoration:underline">🏫 志望校</span>
+          <span id="cmpWishDate" style="font-size:.68rem;color:#94a3b8"></span>
+        </div>
+        <div id="cmpWishBody" style="font-size:.8rem;color:#475569;line-height:2"></div>
+      </div>
+
+      <!-- データ一覧 -->
+      <div class="card">
+        <div class="cardHead" style="justify-content:flex-start">
+          <span>📋 データ一覧</span>
+          <span id="cmpAdmissionDate" style="font-size:.78rem;color:#475569;font-weight:700;white-space:nowrap"></span>
+        </div>
+        <div class="tblWrap" style="overflow-x:auto">
+          <table style="font-size:.72rem;border-collapse:collapse;width:100%">
+            <thead><tr>
+              <th colspan="10" onclick="goToScoresForCurrentStudent()" title="テスト成績一覧でこの生徒を見る" style="background:#eef2ff;padding:4px;cursor:pointer;text-decoration:underline">テスト成績</th>
+              <th colspan="12" onclick="goToReportsForCurrentStudent()" title="通知表一覧でこの生徒を見る" style="background:#fef9ee;padding:4px;cursor:pointer;text-decoration:underline">通知表評定</th>
+            </tr>
+            <tr style="white-space:nowrap">
+              <th style="padding:4px 3px">年度・回次</th>
+              <th style="padding:4px 3px">国</th><th style="padding:4px 3px">社</th><th style="padding:4px 3px">数</th><th style="padding:4px 3px">理</th><th style="padding:4px 3px">英</th>
+              <th style="padding:4px 3px">5科計</th><th style="padding:4px 3px">5科順</th><th style="padding:4px 3px">9科計</th><th style="padding:4px 3px">9科順</th>
+              <th style="padding:4px 3px">年度・学期</th><th style="padding:4px 3px">国</th><th style="padding:4px 3px">社</th><th style="padding:4px 3px">数</th><th style="padding:4px 3px">理</th><th style="padding:4px 3px">英</th>
+              <th style="padding:4px 3px">音</th><th style="padding:4px 3px">美</th><th style="padding:4px 3px">体</th><th style="padding:4px 3px">技</th>
+              <th style="padding:4px 3px">5計</th><th style="padding:4px 3px">9計</th>
+            </tr></thead>
+            <tbody id="cmpBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <!-- ① 得点推移 -->
+      <div id="cmpMeetingCard" class="card" style="display:none">
+        <div class="cardHead" style="justify-content:flex-start">
+          <span>🗒️ 面談・メモ</span>
+          <button class="btn btn-ghost btn-sm" onclick="openMeetingForCurrentStudent()">この生徒にメモを追加</button>
+        </div>
+        <div id="cmpMeetingBody" style="font-size:.82rem;color:#334155;line-height:1.7"></div>
+      </div>
+
+      <!-- ① 得点推移 -->
+      <div class="card">
+        <div class="cardHead">① 📈 得点推移（折れ線）</div>
+        <div style="margin-bottom:10px">
+          <div style="font-size:.75rem;color:#64748b;margin-bottom:6px;font-weight:600">▼ 表示する科目（タップでON/OFF）</div>
+          <div id="cmpSubjCtrls" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+        <div style="position:relative;height:280px"><canvas id="cmpScoreChart"></canvas></div>
+      </div>
+      <!-- ② 得点 vs 平均 -->
+      <div class="card">
+        <div class="cardHead">② 📊 得点 vs 学年平均
+          <select id="cmpAvgSubj" onchange="buildCmpAvgChart()" style="font-size:.76rem;padding:3px 6px;border:1px solid #e2e8f0;border-radius:6px;color:#1e293b">
+            <option value="jpn">国語</option><option value="soc">社会</option>
+            <option value="math">数学</option><option value="sci">理科</option>
+            <option value="eng">英語</option><option value="total5">5科合計</option>
+          </select>
+        </div>
+        <div style="position:relative;height:260px"><canvas id="cmpAvgChart"></canvas></div>
+      </div>
+      <!-- ③ 平均との差 -->
+      <div class="card">
+        <div class="cardHead">③ 📉 平均との差（自分－平均）</div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:.75rem;color:#64748b;margin-bottom:6px;font-weight:600">▼ 表示する科目（タップでON/OFF）</div>
+          <div id="cmpDiffCtrls" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+        <div style="position:relative;height:260px"><canvas id="cmpDiffChart"></canvas></div>
+      </div>
+      <!-- ④ 順位推移 -->
+      <div class="card">
+        <div class="cardHead">④ 🏅 順位推移</div>
+        <div style="margin-bottom:8px;display:flex;gap:8px">
+          <button id="rankBtn5" class="ctrlBtn on" style="--c:#8b5cf6" onclick="toggleRank('rank5')">5科目順位</button>
+          <button id="rankBtn9" class="ctrlBtn on" style="--c:#f59e0b" onclick="toggleRank('rank9')">9科目順位</button>
+        </div>
+        <div style="position:relative;height:240px"><canvas id="cmpRankChart"></canvas></div>
+      </div>
+      <!-- ⑤ 通知表評定推移 -->
+      <div class="card">
+        <div class="cardHead">⑤ 📒 通知表 評定推移
+          <select id="cmpRpSubj" onchange="buildCmpRpChart()" style="font-size:.76rem;padding:3px 6px;border:1px solid #e2e8f0;border-radius:6px;color:#1e293b">
+            <option value="rp_jpn">国語</option><option value="rp_soc">社会</option>
+            <option value="rp_math">数学</option><option value="rp_sci">理科</option>
+            <option value="rp_eng">英語</option><option value="rp_mus">音楽</option>
+            <option value="rp_art">美術</option><option value="rp_pe">保健体育</option>
+            <option value="rp_tech">技術家庭</option>
+          </select>
+          <small style="color:#64748b;font-size:.72rem">または</small>
+          <label style="font-size:.76rem"><input type="checkbox" id="cmpRpAll" onchange="buildCmpRpChart()"> 全科目</label>
+        </div>
+        <div style="position:relative;height:260px"><canvas id="cmpRpChart"></canvas></div>
+      </div>
+    </div>
+
+
+    <!-- 生徒一覧 -->
+    <div id="aTab_students" style="display:none">
+      <div class="card">
+        <div class="cardHead">👥 生徒一覧</div>
+        <div id="stuSourceStatus" style="display:none;margin:-4px 0 12px;color:#64748b;font-size:.74rem"></div>
+
+        <!-- 絞り込み行 -->
+        <div class="filterRow" style="flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px">
+          <div class="searchWrap">
+            <input type="text" id="stuSearch" placeholder="氏名・かな・ローマ字・IDで検索" oninput="onStudentFilterChange()">
+          </div>
+          <select id="stuCampus" onchange="onStudentFilterChange();buildSchoolDropdown()">
+            <option value="">全校舎</option>
+            <option>神領</option>
+            <option>大手</option>
+          </select>
+          <span class="enrollmentFilter">
+            <label><input type="checkbox" id="stuShowActive" checked onchange="onStudentEnrollmentChange()">在籍生</label>
+            <label><input type="checkbox" id="stuShowWithdrawn" onchange="onStudentEnrollmentChange()">退塾生</label>
+          </span>
+          <div class="stuGradeFilter" aria-label="学年（複数選択可）">
+            <div class="stuGradeFilterRow">
+              <span class="stuGradeFilterLabel">学年</span>
+              <button type="button" class="stuGradeBtn group" data-grade-group="elementary" onclick="selectStuGradeGroup('elementary')">小学生</button>
+              <button type="button" class="stuGradeBtn group" data-grade-group="junior" onclick="selectStuGradeGroup('junior')">中学生</button>
+              <button type="button" class="stuGradeBtn group" data-grade-group="high" onclick="selectStuGradeGroup('high')">高校生</button>
+              <button type="button" class="stuGradeBtn group" data-grade-group="all" onclick="selectStuGradeGroup('all')">全員</button>
+              <button type="button" class="stuGradeBtn clear" onclick="selectStuGradeGroup('clear')">クリア</button>
+              <span id="stuGradeSummary" class="stuGradeSummary">全学年</span>
+            </div>
+            <div class="stuGradeFilterRow">
+              <span class="stuGradeFilterLabel">個別</span>
+              <button type="button" class="stuGradeBtn grade" data-grade="小1" onclick="toggleStuGrade('小1')">小1</button><button type="button" class="stuGradeBtn grade" data-grade="小2" onclick="toggleStuGrade('小2')">小2</button><button type="button" class="stuGradeBtn grade" data-grade="小3" onclick="toggleStuGrade('小3')">小3</button><button type="button" class="stuGradeBtn grade" data-grade="小4" onclick="toggleStuGrade('小4')">小4</button><button type="button" class="stuGradeBtn grade" data-grade="小5" onclick="toggleStuGrade('小5')">小5</button><button type="button" class="stuGradeBtn grade" data-grade="小6" onclick="toggleStuGrade('小6')">小6</button><button type="button" class="stuGradeBtn grade" data-grade="中1" onclick="toggleStuGrade('中1')">中1</button><button type="button" class="stuGradeBtn grade" data-grade="中2" onclick="toggleStuGrade('中2')">中2</button><button type="button" class="stuGradeBtn grade" data-grade="中3" onclick="toggleStuGrade('中3')">中3</button><button type="button" class="stuGradeBtn grade" data-grade="高1" onclick="toggleStuGrade('高1')">高1</button><button type="button" class="stuGradeBtn grade" data-grade="高2" onclick="toggleStuGrade('高2')">高2</button><button type="button" class="stuGradeBtn grade" data-grade="高3" onclick="toggleStuGrade('高3')">高3</button>
+            </div>
+          </div>
+
+          <!-- 学校チェックボックスドロップダウン -->
+          <div id="stuSchoolDropWrap" style="position:relative">
+            <button id="stuSchoolDropBtn" onclick="toggleSchoolDrop(event)"
+              style="padding:7px 10px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font-size:.8rem;color:#1e293b;cursor:pointer;white-space:nowrap;min-width:100px;text-align:left;display:flex;align-items:center;gap:6px">
+              <span id="stuSchoolDropLabel">全学校</span>
+              <span style="margin-left:auto;color:#94a3b8;font-size:.7rem">▼</span>
+            </button>
+            <div id="stuSchoolDropMenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:300;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:180px;padding:8px 0">
+              <div style="display:flex;gap:6px;padding:6px 12px 8px;border-bottom:1px solid #f1f5f9">
+                <button onclick="stuSchoolAll(true)"  style="flex:1;padding:3px 0;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;font-size:.73rem;cursor:pointer;color:#475569">すべて✔</button>
+                <button onclick="stuSchoolAll(false)" style="flex:1;padding:3px 0;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;font-size:.73rem;cursor:pointer;color:#475569">すべて外す</button>
+              </div>
+              <div id="stuSchoolCheckList" style="max-height:220px;overflow-y:auto;padding:4px 0"></div>
+            </div>
+          </div>
+
+          <button class="btn btn-outline btn-sm" onclick="printStudentList()">🖨️ 印刷</button>
+          <button id="stuLegacyBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="openStudentsWithLegacy()">従来方式で開く</button>
+          <button class="btn btn-primary btn-sm student-sync-button" onclick="openStudentSyncPreview()" onpointerdown="this.classList.add('is-pressed')" onpointerup="this.classList.remove('is-pressed')" onpointercancel="this.classList.remove('is-pressed')" onpointerleave="this.classList.remove('is-pressed')">🔄 同期</button>
+        </div>
+
+        <!-- 並び順行 -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:10px 12px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
+          <span style="font-size:.74rem;color:#64748b;font-weight:600;white-space:nowrap">並び順：</span>
+          <button id="sortGradeBtn" onclick="setStuSort('grade')"
+            style="padding:5px 14px;border-radius:20px;border:2px solid #1a56a0;background:#1a56a0;color:#fff;font-size:.78rem;font-weight:700;cursor:pointer;transition:.15s">
+            学年順（小1→高3）✔
+          </button>
+          <span style="color:#cbd5e1;font-size:.8rem">＋</span>
+          <div style="display:flex;gap:0">
+            <button id="sortSchoolOffBtn" onclick="setStuSchoolSort('')"
+              style="padding:5px 12px;border-radius:20px 0 0 20px;border:2px solid #1a56a0;background:#1a56a0;color:#fff;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s">
+              学校順なし
+            </button>
+            <button id="sortSchoolAscBtn" onclick="setStuSchoolSort('asc')"
+              style="padding:5px 12px;border-radius:0;border:2px solid #e2e8f0;border-left:none;background:#fff;color:#94a3b8;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s">
+              学校 あ→ん
+            </button>
+            <button id="sortSchoolDescBtn" onclick="setStuSchoolSort('desc')"
+              style="padding:5px 12px;border-radius:0 20px 20px 0;border:2px solid #e2e8f0;border-left:none;background:#fff;color:#94a3b8;font-size:.78rem;font-weight:600;cursor:pointer;transition:.15s">
+              学校 ん→あ
+            </button>
+          </div>
+        </div>
+
+        <div class="listBox" id="stuList"></div>
+        <div id="stuPager" style="display:none;margin-top:12px;justify-content:center;gap:8px">
+          <button id="stuMoreBtn" class="btn btn-outline btn-sm" onclick="loadMoreStudents()">次の50件</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 面談・メモ -->
+    <div id="aTab_meetings" style="display:none">
+      <div class="card">
+        <div class="cardHead">🗒️ 面談・メモ 登録</div>
+        <div style="display:grid;grid-template-columns:minmax(280px,420px) 1fr;gap:18px;align-items:start">
+          <div id="meetStudentPanel" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px">
+            <div class="fld"><label for="meetDate">日付</label><input id="meetDate" type="date" onchange="updateMeetingDateDisplay()" oninput="updateMeetingDateDisplay()"><div id="meetDateDisplay" aria-live="polite" style="margin-top:6px;font-size:1rem;font-weight:700;color:var(--primary)"></div></div>
+            <div class="fld">
+              <label>校舎</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button id="meetCampusJinryo" class="btn btn-ghost btn-sm" type="button" onclick="selectMeetingCampus('神領')">神領</button>
+                <button id="meetCampusOte" class="btn btn-ghost btn-sm" type="button" onclick="selectMeetingCampus('大手')">大手町</button>
+                <button id="meetCampusAll" class="btn btn-ghost btn-sm" type="button" onclick="selectMeetingCampus('')">全校舎</button>
+              </div>
+            </div>
+            <div class="fld"><label for="meetStudentSearch">生徒検索</label>
+              <input id="meetStudentSearch" type="search" placeholder="氏名・かな・ローマ字・IDで検索" oninput="populateMeetingStudents()" autocomplete="off">
+            </div>
+            <div class="fld"><label>学年</label>
+              <div id="meetGradeButtons" style="display:flex;gap:6px;flex-wrap:wrap">
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="" onclick="selectMeetingGradeGroup('')">全員</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="elementary" onclick="selectMeetingGradeGroup('elementary')">小学生</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="junior" onclick="selectMeetingGradeGroup('junior')">中学生</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="high" onclick="selectMeetingGradeGroup('high')">高校生</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="小1" onclick="selectMeetingGradeGroup('小1')">小1</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="小2" onclick="selectMeetingGradeGroup('小2')">小2</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="小3" onclick="selectMeetingGradeGroup('小3')">小3</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="小4" onclick="selectMeetingGradeGroup('小4')">小4</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="小5" onclick="selectMeetingGradeGroup('小5')">小5</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="小6" onclick="selectMeetingGradeGroup('小6')">小6</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="中1" onclick="selectMeetingGradeGroup('中1')">中1</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="中2" onclick="selectMeetingGradeGroup('中2')">中2</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="中3" onclick="selectMeetingGradeGroup('中3')">中3</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="高1" onclick="selectMeetingGradeGroup('高1')">高1</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="高2" onclick="selectMeetingGradeGroup('高2')">高2</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-meet-grade="高3" onclick="selectMeetingGradeGroup('高3')">高3</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="clearMeetingStudentFilters()">クリア</button>
+              </div>
+            </div>
+            <div class="fld"><label for="meetStudent">生徒名 <span id="meetStudentCount" style="color:var(--sub);font-weight:normal"></span></label>
+              <select id="meetStudent" onchange="updateMeetingSelectedStudent()" size="5" style="width:100%;min-height:150px"><option value="">生徒を選択</option></select>
+            </div>
+            <div class="fld"><label>相手</label>
+              <select id="meetCounterpart" onchange="toggleMeetingOther()">
+                <option>母</option><option>父</option><option>本人</option><option>他</option>
+              </select>
+            </div>
+            <div class="fld" id="meetOtherWrap" style="display:none"><label>相手（その他）</label><input id="meetOther" placeholder="例: 祖母、叔父、学校の先生"></div>
+            <div class="fld"><label>担当</label><select id="meetStaff" onchange="toggleMeetingStaffOther()"><option value="">担当を選択</option></select></div>
+            <div class="fld" id="meetStaffOtherWrap" style="display:none"><label>担当（その他）</label><input id="meetStaffOther" placeholder="担当者名を入力"></div>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+            <div id="meetSelectedStudent" aria-live="polite" style="margin-bottom:12px;padding:10px 12px;background:var(--primary-lt);border-radius:8px;color:var(--primary);font-size:1.1rem;font-weight:700">生徒を選択してください</div>
+            <div class="fld"><label>内容</label><textarea id="meetContent" placeholder="面談・電話・相談内容など" style="min-height:170px"></textarea></div>
+            <button id="meetSaveBtn" class="btn btn-primary btn-sm" onclick="saveMeetingMemo(false)">保存する</button>
+            <button id="meetMailSaveBtn" class="btn btn-success btn-sm" onclick="saveMeetingMemo(true)">メール送信して保存</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearMeetingForm()">入力欄をクリア</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardHead">📋 面談・メモ 一覧</div>
+        <div class="filterRow">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button id="meetListCampusAll" class="btn btn-primary btn-sm" type="button" onclick="selectMeetingListCampus('')">全校舎</button>
+            <button id="meetListCampusJinryo" class="btn btn-ghost btn-sm" type="button" onclick="selectMeetingListCampus('神領')">神領</button>
+            <button id="meetListCampusOte" class="btn btn-ghost btn-sm" type="button" onclick="selectMeetingListCampus('大手')">大手町</button>
+          </div>
+          <div class="searchWrap"><input id="meetSearch" placeholder="氏名・かな・ローマ字・ID・内容で検索" oninput="scheduleMeetingMemosLoad()"></div>
+          <span class="enrollmentFilter">
+            <label><input type="checkbox" id="meetShowActive" checked onchange="loadMeetingMemos()">在籍生</label>
+            <label><input type="checkbox" id="meetShowWithdrawn" onchange="loadMeetingMemos()">退塾生</label>
+          </span>
+          <select id="meetFilterStaff" onchange="loadMeetingMemos()"><option value="">全担当</option></select>
+          <select id="meetFilterCounterpart" onchange="loadMeetingMemos()">
+            <option value="">相手すべて</option><option>母</option><option>父</option><option>本人</option><option>他</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="loadMeetingMemos()">🔄 更新</button>
+          <button onclick="openAdminTrash()" class="btn btn-outline btn-sm">🗑️ 削除済みメモを見る</button>
+        </div>
+        <div class="tblWrap">
+          <table>
+            <thead><tr><th>日付</th><th>生徒</th><th>相手</th><th>担当</th><th>内容</th><th></th></tr></thead>
+            <tbody id="meetBody"><tr><td colspan="6" class="noData">データなし</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 学校 -->
+    <div id="aTab_schools" style="display:none">
+      <div class="adminGrid">
+        <div class="card">
+          <div class="cardHead">🏫 学校の登録</div>
+          <div class="fldRow">
+            <input type="text" id="newSchoolName" placeholder="学校名">
+            <input type="number" id="newSchoolTerms" placeholder="年間テスト回数" min="1" max="10">
+            <select id="newSchoolSemType">
+              <option value="3term">3学期制</option>
+              <option value="2term">前期・後期制</option>
+            </select>
+          </div>
+          <button class="btn btn-success btn-sm" onclick="addSchool()">＋ 追加</button>
+        </div>
+        <div class="card">
+          <div class="cardHead">登録済み学校</div>
+          <div class="listBox" id="schoolListBox"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- テスト成績 -->
+    <div id="aTab_scores" style="display:none">
+      <div class="card">
+        <div class="cardHead">🧾 テスト成績一覧</div>
+        <div class="filterRow">
+          <div class="searchWrap">
+            <input type="text" id="scASearch" placeholder="氏名・かな・ローマ字・IDで検索" oninput="filterAdminScores()">
+          </div>
+          <span class="enrollmentFilter">
+            <label><input type="checkbox" id="scAShowActive" checked onchange="filterAdminScores()">在籍生</label>
+            <label><input type="checkbox" id="scAShowWithdrawn" onchange="filterAdminScores()">退塾生</label>
+          </span>
+          <select id="scAYear"></select>
+          <select id="scATerm">
+            <option value="">全回</option>
+            <option value="1">第1回</option><option value="2">第2回</option><option value="3">第3回</option>
+            <option value="4">第4回</option><option value="5">第5回</option><option value="6">第6回</option>
+          </select>
+          <select id="scACampus" onchange="loadAdminScores()">
+            <option value="">全校舎</option>
+            <option>神領</option><option>大手</option>
+          </select>
+          <select id="scAGrade" onchange="filterAdminScores()">
+            <option value="">全学年</option>
+            <option>中1</option><option>中2</option><option>中3</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="loadAdminScores()">🔄 更新</button>
+        </div>
+        <div class="tblWrap" style="max-height:60vh;overflow-y:auto">
+          <table style="border-collapse:collapse">
+            <thead style="position:sticky;top:0;z-index:2;background:#fff">
+              <tr>
+              <th>氏名</th><th>学年</th><th>学校</th><th>年度</th><th>回</th>
+              <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>5計</th><th>5科順</th>
+              <th>音</th><th>美</th><th>体</th><th>技</th><th>9計</th><th>9科順</th><th>操作</th>
+            </tr></thead>
+            <tbody id="scABody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 通知表 -->
+    <div id="aTab_report" style="display:none">
+      <div class="card">
+        <div class="cardHead">📒 通知表一覧</div>
+        <div class="filterRow">
+          <div class="searchWrap">
+            <input type="text" id="rpASearch" placeholder="氏名・かな・ローマ字・IDで検索" oninput="filterAdminReport()">
+          </div>
+          <span class="enrollmentFilter">
+            <label><input type="checkbox" id="rpAShowActive" checked onchange="filterAdminReport()">在籍生</label>
+            <label><input type="checkbox" id="rpAShowWithdrawn" onchange="filterAdminReport()">退塾生</label>
+          </span>
+          <select id="rpAYear"></select>
+          <select id="rpASemester">
+            <option value="">全学期</option>
+            <option>1学期</option><option>2学期</option><option>3学期</option>
+            <option>前期</option><option>後期</option>
+          </select>
+          <select id="rpACampus" onchange="loadAdminReport()">
+            <option value="">全校舎</option>
+            <option>神領</option><option>大手</option>
+          </select>
+          <select id="rpAGrade" onchange="loadAdminReport()">
+            <option value="">全学年</option>
+            <option>中1</option><option>中2</option><option>中3</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="loadAdminReport()">🔄 更新</button>
+        </div>
+        <div class="tblWrap" style="max-height:60vh;overflow-y:auto">
+          <table style="border-collapse:collapse">
+            <thead style="position:sticky;top:0;z-index:2;background:#fff">
+              <tr>
+              <th>氏名</th><th>学年</th><th>学校</th><th>学期</th>
+              <th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>5計</th>
+              <th>音</th><th>美</th><th>体</th><th>技</th><th>9計</th><th>操作</th>
+            </tr></thead>
+            <tbody id="rpABody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardHead">📈 評定推移グラフ（生徒別）</div>
+        <div class="filterRow">
+          <select id="rpAStudent" onchange="drawReportChart()">
+            <option value="">生徒を選択</option>
+          </select>
+          <select id="rpASubject" onchange="drawReportChart()">
+            <option value="rp_jpn">国語</option><option value="rp_soc">社会</option>
+            <option value="rp_math">数学</option><option value="rp_sci">理科</option>
+            <option value="rp_eng">英語</option><option value="rp_mus">音楽</option>
+            <option value="rp_art">美術</option><option value="rp_pe">保健体育</option>
+            <option value="rp_tech">技術家庭</option>
+          </select>
+        </div>
+        <div class="chartWrap"><canvas id="reportChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- 志望校 -->
+    <div id="aTab_wish" style="display:none">
+      <div class="card">
+        <div class="cardHead">🏫 志望校一覧</div>
+        <div class="filterRow" style="margin-bottom:12px">
+          <select id="wishCampus" onchange="filterWishStudents()">
+            <option value="">全校舎</option><option>神領</option><option>大手</option>
+          </select>
+          <select id="wishGrade" onchange="filterWishStudents()">
+            <option value="">全学年</option><option>中1</option><option>中2</option><option>中3</option>
+          </select>
+          <div class="searchWrap">
+            <input type="text" id="wishSearch" placeholder="氏名・かな・ローマ字・IDで検索" oninput="filterWishStudents()">
+          </div>
+          <span class="enrollmentFilter">
+            <label><input type="checkbox" id="wishShowActive" checked onchange="filterWishStudents()">在籍生</label>
+            <label><input type="checkbox" id="wishShowWithdrawn" onchange="filterWishStudents()">退塾生</label>
+          </span>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="font-size:.75rem;width:100%;border-collapse:collapse">
+            <thead><tr style="background:#f1f5f9">
+              <th style="padding:5px 8px;text-align:left">氏名</th>
+              <th style="padding:5px 4px">学年</th>
+              <th style="padding:5px 4px;background:#dde8ff;border-left:3px solid #4f46e5" colspan="4">公立 第1志望</th>
+              <th style="padding:5px 4px;background:#dde8ff;border-left:3px solid #4f46e5" colspan="4">公立 第2志望</th>
+              <th style="padding:5px 4px;background:#dde8ff;border-left:3px solid #4f46e5" colspan="4">公立 第3志望</th>
+              <th style="padding:5px 4px;background:#fef5d0;border-left:3px solid #d97706" colspan="4">私立 第1志望</th>
+              <th style="padding:5px 4px;background:#fef5d0;border-left:3px solid #d97706" colspan="4">私立 第2志望</th>
+              <th style="padding:5px 4px;background:#fef5d0;border-left:3px solid #d97706" colspan="4">私立 第3志望</th>
+              <th style="padding:5px 4px">更新日</th>
+              <th style="padding:5px 4px">操作</th>
+            </tr>
+            <tr style="background:#f8fafc;font-size:.68rem;color:#94a3b8">
+              <th></th><th></th>
+              <th style="border-left:3px solid #4f46e5">高校名</th><th>入試</th><th>合否</th><th>進学</th>
+              <th style="border-left:3px solid #4f46e5">高校名</th><th>入試</th><th>合否</th><th>進学</th>
+              <th style="border-left:3px solid #4f46e5">高校名</th><th>入試</th><th>合否</th><th>進学</th>
+              <th style="border-left:3px solid #d97706">高校名</th><th>入試</th><th>合否</th><th>進学</th>
+              <th style="border-left:3px solid #d97706">高校名</th><th>入試</th><th>合否</th><th>進学</th>
+              <th style="border-left:3px solid #d97706">高校名</th><th>入試</th><th>合否</th><th>進学</th>
+              <th></th><th></th>
+            </tr></thead>
+            <tbody id="wishBody"><tr><td colspan="28" class="noData">データなし</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 同期 -->
+    <div id="aTab_entry" style="display:none">
+      <div class="card">
+        <div class="cardHead">入塾書類取込</div>
+        <div class="filterRow" style="align-items:flex-end">
+          <div class="fld" style="min-width:140px"><label>生徒ID</label><input id="entryStudentId" placeholder="例: 1001"></div>
+          <div class="fld" style="min-width:180px"><label>生徒氏名</label><input id="entryName" placeholder="例: 加瀬壮真"></div>
+          <button class="btn btn-ghost btn-sm" onclick="loadEntryData()">既存データ確認</button>
+          <a class="btn btn-ghost btn-sm" href="entry_import.html" target="_blank" rel="noopener" style="text-decoration:none">スマホ取込ページ</a>
+        </div>
+        <div style="font-size:.78rem;color:#64748b;margin:8px 0 12px">
+          OCR後の内容を確認して登録します。生徒IDと氏名が一致しない場合は保存されません。
+        </div>
+        <div class="adminGrid">
+          <!-- 左：生徒ページに表示する入塾時情報 -->
+          <div>
+            <div class="cardHead" style="font-size:.86rem;margin-bottom:8px">生徒ページに表示する入塾時情報</div>
+            <!-- 入塾日（読取専用表示） -->
+            <div id="entryJoinDateWrap" style="display:none;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:.85rem;color:#0369a1">
+              📅 <span id="entryJoinDateLabel"></span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+              <input id="entryClub" placeholder="部活動">
+              <input id="entryNickname" placeholder="ニックネーム">
+              <input id="entryCommute" placeholder="通塾方法">
+              <input id="entrySignatureDate" placeholder="保護者署名日：2024-7-22">
+              <input id="entrySignatureName" placeholder="保護者署名氏名">
+              <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px">
+                <input id="entryImageUrl1" placeholder="原本画像URL 1" style="flex:1">
+                <a id="entryImageUrl1Link" href="#" target="_blank" rel="noopener" style="display:none;white-space:nowrap;font-size:.8rem;padding:5px 10px;border:1px solid #bae6fd;border-radius:6px;color:var(--primary);background:#f0f9ff;text-decoration:none">📄 画像1を開く</a>
+              </div>
+              <div style="grid-column:1/-1;display:flex;align-items:center;gap:8px">
+                <input id="entryImageUrl2" placeholder="原本画像URL 2" style="flex:1">
+                <a id="entryImageUrl2Link" href="#" target="_blank" rel="noopener" style="display:none;white-space:nowrap;font-size:.8rem;padding:5px 10px;border:1px solid #bae6fd;border-radius:6px;color:var(--primary);background:#f0f9ff;text-decoration:none">📄 画像2を開く</a>
+              </div>
+              <textarea id="entryCurrentLessons" placeholder="現在通っている習い事や塾" style="grid-column:1/-1;min-height:52px"></textarea>
+              <textarea id="entryPastLessons" placeholder="過去に通っていた習い事や塾" style="grid-column:1/-1;min-height:52px"></textarea>
+              <textarea id="entryFamilyRequest" placeholder="ご家庭からの要望・希望" style="grid-column:1/-1;min-height:70px"></textarea>
+            </div>
+            <!-- 家族情報 -->
+            <div class="cardHead" style="font-size:.82rem;margin:12px 0 6px">家族構成（入塾日現在）</div>
+            <div id="entryFamilyRows" style="display:grid;gap:8px"></div>
+            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="addFamilyRow()">＋ 家族を追加</button>
+            <textarea id="entryFamilyJson" style="display:none"></textarea>
+          </div>
+          <!-- 右：生徒マスタへ反映する保護者欄 -->
+          <div>
+            <div class="cardHead" style="font-size:.86rem;margin-bottom:4px;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:8px 12px">
+              ⚠️ 生徒マスタへ反映する右側の保護者欄（AA〜AE列）
+            </div>
+            <div style="font-size:.76rem;color:#92400e;background:#fffbeb;border:1px solid #fcd34d;border-radius:0 0 8px 8px;padding:6px 12px;margin-bottom:10px">
+              ここに入力して「確認して取り込む」を押すと、☆マスタのAA〜AE列に書き込まれます。誤入力に注意してください。
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+              <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">保護者氏名（AA列）</label><input id="entryG2Name" placeholder="例: 山田花子"></div>
+              <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">フリガナ（AB列）</label><input id="entryG2Kana" placeholder="例: ヤマダハナコ"></div>
+              <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">続柄（AC列）</label><input id="entryG2Relation" placeholder="例: 母"></div>
+              <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">携帯番号（AE列）</label><input id="entryG2Mobile" placeholder="例: 090-1234-5678"></div>
+              <div style="grid-column:1/-1"><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">メール（AD列）</label><input id="entryG2Email" placeholder="例: hanako@example.com" style="width:100%;box-sizing:border-box"></div>
+            </div>
+            <div style="margin-top:12px">
+              <button class="btn btn-primary btn-sm" onclick="saveEntryImport()">✅ 確認して取り込む</button>
+              <div id="entryImportMsgRight" style="margin-top:6px;font-size:.8rem;color:#64748b"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cardHead">OCR結果JSON / 成績・通知表・志望校</div>
+        <textarea id="entryJson" style="width:100%;min-height:180px;font-family:Consolas,monospace;font-size:.78rem" placeholder='{"scores":[{"year":2026,"term":1,"jpn":58,"soc":77,"math":66,"sci":55,"eng":44,"total5":300}],"reports":[{"year":2026,"semester":"1学期","rp_jpn":5,"rp_soc":5,"rp_math":5,"rp_sci":5,"rp_eng":5,"rp_mus":4,"rp_art":3,"rp_pe":2,"rp_tech":2}],"wish":{"pub1name":"春日井高校","pub1dept":"ふつう"}}'></textarea>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-ghost btn-sm" onclick="fillEntryFromJson()">JSONをフォームへ反映</button>
+          <button class="btn btn-primary btn-sm" onclick="saveEntryImport()">確認して取り込む</button>
+        </div>
+        <div id="entryImportMsg" style="margin-top:10px;font-size:.82rem;color:#64748b"></div>
+      </div>
+    </div>
+
+    <div id="aTab_sync" style="display:none">
+      <div class="card">
+        <div class="cardHead">🔄 生徒マスタ同期</div>
+        <p style="font-size:.82rem;color:var(--sub);margin-bottom:14px">
+          元スプレッドシート（☆マスタ）から差分を確認して適用します。<br>
+          Supabase方式では、GAS生徒マスタの変更をここからSupabaseへ反映できます。
+        </p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="runSync()">🔍 差分を確認する</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadSyncLog()">📋 同期ログを見る</button>
+        </div>
+      </div>
+      <div id="syncResult" style="display:none"></div>
+      <div id="syncLogWrap" style="display:none">
+        <div class="card">
+          <div class="cardHead">📋 同期ログ（直近50件）</div>
+          <div id="syncLogList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 設定 -->
+    <div id="aTab_settings" style="display:none">
+      <div class="card" style="max-width:440px">
+        <div class="cardHead">⚙️ 管理者パスワード変更</div>
+        <div class="fld"><label>現在のパスワード</label><input type="password" id="curPass" placeholder="現在のパスワード"></div>
+        <div class="fld"><label>新しいパスワード</label><input type="password" id="newPass" placeholder="新しいパスワード（4文字以上）"></div>
+        <div class="fld"><label>新しいパスワード（確認）</label><input type="password" id="newPass2" placeholder="もう一度入力"></div>
+        <div class="errMsg" id="passErr" style="min-height:18px"></div>
+        <button class="btn btn-primary" onclick="changeAdminPass()" style="width:100%;margin-top:4px">🔑 パスワードを変更する</button>
+      </div>
+      <div class="card" style="max-width:760px">
+        <div class="cardHead">👤 面談担当者</div>
+        <div style="display:grid;grid-template-columns:minmax(120px,160px) minmax(220px,1fr) auto;gap:10px;align-items:end">
+          <div class="fld" style="margin-bottom:0"><label>担当者名</label><input id="newStaffName" placeholder="例: 佐藤"></div>
+          <div class="fld" style="margin-bottom:0"><label>メールアドレス</label><input id="newStaffEmail" placeholder="example@gmail.com"></div>
+          <button class="btn btn-success btn-sm" onclick="addStaffMember()">＋ 追加</button>
+          <div style="grid-column:1/-1;display:flex;gap:14px;flex-wrap:wrap;color:#334155;font-size:.84rem">
+            <label style="display:flex;align-items:center;gap:6px"><input id="newStaffNotifyOte" type="checkbox"> 大手町の面談内容を受取</label>
+            <label style="display:flex;align-items:center;gap:6px"><input id="newStaffNotifyJinryo" type="checkbox"> 神領の面談内容を受取</label>
+          </div>
+        </div>
+        <div id="staffListBox" class="listBox" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- 同期モーダル -->
+<div class="overlay" id="syncModal">
+  <div class="modal">
+    <h3>🔄 同期プレビュー</h3>
+    <div id="syncModalBody" class="syncModalBody"></div>
+    <div class="modalFoot" id="syncModalFoot">
+      <!-- ボタンはJS側で動的に生成 -->
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="entryInfoModal">
+  <div class="modal" style="max-width:760px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
+      <h3 id="entryInfoTitle" style="margin:0">入塾時情報</h3>
+    </div>
+    <div id="entryInfoModalBody" style="font-size:.84rem;color:#334155;line-height:1.7"></div>
+    <div class="modalFoot" style="margin-top:16px">
+      <button id="entryGuardian2Btn" class="btn btn-primary btn-sm" onclick="applyEntryAiReview()" style="display:none">保護者2・定期テスト・通知表を確認済みにして転記</button>
+      <button class="btn btn-primary btn-sm" onclick="editCurrentEntryInfo()">編集する</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeEntryInfoModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ゴミ箱モーダル（管理画面用） -->
+<div id="adminTrashModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:16px;padding:20px;width:min(95vw,760px);max-height:85vh;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div style="font-weight:800;font-size:1rem">🗑️ 削除済みメモ</div>
+      <button onclick="closeAdminTrash()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#94a3b8">✕</button>
+    </div>
+    <div style="font-size:.8rem;color:#94a3b8">完全削除したメモの一覧です。「復元する」で面談メモデータに戻せます。</div>
+    <div id="adminTrashList" style="overflow-y:auto;flex:1;display:grid;gap:8px">
+      <div style="color:#94a3b8;text-align:center;padding:20px">読み込み中...</div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="editModal">
+  <div class="modal" style="max-width:720px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
+      <h3 style="margin:0">編集</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeEditModal()">閉じる</button>
+    </div>
+    <div id="editModalBody"></div>
+    <div class="modalFoot">
+      <button class="btn btn-primary btn-sm" onclick="saveEditModal()">保存する</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeEditModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="assets/js/supabase-config.js"></script>
+<script src="assets/js/staff-auth.js?v=20261009-single-read"></script>
+<script>
+if (location.hash === '#directory') location.replace('student_directory.html');
+const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
+const RUNTIME_CONFIG = window.SEISEKI_CONFIG || {};
+const SUPABASE_URL = RUNTIME_CONFIG.supabaseUrl || localStorage.getItem('seisekiSupabaseUrl') || '';
+const SUPABASE_ANON_KEY = RUNTIME_CONFIG.supabaseAnonKey || localStorage.getItem('seisekiSupabaseAnonKey') || '';
+const DEFAULT_SUPABASE_AUTH_EMAIL = RUNTIME_CONFIG.supabaseAdminEmail || localStorage.getItem('seisekiSupabaseAdminEmail') || 'stepkobetsu@gmail.com';
+// 成績データの正本は本番Supabase。管理権限は共通スタッフセッションで検証する。
+const SEISEKI_ADMIN_RUNTIME_URL = 'https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
+const ADMIN_SESSION_TOKEN_KEY = 'adminSystemPortalSessionToken';
+const ADMIN_SESSION_EXPIRES_KEY = 'adminSystemPortalExpiresAt';
+const SUPABASE_ENABLED_ACTIONS = new Set(['getEntrySheetData','importMissingEntryGrades',
+  'getStudents', 'getStudentList',
+  'getAllScores', 'getStudentScores', 'getStudentGradeProfile', 'saveScore', 'deleteScore',
+  'getAllReports', 'getReports', 'saveReport', 'deleteReport',
+  'getAllWishes', 'getWish', 'saveWish', 'saveWishResult',
+  'getSchools', 'addSchool', 'updateSchool', 'deleteSchool',
+  'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
+  'getStaffMembers', 'addStaffMember', 'deleteStaffMember'
+]);
+const SUPABASE_WRITE_ACTIONS = new Set(['importMissingEntryGrades',
+  'saveScore', 'deleteScore', 'saveReport', 'deleteReport',
+  'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool',
+  'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember'
+]);
+let DATA_SOURCE = 'supabase-admin-edge';
+localStorage.setItem('seisekiDataSource', DATA_SOURCE);
+let schools = [];
+let students = [];
+let allScores = [];
+let allReports = [];
+let pendingSync = null;
+let staffMembers = [];
+let staffMemberRecords = [];
+let meetingMemos = [];
+let meetingMemoSourceRows = [];
+let meetingMemoSourceLoaded = false;
+let adminScores = [];
+let renderedAdminScores = [];
+let renderedAdminReports = [];
+let renderedWishes = [];
+let selectedMeetingCampus = '';
+let selectedMeetingGradeGroup = '';
+let selectedMeetingListCampus = '';
+let currentMeetingMemoId = '';
+let schoolScheduleHistory = {};
+let schoolAutoSaveTimers = {};
+let activeScheduleCell = null;
+const TABS = ['speed','compare','students','meetings','schools','scores','report','wish','entry','sync','settings'];
+// タブ履歴管理（グローバル宣言）
+let _navHist = [];
+let _navIdx = -1;
+let _navSkip = false;
+
+let speedChartInst = null;
+// キャッシュ（通信呼び出し削減）
+let _cache = { students: null, allScores: null, allReports: null, allWishes: null, studentDetail: {} };
+let cmpScoreChartInst = null;
+let cmpRpChartInst = null;
+let cmpDiffChartInst = null;
+let reportChartInst = null;
+let cmpScoreData = [];
+let cmpRpData = [];
+let currentEntryInfoStudentId = '';
+let currentEntryGuardian2 = null;
+let currentEntryAiReview = null;
+let _studentPageOffset = 0;
+let studentPageOffset = 0; // backward-compatible alias for stale browser state
+let _studentHasMore = false;
+let _studentFilterTimer = null;
+let _stuSortGrade = true;
+let _stuSortSchool = '';
+let _stuSchoolExclude = new Set(); // チェックを外した学校名
+
+function getNendo(date) {
+  const d = date || new Date();
+  return d.getMonth() < 3 ? d.getFullYear() - 1 : d.getFullYear();
+}
+const NOW_YEAR = getNendo();
+
+function normalizeGrade(grade) {
+  const s = String(grade || '')
+    .trim()
+    .replace(/[１２３４５６]/g, ch => ({'１':'1','２':'2','３':'3','４':'4','５':'5','６':'6'}[ch]))
+    .replace(/\s+/g, '')
+    .replace(/^小学/, '小')
+    .replace(/^中学/, '中')
+    .replace(/^高校/, '高')
+    .replace(/年$/, '');
+  const m = s.match(/^([小中高]?)([1-6])$/);
+  if (!m) return s;
+  return (m[1] || '中') + m[2];
+}
+
+function gradeMatchesGroup(grade, group) {
+  if (!group) return true;
+  const g = normalizeGrade(grade);
+  const n = Number((g.match(/[1-6]/) || [''])[0]);
+  if (group === 'elementary') return g.startsWith('小');
+  if (group === 'junior') return g.startsWith('中');
+  if (group === 'high') return g.startsWith('高');
+  if (group === 'e13') return g.startsWith('小') && n >= 1 && n <= 3;
+  if (group === 'e46') return g.startsWith('小') && n >= 4 && n <= 6;
+  if (group === 'j1') return g === '中1';
+  if (group === 'j2') return g === '中2';
+  if (group === 'j3') return g === '中3';
+  if (group === 'h13') return g.startsWith('高') && n >= 1 && n <= 3;
+  return true;
+}
+
+const GRADE_FILTER_OPTIONS = [
+  ['', '全学年'],
+  ['elementary', '小学生'],
+  ['junior', '中学生'],
+  ['high', '高校生'],
+  ['e13', '小1〜小3'],
+  ['e46', '小4〜小6'],
+  ['j1', '中1'],
+  ['j2', '中2'],
+  ['j3', '中3'],
+  ['h13', '高1〜高3']
+];
+function initGradeSelects() {
+  ['spGrade','chartGrade','cmpGrade','stuGrade','scAGrade','rpAGrade','wishGrade','meetGradeGroup'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const prev = el.value;
+    el.innerHTML = GRADE_FILTER_OPTIONS.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+    if (GRADE_FILTER_OPTIONS.some(([value]) => value === prev)) el.value = prev;
+  });
+}
+
+// ===== API =====
+function hasSupabaseConfig() {
+  return /^https:\/\/.+\.supabase\.co$/.test(SUPABASE_URL) && !!SUPABASE_ANON_KEY;
+}
+
+function getSupabaseSession() {
+  try {
+    const raw = sessionStorage.getItem('seisekiSupabaseSession');
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    if (!session.access_token || !session.expires_at) return null;
+    if (Date.now() > Number(session.expires_at) * 1000 - 60000) return null;
+    return session;
+  } catch(e) {
+    return null;
+  }
+}
+
+function clearSensitiveCache() {
+  _cache = { students: null, allScores: null, allReports: null, allWishes: null, studentDetail: {} };
+  students = [];
+  allScores = [];
+  allReports = [];
+  meetingMemos = [];
+  adminScores = [];
+  renderedAdminScores = [];
+  renderedAdminReports = [];
+  renderedWishes = [];
+  sessionStorage.removeItem('seisekiStudentsCache');
+}
+
+function setStudentSourceStatus(message, isError) {
+  const el = document.getElementById('stuSourceStatus');
+  if (!el) return;
+  el.style.display = message ? 'block' : 'none';
+  el.style.color = isError ? '#dc2626' : '#64748b';
+  el.textContent = message || '';
+}
+
+function setDataSource(source) {
+  DATA_SOURCE = source;
+  localStorage.setItem('seisekiDataSource', source);
+  if (source !== 'supabase') clearSensitiveCache();
+}
+
+function supabaseHeaders(extra) {
+  const session = getSupabaseSession();
+  return Object.assign({
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: 'Bearer ' + (session?.access_token || SUPABASE_ANON_KEY),
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation'
+  }, extra || {});
+}
+
+async function supabaseSignIn(email, password) {
+  const url = SUPABASE_URL.replace(/\/$/, '') + '/auth/v1/token?grant_type=password';
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email, password })
+  });
+  const json = await r.json().catch(() => ({}));
+  if (!r.ok || !json.access_token) throw new Error('Supabase認証に失敗しました');
+  sessionStorage.setItem('seisekiSupabaseSession', JSON.stringify({
+    access_token: json.access_token,
+    refresh_token: json.refresh_token || '',
+    expires_at: Math.floor(Date.now() / 1000) + Number(json.expires_in || 3600),
+    user_id: json.user?.id || '',
+    email: json.user?.email || email
+  }));
+  return json;
+}
+
+async function supabaseSignOut() {
+  const session = getSupabaseSession();
+  if (session?.access_token && hasSupabaseConfig()) {
+    try {
+      await fetch(SUPABASE_URL.replace(/\/$/, '') + '/auth/v1/logout', {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: 'Bearer ' + session.access_token
+        }
+      });
+    } catch(e) { /* logout must still clear local state */ }
+  }
+  sessionStorage.removeItem('seisekiSupabaseSession');
+}
+
+function sbValue(v) {
+  return v === null || v === undefined ? '' : v;
+}
+
+function sbStudent(row) {
+  return {
+    id: sbValue(row.student_code || row.id),
+    studentCode: sbValue(row.student_code),
+    name: sbValue(row.name),
+    nameKana: sbValue(row.name_kana),
+    campus: sbValue(row.campus),
+    grade: sbValue(row.grade),
+    school: sbValue(row.school_name),
+    flag: row.active === false ? '退塾' : '1',
+    syncedAt: sbValue(row.source_updated_at || row.updated_at)
+  };
+}
+
+let enrollmentByStudentId = new Map();
+let studentSearchById = new Map();
+let enrollmentIndexReady = false;
+
+function normalizedEnrollmentFlag(student) {
+  const value = student?.enrollmentFlag ?? student?.flag ?? student?.active ?? '';
+  if (value === true) return '1';
+  if (value === false) return '0';
+  const flag = String(value).trim();
+  if (flag === '1') return '1';
+  if (flag === '0' || flag === '退塾' || flag === 'inactive' || flag === 'false') return '0';
+  return '';
+}
+
+function enrollmentSelection(activeId, withdrawnId) {
+  return {
+    showActive: !!document.getElementById(activeId)?.checked,
+    showWithdrawn: !!document.getElementById(withdrawnId)?.checked
+  };
+}
+
+function matchesEnrollmentFilter(student, showActive, showWithdrawn) {
+  const flag = normalizedEnrollmentFlag(student);
+  if (flag === '1') return showActive;
+  if (flag === '' || flag === '0') return showWithdrawn;
+  return false;
+}
+
+function matchesEnrollmentRecord(studentId, activeId, withdrawnId) {
+  const { showActive, showWithdrawn } = enrollmentSelection(activeId, withdrawnId);
+  const flag = enrollmentByStudentId.get(String(studentId));
+  return matche…1467 tokens truncated…    content: sbValue(row.content),
+    staff: sbValue(row.staff_name),
+    staffEmail: sbValue(row.staff_email),
+    createdAt: sbValue(row.created_at),
+    updatedAt: sbValue(row.updated_at)
+  };
+}
+
+function supabaseUrl(path, params) {
+  const url = new URL(SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/' + path);
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== '' && value !== null && value !== undefined) url.searchParams.set(key, value);
+  });
+  return url.toString();
+}
+
+async function supabaseGet(path, params) {
+  const url = supabaseUrl(path, params);
+  if (path === 'students') console.info('Supabase students request:', url);
+  const r = await fetch(url, { headers: supabaseHeaders() });
+  if (!r.ok) throw new Error('Supabase read failed: ' + r.status);
+  return await r.json();
+}
+
+async function supabaseWrite(path, params, options) {
+  const url = supabaseUrl(path, params);
+  const r = await fetch(url, {
+    method: options.method || 'POST',
+    headers: supabaseHeaders(options.headers),
+    body: options.body === undefined ? undefined : JSON.stringify(options.body)
+  });
+  const text = await r.text();
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch(e) { body = text; }
+  if (!r.ok) {
+    const message = typeof body === 'object' && body ? (body.message || body.msg || JSON.stringify(body)) : String(body || '');
+    throw new Error('Supabase write failed: ' + r.status + (message ? ' ' + message : ''));
+  }
+  return body;
+}
+
+async function legacyApi(data) {
+  const r = await fetch(GAS, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(data)
+  });
+  return await r.json();
+}
+
+async function supabaseApi(data) {
+  if (!hasSupabaseConfig()) return { success: false, fallback: true, error: 'Supabase設定がありません' };
+  if (!SUPABASE_ENABLED_ACTIONS.has(data.action)) {
+    return { success: false, fallback: true, error: 'Phase 2ではSupabase対象外です: ' + data.action };
+  }
+  if (!getSupabaseSession()) {
+    return { success: false, fallback: false, authRequired: true, error: 'Supabaseログインが必要です' };
+  }
+  switch (data.action) {
+    case 'getStudents': {
+      const limit = Math.min(Number(data.limit || 50), 50);
+      const offset = Math.max(Number(data.offset || 0), 0);
+      const params = {
+        select: 'id,student_code,name,name_kana,campus,grade,school_name,active',
+        order: 'active.desc,campus.asc,grade.asc,student_code.asc',
+        limit,
+        offset
+      };
+      if (data.activeOnly === true) params.active = 'eq.true';
+      else if (data.withdrawnOnly === true) params.active = 'eq.false';
+      if (data.campus) params.campus = 'eq.' + data.campus;
+      if (Array.isArray(data.grades) && data.grades.length) params.grade = supabaseGradesParam(data.grades);
+      else if (data.grade) params.grade = supabaseGradeParam(data.grade);
+      if (data.q) {
+        const q = String(data.q).replace(/[()*.,]/g, ' ').trim();
+        if (q) params.or = `(name.ilike.*${q}*,student_code.ilike.*${q}*)`;
+      }
+      const rows = await supabaseGet('students', {
+        ...params
+      });
+      return { success: true, students: rows.map(sbStudent), source: 'supabase', hasMore: rows.length === limit, limit, offset };
+    }
+    case 'syncStudents':
+      return await previewSupabaseStudentSync();
+    case 'applySyncResult':
+      return await applySupabaseStudentSync(data);
+    case 'getSyncLog':
+      return { success: true, logs: getSupabaseSyncLogs() };
+    default:
+      return { success: false, fallback: true, error: 'Supabase未対応アクション: ' + data.action };
+  }
+}
+
+function cleanSyncValue(value) {
+  return value === null || value === undefined ? '' : String(value).trim();
+}
+
+function activeFromStudentFlag(value) {
+  if (value === false) return false;
+  const flag = cleanSyncValue(value);
+  return !['退塾', 'inactive', 'false', '0'].includes(flag);
+}
+
+function syncStudentFromGas(s, index) {
+  const active = activeFromStudentFlag(s.flag ?? s.status ?? s.active);
+  return {
+    id: cleanSyncValue(s.id || s.studentId || s.student_code),
+    name: cleanSyncValue(s.name),
+    nameKana: cleanSyncValue(s.kana || s.nameKana || s.name_kana),
+    campus: cleanSyncValue(s.campus),
+    grade: cleanSyncValue(s.grade),
+    school: cleanSyncValue(s.school || s.school_name),
+    flag: active ? '1' : '退塾',
+    active,
+    sourceRow: index + 2
+  };
+}
+
+function syncStudentToSupabaseRow(s) {
+  return {
+    student_code: cleanSyncValue(s.id),
+    name: cleanSyncValue(s.name),
+    name_kana: cleanSyncValue(s.nameKana),
+    campus: cleanSyncValue(s.campus),
+    grade: cleanSyncValue(s.grade),
+    school_name: cleanSyncValue(s.school),
+    active: activeFromStudentFlag(s.flag),
+    source_row: Number(s.sourceRow || 0) || null,
+    source_updated_at: new Date().toISOString()
+  };
+}
+
+function supabaseStudentToSync(row) {
+  return {
+    id: cleanSyncValue(row.student_code),
+    name: cleanSyncValue(row.name),
+    nameKana: cleanSyncValue(row.name_kana),
+    campus: cleanSyncValue(row.campus),
+    grade: cleanSyncValue(row.grade),
+    school: cleanSyncValue(row.school_name),
+    flag: row.active === false ? '退塾' : '1',
+    active: row.active !== false
+  };
+}
+
+function studentSyncChanges(next, current) {
+  const fields = [
+    ['name', '氏名'],
+    ['nameKana', 'かな'],
+    ['campus', '校舎'],
+    ['grade', '学年'],
+    ['school', '学校'],
+    ['flag', '在籍']
+  ];
+  return fields
+    .filter(([key]) => cleanSyncValue(next[key]) !== cleanSyncValue(current[key]))
+    .map(([key, label]) => `${label}: ${cleanSyncValue(current[key]) || '-'}→${cleanSyncValue(next[key]) || '-'}`);
+}
+
+async function previewSupabaseStudentSync() {
+  const gasResult = await legacyApi({ action: 'getStudents' });
+  if (!gasResult.success) return { success: false, error: gasResult.error || 'GAS生徒マスタを取得できませんでした' };
+  const gasStudents = (gasResult.students || [])
+    .map(syncStudentFromGas)
+    .filter(s => s.id && s.name);
+  const supabaseRows = await supabaseGet('students', {
+    select: 'student_code,name,name_kana,campus,grade,school_name,active',
+    order: 'student_code.asc',
+    limit: 1000
+  });
+  const currentByCode = new Map(supabaseRows.map(row => [cleanSyncValue(row.student_code), supabaseStudentToSync(row)]));
+  const nextByCode = new Map(gasStudents.map(s => [s.id, s]));
+  const toAdd = [];
+  const toUpdate = [];
+  const toDeactivate = [];
+  gasStudents.forEach(next => {
+    const current = currentByCode.get(next.id);
+    if (!current) {
+      toAdd.push(next);
+      return;
+    }
+    const changes = studentSyncChanges(next, current);
+    if (changes.length) toUpdate.push({ ...next, changes });
+  });
+  currentByCode.forEach((current, id) => {
+    if (!nextByCode.has(id) && current.active) toDeactivate.push(current);
+  });
+  return {
+    success: true,
+    preview: { toAdd, toUpdate, passChanged: [], toDeactivate },
+    masterCount: gasStudents.length,
+    localCount: supabaseRows.length,
+    source: 'supabase'
+  };
+}
+
+async function applySupabaseStudentSync(data) {
+  const toUpsert = [...(data.toAdd || []), ...(data.toUpdate || [])].map(syncStudentToSupabaseRow);
+  let applied = 0;
+  if (toUpsert.length) {
+    await supabaseWrite('students', { on_conflict: 'student_code' }, {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+      body: toUpsert
+    });
+    applied += toUpsert.length;
+  }
+  const toDeactivate = data.toDeactivate || [];
+  if (toDeactivate.length) {
+    const codes = toDeactivate.map(s => cleanSyncValue(s.id)).filter(Boolean);
+    if (data.deleteDeactivated) {
+      for (const code of codes) {
+        await supabaseWrite('students', { student_code: 'eq.' + code }, { method: 'DELETE' });
+        applied++;
+      }
+    } else {
+      const rows = toDeactivate.map(s => ({
+        student_code: cleanSyncValue(s.id),
+        name: cleanSyncValue(s.name) || '退塾生',
+        name_kana: cleanSyncValue(s.nameKana),
+        campus: cleanSyncValue(s.campus),
+        grade: cleanSyncValue(s.grade),
+        school_name: cleanSyncValue(s.school),
+        active: false,
+        source_updated_at: new Date().toISOString()
+      }));
+      await supabaseWrite('students', { on_conflict: 'student_code' }, {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: rows
+      });
+      applied += rows.length;
+    }
+  }
+  addSupabaseSyncLog(applied, toUpsert.length, toDeactivate.length, !!data.deleteDeactivated);
+  return { success: true, applied };
+}
+
+function getSupabaseSyncLogs() {
+  try { return JSON.parse(localStorage.getItem('seisekiSupabaseSyncLogs') || '[]'); }
+  catch(e) { return []; }
+}
+
+function addSupabaseSyncLog(applied, upserted, deactivated, deleted) {
+  const logs = getSupabaseSyncLogs();
+  logs.unshift({
+    time: new Date().toLocaleString('ja-JP'),
+    type: 'sync',
+    detail: `Supabase生徒マスタ同期: ${applied}件（追加/更新 ${upserted}件、${deleted ? '削除' : '退塾'} ${deactivated}件）`
+  });
+  localStorage.setItem('seisekiSupabaseSyncLogs', JSON.stringify(logs.slice(0, 50)));
+}
+
+function supabaseGradesParam(grades) {
+  const toFullWidthDigit = v => String(v).replace(/[1-6]/g, ch => ({'1':'１','2':'２','3':'３','4':'４','5':'５','6':'６'}[ch]));
+  const values = [...new Set((grades || []).flatMap(v => {
+    const normalized = normalizeGrade(v);
+    return [normalized, toFullWidthDigit(normalized)];
+  }))];
+  return 'in.(' + values.join(',') + ')';
+}
+
+function supabaseGradeParam(grade) {
+  const map = {
+    elementary: ['小1','小2','小3','小4','小5','小6'],
+    junior: ['中1','中2','中3'],
+    high: ['高1','高2','高3'],
+    e13: ['小1','小2','小3'],
+    e46: ['小4','小5','小6'],
+    j1: ['中1'],
+    j2: ['中2'],
+    j3: ['中3'],
+    h13: ['高1','高2','高3']
+  };
+  const toFullWidthDigit = v => String(v).replace(/[1-6]/g, ch => ({'1':'１','2':'２','3':'３','4':'４','5':'５','6':'６'}[ch]));
+  const baseValues = map[grade] || [normalizeGrade(grade)];
+  const values = [...new Set(baseValues.flatMap(v => [v, toFullWidthDigit(v)]))];
+  return 'in.(' + values.join(',') + ')';
+}
+
+function newAdminMutationId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return 'admin-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+}
+
+function getAdminSessionToken() {
+  return getAdminState(ADMIN_SESSION_TOKEN_KEY) || '';
+}
+
+function hasValidAdminSessionToken() {
+  const token = getAdminSessionToken();
+  if (!token) return false;
+  const expiresAt = getAdminState(ADMIN_SESSION_EXPIRES_KEY);
+  return !expiresAt || !Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) > Date.now() + 30000;
+}
+
+async function adminSupabaseApi(data) {
+  const token = getAdminSessionToken();
+  if (!token) {
+    return { success: false, authRequired: true, code: 'AUTH_REQUIRED', error: '管理者セッションがありません。再ログインしてください。' };
+  }
+  const payload = { ...data, token, requestTrace: 'admin-' + crypto.randomUUID() };
+  if (SUPABASE_WRITE_ACTIONS.has(data.action) && !payload.mutationId) {
+    payload.mutationId = newAdminMutationId();
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), data.action==='importMissingEntryGrades'?45000:15000);
+  try {
+    const response = await fetch(SEISEKI_ADMIN_RUNTIME_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+      signal: controller.signal
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.success !== true) {
+      const authRequired = response.status === 401 || response.status === 403 || result.code === 'AUTH_REQUIRED';
+      return {
+        success: false,
+        authRequired,
+        code: result.code || 'SUPABASE_ERROR',
+        error: authRequired ? 'ログインの有効期限が切れました。再ログインしてください。' : (result.error || 'Supabaseから取得できませんでした。')
+      };
+    }
+    return result;
+  } catch (e) {
+    return {
+      success: false,
+      error: e.name === 'AbortError' ? 'Supabaseへの接続がタイムアウトしました。' : e.message
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function api(data) {
+  try {
+    if (SUPABASE_ENABLED_ACTIONS.has(data.action)) {
+      return await adminSupabaseApi(data);
+    }
+    return await legacyApi(data);
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// ===== LOGIN =====
+const ADMIN_DEVICE_KEY = 'adminDeviceMode';
+const ADMIN_IDLE_AT_KEY = 'adminLastActivityAt';
+const ADMIN_IDLE_LIMIT_MS = 30 * 60 * 1000;
+const ADMIN_ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
+let adminDeviceMode = '';
+let adminIdleTimer = null;
+let adminLoginInProgress = false;
+
+function getSavedAdminDevice() {
+  if(localStorage.getItem(ADMIN_SESSION_TOKEN_KEY))return 'personal';
+  if(sessionStorage.getItem(ADMIN_SESSION_TOKEN_KEY))return 'school';
+  return localStorage.getItem(ADMIN_DEVICE_KEY) === 'personal'
+    ? 'personal'
+    : (sessionStorage.getItem(ADMIN_DEVICE_KEY) === 'school' ? 'school' : '');
+}
+function selectAdminDevice(mode) {
+  if (!['personal', 'school'].includes(mode)) return;
+  adminDeviceMode = mode;
+  document.getElementById('devicePersonal')?.classList.toggle('selected', mode === 'personal');
+  document.getElementById('deviceSchool')?.classList.toggle('selected', mode === 'school');
+  document.getElementById('deviceWarning')?.classList.add('hidden');
+  if (mode === 'school') {
+    localStorage.removeItem(ADMIN_DEVICE_KEY);
+    localStorage.removeItem('adminCodeInput');
+    localStorage.removeItem('adminPwInput');
+    localStorage.removeItem('adminEmailInput');
+    localStorage.removeItem('adminLoggedIn');
+    localStorage.removeItem('adminStaffCode');
+    localStorage.removeItem('adminStaffName');
+    sessionStorage.setItem(ADMIN_DEVICE_KEY, 'school');
+    document.getElementById('adminCodeIn').value = '';
+    document.getElementById('adminPwIn').value = '';
+  } else {
+    sessionStorage.removeItem(ADMIN_DEVICE_KEY);
+    localStorage.setItem(ADMIN_DEVICE_KEY, 'personal');
+  }
+}
+function getAdminState(key) {
+  return adminDeviceMode === 'personal' ? localStorage.getItem(key) : sessionStorage.getItem(key);
+}
+function setAdminState(key, value) {
+  const store = adminDeviceMode === 'personal' ? localStorage : sessionStorage;
+  store.setItem(key, value);
+}
+function clearAdminIdleTimer() {
+  if (adminIdleTimer) clearTimeout(adminIdleTimer);
+  adminIdleTimer = null;
+  ADMIN_ACTIVITY_EVENTS.forEach(eventName => document.removeEventListener(eventName, recordAdminActivity));
+}
+function scheduleAdminIdleLogout() {
+  if (adminDeviceMode !== 'school' || getAdminState('adminLoggedIn') !== '1') return;
+  clearAdminIdleTimer();
+  ADMIN_ACTIVITY_EVENTS.forEach(eventName => document.addEventListener(eventName, recordAdminActivity, { passive:true }));
+  const lastActivity = Number(sessionStorage.getItem(ADMIN_IDLE_AT_KEY)) || Date.now();
+  const remaining = Math.max(0, ADMIN_IDLE_LIMIT_MS - (Date.now() - lastActivity));
+  adminIdleTimer = setTimeout(() => logout({ automatic:true }), remaining);
+}
+function recordAdminActivity() {
+  if (adminDeviceMode !== 'school' || getAdminState('adminLoggedIn') !== '1') return;
+  sessionStorage.setItem(ADMIN_IDLE_AT_KEY, String(Date.now()));
+  if (adminIdleTimer) clearTimeout(adminIdleTimer);
+  adminIdleTimer = setTimeout(() => logout({ automatic:true }), ADMIN_IDLE_LIMIT_MS);
+}
+
+function toggleSidebar(){
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sideOverlay');
+  const isOpen = sb.classList.contains('open');
+  if(isOpen){ closeSidebar(); } else {
+    sb.classList.add('open');
+    ov.classList.add('show');
+    document.getElementById('sideToggleBtn').textContent = '✕';
+  }
+}
+function closeSidebar(){
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sideOverlay');
+  sb.classList.remove('open');
+  ov.classList.remove('show');
+  document.getElementById('sideToggleBtn').textContent = '☰';
+}
+
+async function doAdminLogin() {
+  if (adminLoginInProgress) return;
+  const code = document.getElementById('adminCodeIn').value.trim();
+  const pw = document.getElementById('adminPwIn').value;
+  const errEl = document.getElementById('loginErr');
+  adminDeviceMode = adminDeviceMode || getSavedAdminDevice();
+  if (!adminDeviceMode) {
+    document.getElementById('deviceWarning').classList.remove('hidden');
+    return;
+  }
+  if (!code || !pw) {
+    errEl.textContent = '講師コードとパスワードを入力してください';
+    return;
+  }
+  adminLoginInProgress = true;
+  let staff;
+  try {
+    staff = await StepStaffAuth.login(code, pw);
+  } catch (error) {
+    errEl.textContent = error.message || 'ログインできませんでした';
+    adminLoginInProgress = false;
+    return;
+  }
+  if (!staff.success) {
+    errEl.textContent = staff.error || 'ログインできませんでした';
+    adminLoginInProgress = false;
+    return;
+  }
+  const gradeToken = staff.gradeSessionToken || staff.systemPortalSessionToken;
+  if (!gradeToken || !['1','2','3','4'].includes(String(staff.permissionLevel))) {
+    errEl.textContent = '成績管理にはスタッフ権限（権限1〜4）が必要です。';
+    adminLoginInProgress = false;
+    return;
+  }
+  setAdminState('adminLoggedIn', '1');
+  setAdminState('adminStaffCode', staff.code || code);
+  setAdminState('adminStaffName', staff.name || '');
+  setAdminState(ADMIN_SESSION_TOKEN_KEY, gradeToken);
+  setAdminState(ADMIN_SESSION_EXPIRES_KEY, staff.gradeExpiresAt || staff.systemPortalExpiresAt || '');
+  if (adminDeviceMode === 'personal') {
+    try {
+      await StepStaffAuth.persist(gradeToken);
+      setAdminState(ADMIN_SESSION_EXPIRES_KEY, '2100-01-01T00:00:00.000Z');
+    } catch (error) {
+      if(error.authRequired){await logout();errEl.textContent=error.message;adminLoginInProgress=false;return;}
+      // A network failure does not invalidate the authenticated session.
+      console.warn('端末のログイン保持を再確認してください。');
+    }
+    rememberAdminLogin(code, pw, '');
+  } else {
+    sessionStorage.setItem(ADMIN_IDLE_AT_KEY, String(Date.now()));
+  }
+
+  errEl.textContent = '';
+  adminLoginInProgress = false;
+  showMain();
+}
+function rememberAdminLogin(code, password, email) {
+  localStorage.setItem('adminCodeInput', code || '');
+  localStorage.removeItem('adminPwInput');
+  if (email) localStorage.setItem('adminEmailInput', email);
+}
+function restoreAdminLoginInputs() {
+  const codeEl = document.getElementById('adminCodeIn');
+  const pwEl = document.getElementById('adminPwIn');
+  const emailEl = document.getElementById('adminEmailIn');
+  if (codeEl) codeEl.value = adminDeviceMode === 'personal' ? (localStorage.getItem('adminCodeInput') || '') : '';
+  if (pwEl) pwEl.value = adminDeviceMode === 'personal' ? (localStorage.getItem('adminPwInput') || '') : '';
+  if (emailEl) emailEl.value = localStorage.getItem('adminEmailInput') || DEFAULT_SUPABASE_AUTH_EMAIL;
+}
+function updateAdminLabel() {
+  const label = document.getElementById('adminLabel');
+  if (!label) return;
+  const name = getAdminState('adminStaffName') || '';
+  const code = getAdminState('adminStaffCode') || '';
+  label.textContent = name ? `${name}（${code}）` : '管理者';
+  label.style.fontSize = '.78rem';
+}
+
+let adminReconcileInProgress = false;
+function reconcileAdminDataInBackground() {
+  const cutoverKey = 'seisekiSupabaseCutoverReconciledV2';
+  if (adminReconcileInProgress || localStorage.getItem(cutoverKey) === '1' || !hasValidAdminSessionToken()) return;
+  adminReconcileInProgress = true;
+  setTimeout(async () => {
+    try {
+      const reconciled = await adminSupabaseApi({ action: 'reconcileLegacy' });
+      if (!reconciled.success) {
+        console.warn('在籍区分の再照合を完了できませんでした', reconciled.error);
+        return;
+      }
+      localStorage.setItem(cutoverKey, '1');
+      enrollmentIndexReady = false;
+      clearSensitiveCache();
+      if (getAdminState('adminLoggedIn') === '1') {
+        reloadData();
+        toast('在籍区分を最新状態に更新しました');
+      }
+    } finally {
+      adminReconcileInProgress = false;
+    }
+  }, 0);
+}
+
+function showMain() {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('mainHeader').style.display = 'flex';
+  document.getElementById('mainLayout').style.display = 'flex';
+  updateAdminLabel();
+  initYearSelects();
+  initGradeSelects();
+  const initialTab = getInitialAdminTab();
+  _navHist.length = 0;
+  _navHist.push(initialTab);
+  _navIdx = 0;
+  _updateNavBtns();
+  const el = [...document.querySelectorAll('.sideItem')].find(e => e.getAttribute('onclick')?.includes("'" + initialTab + "'"));
+  if (el) {
+    _navSkip = true;
+    if (initialTab === 'compare' && /^\d{1,10}$/.test(new URLSearchParams(location.search).get('studentId') || '')) {
+      goToCompare(new URLSearchParams(location.search).get('studentId'));
+    } else aNav(initialTab, el);
+    _navSkip = false;
+  } else {
+    loadSpeed();
+  }
+  scheduleAdminIdleLogout();
+  reconcileAdminDataInBackground();
+}
+async function logout(options = {}) {
+  clearAdminIdleTimer();
+  const token = getAdminSessionToken();
+  if (token) {
+    try {
+      await Promise.race([
+        adminSupabaseApi({ action: 'logoutAdmin' }),
+        new Promise(resolve => setTimeout(resolve, 3000))
+      ]);
+    } catch(e) { /* local logout must always continue */ }
+  }
+  sessionStorage.removeItem('seisekiSupabaseSession');
+  clearSensitiveCache();
+  sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+  sessionStorage.removeItem(ADMIN_SESSION_EXPIRES_KEY);
+  localStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+  localStorage.removeItem(ADMIN_SESSION_EXPIRES_KEY);
+  sessionStorage.removeItem('adminLoggedIn');
+  sessionStorage.removeItem('adminStaffCode');
+  sessionStorage.removeItem('adminStaffName');
+  sessionStorage.removeItem(ADMIN_DEVICE_KEY);
+  sessionStorage.removeItem(ADMIN_IDLE_AT_KEY);
+  localStorage.removeItem('adminLoggedIn');
+  localStorage.removeItem('adminStaffCode');
+  localStorage.removeItem('adminStaffName');
+  localStorage.removeItem(ADMIN_DEVICE_KEY);
+  localStorage.removeItem('adminCodeInput');
+  localStorage.removeItem('adminPwInput');
+  localStorage.removeItem('adminEmailInput');
+  localStorage.removeItem('stepStudentDirectorySearchIndexV1');
+  adminDeviceMode = '';
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('mainHeader').style.display = 'none';
+  document.getElementById('mainLayout').style.display = 'none';
+  document.getElementById('adminLabel').textContent = '管理者';
+  document.getElementById('devicePersonal')?.classList.remove('selected');
+  document.getElementById('deviceSchool')?.classList.remove('selected');
+  restoreAdminLoginInputs();
+  if (options.automatic) {
+    document.getElementById('loginErr').textContent = '30分間操作がなかったため、自動でログアウトしました。';
+  }
+}
+// Restore the same saved staff session used by the directory and memo pages.
+// Every data request still validates its token and permissions on the server.
+(async function() {
+  adminDeviceMode=getSavedAdminDevice();
+  if(adminDeviceMode)selectAdminDevice(adminDeviceMode);
+  restoreAdminLoginInputs();
+  const savedToken=getAdminSessionToken();
+  if(savedToken){
+    if(adminDeviceMode==='school'){
+      const lastActivity=Number(sessionStorage.getItem(ADMIN_IDLE_AT_KEY))||Number(sessionStorage.getItem('meetingMemoLastActivityAt'))||0;
+      if(lastActivity&&Date.now()-lastActivity>=ADMIN_IDLE_LIMIT_MS){
+        await logout({automatic:true});return;
+      }
+    }
+    setAdminState('adminLoggedIn','1');
+    // The server, rather than an old local expiry value, determines validity.
+    showMain();
+    StepStaffAuth.verify(savedToken).then(()=>{
+      if(savedToken!==getAdminSessionToken())return;
+      if(adminDeviceMode==='personal'){
+        StepStaffAuth.persist(savedToken).then(()=>{
+          if(savedToken===getAdminSessionToken())setAdminState(ADMIN_SESSION_EXPIRES_KEY,'2100-01-01T00:00:00.000Z');
+        }).catch(()=>{});
+      }
+    }).catch(async error=>{
+      if(savedToken!==getAdminSessionToken()||!error.authRequired)return;
+      await logout();
+      document.getElementById('loginErr').textContent=error.message;
+    });
+    return;
+  }
+})();
+
+// ===== NAV =====
+function getInitialAdminTab() {
+  const tab = (location.hash || '').replace(/^#/, '');
+  return TABS.includes(tab) ? tab : 'speed';
+}
+
+function navToSpeed() {
+  const speedBtn = [...document.querySelectorAll('.sideItem')].find(el => el.getAttribute('onclick')?.includes("'speed'"));
+  if (speedBtn) aNav('speed', speedBtn);
+}
+
+function reloadData() {
+  clearSensitiveCache();
+  const visibleTab = TABS.find(t => {
+    const el = document.getElementById('aTab_' + t);
+    return el && el.style.display !== 'none';
+  }) || 'speed';
+  if (visibleTab === 'speed') loadSpeed();
+  else if (visibleTab === 'compare') {
+    const sid = document.getElementById('cmpStudent').value;
+    if (sid) loadCompare(sid); else initCompare();
+  }
+  else if (visibleTab === 'students') loadStudents();
+  else if (visibleTab === 'meetings') initMeetings();
+  else if (visibleTab === 'schools') loadSchools();
+  else if (visibleTab === 'scores') initAdminScoresTab();
+  else if (visibleTab === 'report') initAdminReportTab();
+  else if (visibleTab === 'wish') { _allWishes = []; loadAllWishes(); }
+  else if (visibleTab === 'sync') loadSyncLog();
+  else loadSpeed();
+}
+
+function _updateNavBtns() {
+  const back = document.getElementById('navBackBtn');
+  const fwd  = document.getElementById('navFwdBtn');
+  if (back) {
+    back.disabled = _navIdx <= 0;
+    back.style.color  = _navIdx <= 0  ? '#c8d0da' : '#1a56a0';
+    back.style.background = _navIdx <= 0 ? '#f8fafc' : '#e8f0fb';
+  }
+  if (fwd) {
+    fwd.disabled = _navIdx >= _navHist.length - 1;
+    fwd.style.color  = _navIdx >= _navHist.length - 1 ? '#c8d0da' : '#1a56a0';
+    fwd.style.background = _navIdx >= _navHist.length - 1 ? '#f8fafc' : '#e8f0fb';
+  }
+}
+
+function navBack() {
+  if (_navIdx <= 0) return;
+  _navIdx--;
+  _navSkip = true;
+  const name = _navHist[_navIdx];
+  const el = [...document.querySelectorAll('.sideItem')].find(e => e.getAttribute('onclick')?.includes("'"+name+"'"));
+  if (el) aNav(name, el);
+  _navSkip = false;
+  _updateNavBtns();
+}
+
+function navForward() {
+  if (_navIdx >= _navHist.length - 1) return;
+  _navIdx++;
+  _navSkip = true;
+  const name = _navHist[_navIdx];
+  const el = [...document.querySelectorAll('.sideItem')].find(e => e.getAttribute('onclick')?.includes("'"+name+"'"));
+  if (el) aNav(name, el);
+  _navSkip = false;
+  _updateNavBtns();
+}
+
+function aNav(name, el) {
+  TABS.forEach(t => {
+    const tab = document.getElementById('aTab_' + t);
+    if (tab) tab.style.display = 'none';
+  });
+  document.getElementById('aTab_' + name).style.display = 'block';
+  document.querySelectorAll('.sideItem').forEach(s => s.classList.remove('on'));
+  el.classList.add('on');
+  if (location.hash !== '#' + name || (name !== 'compare' && new URLSearchParams(location.search).has('studentId'))) {
+    const url = new URL(location.href);
+    if (name !== 'compare') url.searchParams.delete('studentId');
+    url.hash = name;
+    history.replaceState(null, '', url);
+  }
+  if (window.innerWidth <= 760) closeSidebar();
+  if (name === 'speed') loadSpeed();
+  if (name === 'students') loadStudents();
+  if (name === 'meetings') initMeetings();
+  if (name === 'schools') loadSchools();
+  if (name === 'scores') initAdminScoresTab();
+  if (name === 'report') initAdminReportTab();
+  if (name === 'compare') initCompare();
+  if (name === 'wish') loadAllWishes();
+  if (name === 'entry') initEntryTab();
+  if (name === 'settings') loadStaffMembers();
+  // 履歴に追加
+  if (!_navSkip) {
+    _navHist.splice(_navIdx + 1);
+    if (_navHist[_navHist.length - 1] !== name) {
+      _navHist.push(name);
+      _navIdx = _navHist.length - 1;
+    }
+    _updateNavBtns();
+  }
+}
+
+// ===== ENTRY SHEET IMPORT =====
+function initEntryTab() {
+  const msg = document.getElementById('entryImportMsg');
+  if (msg && !msg.textContent) msg.textContent = 'OCR結果を貼り付けるか、各欄へ入力して取り込みます。';
+}
+
+function entryVal(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+
+function setEntryVal(id, value) {
+  const el = document.getElementById(id);
+  if (el && value != null) el.value = value;
+}
+
+// ===== 家族情報UI =====
+let _familyRowCount = 0;
+function addFamilyRow(data) {
+  const idx = _familyRowCount++;
+  const container = document.getElementById('entryFamilyRows');
+  const div = document.createElement('div');
+  div.id = 'familyRow_' + idx;
+  div.style.cssText = 'border:1px solid #bae6fd;border-radius:10px;padding:10px 12px;background:#f0f9ff;display:grid;gap:6px';
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+      <span style="font-size:.8rem;font-weight:700;color:#475569">家族 ${container.children.length + 1}人目</span>
+      <button type="button" onclick="removeFamilyRow('familyRow_${idx}')" style="background:none;border:none;color:#f87171;font-size:.85rem;cursor:pointer;padding:0">✕ 削除</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+      <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">氏名</label><input class="frow-name" value="${htmlEsc(data&&data.name||'')}" placeholder="例: 山田花子" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;box-sizing:border-box;font-size:.84rem"></div>
+      <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">続柄</label><input class="frow-relation" value="${htmlEsc(data&&data.relation||'')}" placeholder="例: 母・父・兄" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;box-sizing:border-box;font-size:.84rem"></div>
+      <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">職業</label><input class="frow-job" value="${htmlEsc(data&&data.job||'')}" placeholder="例: 会社員" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;box-sizing:border-box;font-size:.84rem"></div>
+      <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">勤務先・学校名</label><input class="frow-workplace" value="${htmlEsc(data&&data.workplace||'')}" placeholder="例: ○○株式会社" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;box-sizing:border-box;font-size:.84rem"></div>
+      <div><label style="font-size:.75rem;color:#64748b;display:block;margin-bottom:2px">学年（生徒の場合）</label><input class="frow-grade" value="${htmlEsc(data&&data.grade||'')}" placeholder="例: 中1・小5" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;box-sizing:border-box;font-size:.84rem"></div>
+    </div>
+  `;
+  container.appendChild(div);
+  syncFamilyJson();
+  div.querySelectorAll('input').forEach(el => el.addEventListener('input', syncFamilyJson));
+}
+
+function removeFamilyRow(id){
+  const el = document.getElementById(id);
+  if (el) { el.remove(); syncFamilyJson(); renumberFamilyRows(); }
+}
+
+function renumberFamilyRows(){
+  document.querySelectorAll('#entryFamilyRows > div').forEach((div, i) => {
+    const label = div.querySelector('span');
+    if (label) label.textContent = '家族 ' + (i+1) + '人目';
+  });
+}
+
+function syncFamilyJson(){
+  const rows = document.querySelectorAll('#entryFamilyRows > div');
+  const family = [];
+  rows.forEach(div => {
+    const name     = (div.querySelector('.frow-name')?.value||'').trim();
+    const relation = (div.querySelector('.frow-relation')?.value||'').trim();
+    const job      = (div.querySelector('.frow-job')?.value||'').trim();
+    const workplace= (div.querySelector('.frow-workplace')?.value||'').trim();
+    const grade    = (div.querySelector('.frow-grade')?.value||'').trim();
+    family.push({name,relation,job,workplace,grade});
+  });
+  const json = document.getElementById('entryFamilyJson');
+  if (json) json.value = JSON.stringify(family);
+}
+
+function updateImageLinks(){
+  ['1','2'].forEach(n => {
+    const url = (document.getElementById('entryImageUrl'+n)?.value||'').trim();
+    const link = document.getElementById('entryImageUrl'+n+'Link');
+    if (!link) return;
+    if (url) { link.href = url; link.style.display = ''; }
+    else { link.style.display = 'none'; }
+  });
+}
+// URL入力欄変更時にリンク更新
+['entryImageUrl1','entryImageUrl2'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', updateImageLinks);
+});
+
+function setFamilyRows(arr){
+  const container = document.getElementById('entryFamilyRows');
+  if (!container) return;
+  container.innerHTML = '';
+  _familyRowCount = 0;
+  (arr||[]).forEach(item => addFamilyRow(item));
+}
+
+function parseEntryJson() {
+  const raw = entryVal('entryJson');
+  if (!raw) return {};
+  try { return JSON.parse(raw); }
+  catch(e) { throw new Error('JSONの形式を確認してください: ' + e.message); }
+}
+
+function fillEntryFromJson() {
+  try {
+    const d = parseEntryJson();
+    if (Array.isArray(d)) {
+      setFamilyRows(d);
+      document.getElementById('entryImportMsg').textContent = '家族情報をフォームへ反映しました。内容を確認して取り込んでください。';
+      return;
+    }
+    const map = {
+      studentId:'entryStudentId', name:'entryName',
+      guardian1Name:'entryG1Name', guardian1Kana:'entryG1Kana', guardian1Relation:'entryG1Relation',
+      guardian1Mobile:'entryG1Mobile', guardian1Email:'entryG1Email',
+      postalCode:'entryPostalCode', prefecture:'entryPrefecture', city:'entryCity', addressLine:'entryAddressLine',
+      guardian2Name:'entryG2Name', guardian2Kana:'entryG2Kana', guardian2Relation:'entryG2Relation',
+      guardian2Mobile:'entryG2Mobile', guardian2Email:'entryG2Email', homePhone:'entryHomePhone',
+      club:'entryClub', nickname:'entryNickname', commuteMethod:'entryCommute',
+      signatureDate:'entrySignatureDate', signatureName:'entrySignatureName',
+      imageUrl1:'entryImageUrl1', imageUrl2:'entryImageUrl2',
+      currentLessons:'entryCurrentLessons', pastLessons:'entryPastLessons', familyRequest:'entryFamilyRequest'
+    };
+    Object.keys(map).forEach(k => setEntryVal(map[k], d[k]));
+    if (d.family) setFamilyRows(d.family);
+    else if (Array.isArray(d)) { setFamilyRows(d); return; }
+    document.getElementById('entryImportMsg').textContent = 'JSONをフォームへ反映しました。内容を確認して取り込んでください。';
+  } catch(e) {
+    document.getElementById('entryImportMsg').textContent = e.message;
+  }
+}
+
+function buildEntryPayload() {
+  let extra = {};
+  try { extra = parseEntryJson(); } catch(e) { throw e; }
+  let family = [];
+  const familyRaw = entryVal('entryFamilyJson');
+  if (familyRaw) {
+    try { family = JSON.parse(familyRaw); }
+    catch(e) { throw new Error('家族情報JSONの形式を確認してください: ' + e.message); }
+  } else if (Array.isArray(extra)) {
+    family = extra;
+    extra = {};
+  } else if (Array.isArray(extra.family)) {
+    family = extra.family;
+  }
+  const pick = (id, key) => entryVal(id) || extra[key] || '';
+  return Object.assign({}, extra, {
+    action: 'importEntrySheet',
+    studentId: entryVal('entryStudentId') || extra.studentId,
+    name: entryVal('entryName') || extra.name,
+    guardian1Name: pick('entryG1Name', 'guardian1Name'),
+    guardian1Kana: pick('entryG1Kana', 'guardian1Kana'),
+    guardian1Relation: pick('entryG1Relation', 'guardian1Relation'),
+    guardian1Mobile: pick('entryG1Mobile', 'guardian1Mobile'),
+    guardian1Email: pick('entryG1Email', 'guardian1Email'),
+    postalCode: pick('entryPostalCode', 'postalCode'),
+    prefecture: pick('entryPrefecture', 'prefecture'),
+    city: pick('entryCity', 'city'),
+    addressLine: pick('entryAddressLine', 'addressLine'),
+    guardian2Name: pick('entryG2Name', 'guardian2Name'),
+    guardian2Kana: pick('entryG2Kana', 'guardian2Kana'),
+    guardian2Relation: pick('entryG2Relation', 'guardian2Relation'),
+    guardian2Mobile: pick('entryG2Mobile', 'guardian2Mobile'),
+    guardian2Email: pick('entryG2Email', 'guardian2Email'),
+    homePhone: pick('entryHomePhone', 'homePhone'),
+    club: pick('entryClub', 'club'),
+    nickname: pick('entryNickname', 'nickname'),
+    commuteMethod: pick('entryCommute', 'commuteMethod'),
+    signatureDate: pick('entrySignatureDate', 'signatureDate'),
+    signatureName: pick('entrySignatureName', 'signatureName'),
+    imageUrl1: pick('entryImageUrl1', 'imageUrl1'),
+    imageUrl2: pick('entryImageUrl2', 'imageUrl2'),
+    currentLessons: pick('entryCurrentLessons', 'currentLessons'),
+    pastLessons: pick('entryPastLessons', 'pastLessons'),
+    familyRequest: pick('entryFamilyRequest', 'familyRequest'),
+    family
+  });
+}
+
+async function loadEntryData() {
+  const sid = entryVal('entryStudentId');
+  const msg = document.getElementById('entryImportMsg');
+  if (!sid) { msg.textContent = '生徒IDを入力してください。'; return; }
+  msg.textContent = '確認中...';
+  const r = await api({ action: 'getEntrySheetData', studentId: sid });
+  if (!r.success) { msg.textContent = r.error || '取得できませんでした'; return; }
+  if (!r.data) { msg.textContent = '入塾時情報はまだ保存されていません。'; return; }
+  setEntryVal('entryName', r.data.name);
+  setEntryVal('entryClub', r.data.club);
+  setEntryVal('entryNickname', r.data.nickname);
+  setEntryVal('entryCommute', r.data.commuteMethod);
+  setEntryVal('entryCurrentLessons', r.data.currentLessons);
+  setEntryVal('entryPastLessons', r.data.pastLessons);
+  setEntryVal('entryFamilyRequest', r.data.familyRequest);
+  // 入塾日：生徒マスタから取得して表示
+  const joinRaw = r.data.masterInfo?.colC || '';
+  if (joinRaw) {
+    const jd = new Date(joinRaw);
+    let joinLabel = '';
+    if (!isNaN(jd)) {
+      const y = jd.getFullYear(), m = jd.getMonth()+1, d = jd.getDate();
+      const now = new Date();
+      const months = (now.getFullYear()-y)*12 + (now.getMonth()-jd.getMonth());
+      const yrs = Math.floor(months/12), mos = months%12;
+      const tenure = yrs > 0 ? yrs+'年'+mos+'ヶ月通塾' : mos+'ヶ月通塾';
+      joinLabel = `入塾日：${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}（${tenure}）`;
+    } else {
+      joinLabel = '入塾日：' + joinRaw;
+    }
+    const wrap = document.getElementById('entryJoinDateWrap');
+    const label = document.getElementById('entryJoinDateLabel');
+    if (wrap && label) { label.textContent = joinLabel; wrap.style.display = ''; }
+  }
+  // 保護者署名日：「保護者署名日：YYYY-M-D」形式でinput欄に表示
+  const rawDate = r.data.signatureDate || '';
+  const parsedDate = rawDate ? new Date(rawDate) : null;
+  if (parsedDate && !isNaN(parsedDate)) {
+    const y = parsedDate.getFullYear(), m = parsedDate.getMonth()+1, d = parsedDate.getDate();
+    setEntryVal('entrySignatureDate', `保護者署名日：${y}-${m}-${d}`);
+  } else if (rawDate) {
+    setEntryVal('entrySignatureDate', rawDate);
+  }
+  setEntryVal('entrySignatureName', r.data.signatureName);
+  // 画像URLをリンクボタンに反映
+  setEntryVal('entryImageUrl1', r.data.imageUrl1);
+  setEntryVal('entryImageUrl2', r.data.imageUrl2);
+  updateImageLinks();
+  setFamilyRows(r.data.family || []);
+  msg.textContent = '保存済みの入塾時情報を読み込みました。';
+}
+
+async function saveEntryImport() {
+  const msg = document.getElementById('entryImportMsg');
+  const msgR = document.getElementById('entryImportMsgRight');
+  const setMsg = t => { if(msg) msg.textContent = t; if(msgR) msgR.textContent = t; };
+  try {
+    const payload = buildEntryPayload();
+    if (!payload.studentId || !payload.name) throw new Error('生徒IDと氏名を入力してください。');
+    if (!confirm('生徒ID: ' + payload.studentId + '\n氏名: ' + payload.name + '\n\nこの生徒として取り込みます。\n間違いがあれば「キャンセル」を押して、画面の欄を修正してください。')) return;
+    setMsg('取り込み中...');
+    const r = await api(payload);
+    if(r.success){const grades=await api({action:'importMissingEntryGrades',studentId:String(payload.studentId)});if(!grades.success)r.warning=(r.warning?r.warning+' ':'')+'書類は保存済みです。成績の補完は生徒情報検索で再取得してください。';else r.message+='／既存成績を保持し、テスト'+grades.addedScores+'件・通知表'+grades.addedReports+'件を追加'+(grades.warnings?.length?'（'+grades.warnings.join(' ')+'）':'');}
+    setMsg(r.success ? (r.message + '（' + (r.saved || []).join(', ') + '）' + (r.warning ? ' ' + r.warning : '')) : (r.error || '取り込みに失敗しました'));
+  } catch(e) {
+    setMsg(e.message);
+  }
+}
+
+// ===== YEAR SELECTS =====
+function initYearSelects() {
+  ['spYear','rpAYear'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = '';
+    for (let y = NOW_YEAR; y >= NOW_YEAR - 3; y--) {
+      el.innerHTML += `<option value="${y}">${y}年度</option>`;
+    }
+  });
+  // 成績×通知表：全期間をデフォルトに
+  const cmpYearEl = document.getElementById('cmpYear');
+  if (cmpYearEl) {
+    cmpYearEl.innerHTML = '<option value="">全期間</option>';
+    for (let y = NOW_YEAR; y >= NOW_YEAR - 3; y--) {
+      cmpYearEl.innerHTML += `<option value="${y}">${y}年度</option>`;
+    }
+    cmpYearEl.value = '';
+  }
+}
+
+// ===== 速報 =====
+async function loadSpeed() {
+  const year = document.getElementById('spYear').value;
+  const term = document.getElementById('spTerm').value;
+  const campus = document.getElementById('spCampus').value;
+  const grade = document.getElementById('spGrade').value;
+
+  const scoreCacheKey = [year, term, campus].join('|');
+  if (!_cache.allScores || _cache.allScores.key !== scoreCacheKey) {
+    const r = await api({ action: 'getAllScores', year, term, campus });
+    if (r.success !== true || !Array.isArray(r.scores)) {
+      document.getElementById('speedCount').textContent = '取得失敗';
+      document.getElementById('speedBody').innerHTML = '<tr><td colspan="17" class="noData">' + htmlEsc(r.error || '成績を取得できませんでした。') + '</td></tr>';
+      return;
+    }
+    _cache.allScores = { key: scoreCacheKey, rows: r.scores };
+  }
+  window._allScoresFull = _cache.allScores.rows;
+
+  // 校舎・年度・回次はAPI側で絞り込み、学年グループだけ画面側で絞り込む
+  allScores = _cache.allScores.rows.filter(s => {
+    if (grade  && !gradeMatchesGroup(s.grade, grade)) return false;
+    return true;
+  });
+  const badge = document.getElementById('speedCount');
+  badge.textContent = allScores.length + '名';
+
+  // 統計
+  const totals = allScores.map(s => Number(s.total5)).filter(v => v > 0);
+  const avg = totals.length ? Math.round(totals.reduce((a,b) => a+b, 0) / totals.length) : '-';
+  const max = totals.length ? Math.max(...totals) : '-';
+  const min = totals.length ? Math.min(...totals) : '-';
+  document.getElementById('speedStats').innerHTML = `
+    <div class="statCard"><div class="sLabel">人数</div><div class="sVal">${allScores.length}</div><div class="sUnit">名</div></div>
+    <div class="statCard"><div class="sLabel">平均</div><div class="sVal">${avg}</div><div class="sUnit">点</div></div>
+    <div class="statCard"><div class="sLabel">最高</div><div class="sVal">${max}</div><div class="sUnit">点</div></div>
+    <div class="statCard"><div class="sLabel">最低</div><div class="sVal">${min}</div><div class="sUnit">点</div></div>
+  `;
+
+  // テスト回次セレクト
+  if (!document.getElementById('spTerm').options.length || !term) {
+    const terms = [...new Set(allScores.map(s => s.term))].sort((a,b)=>a-b);
+    const termSel = document.getElementById('spTerm');
+    termSel.innerHTML = '<option value="">全回次</option>' + terms.map(t => `<option value="${t}">第${t}回</option>`).join('');
+  }
+
+  // グラフ（分布）
+  redrawSpeedChart();
+
+  // テーブル（登録日時の新しい順）
+  const tbody = document.getElementById('speedBody');
+  if (!allScores.length) { tbody.innerHTML = '<tr><td colspan="16" class="noData">データなし</td></tr>'; return; }
+  const sortedScores = [...allScores].sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  tbody.innerHTML = sortedScores.map(s => {
+    const termLabel = s.year && s.term ? String(s.year).slice(2) + '年度' + '第' + s.term + '回' : '-';
+    const sc5k = ['jpn','soc','math','sci','eng'];
+    const sc9k = [...sc5k,'mus','art','pe','tech'];
+    const calc5 = sc5k.every(k=>s[k]!==''&&s[k]!=null) ? sc5k.reduce((a,k)=>a+Number(s[k]),0) : '';
+    const calc9 = sc9k.every(k=>s[k]!==''&&s[k]!=null) ? sc9k.reduce((a,k)=>a+Number(s[k]),0) : '';
+    const t5 = (s.total5!==''&&s.total5!=null) ? s.total5 : calc5;
+    const t9 = (s.total9!==''&&s.total9!=null) ? s.total9 : calc9;
+    return `<tr>
+      <td style="text-align:left;font-weight:600;cursor:pointer;color:var(--primary)" onclick="goToCompare('${s.studentId}')" title="成績を見る">${s.name}</td>
+      <td style="font-size:.78rem;color:#64748b;white-space:nowrap">${termLabel}</td>
+      <td>${s.grade}</td><td>${s.campus}</td>
+      <td>${s.jpn||'-'}</td><td>${s.soc||'-'}</td><td>${s.math||'-'}</td>
+      <td>${s.sci||'-'}</td><td>${s.eng||'-'}</td>
+      <td style="font-weight:700;color:var(--primary)">${t5!==''?t5:'-'}</td>
+      <td>${s.rank5||'-'}</td>
+      <td>${s.mus||'-'}</td><td>${s.art||'-'}</td><td>${s.pe||'-'}</td><td>${s.tech||'-'}</td>
+      <td style="font-weight:700;color:var(--primary)">${t9!==''?t9:'-'}</td><td>${s.rank9||'-'}</td>
+    </tr>`;
+  }).join('');
+  // studentsが未ロードなら非同期で取得（成績×通知表で名前が出るように）
+  if (!students || students.length === 0) {
+    api({ action: 'getStudents' }).then(r => {
+      if (r.success === true && Array.isArray(r.students)) students = r.students;
+    });
+  }
+  // 新着バッジ確認
+  try {
+    const [rr, rw] = await Promise.all([
+      api({ action:'getAllReports', year, campus }),
+      api({ action:'getAllWishes', campus })
+    ]);
+    checkSpeedNewBadges(_cache.allScores.rows || [], rr.data || [], rw.wishes || []);
+  } catch(e) { /* 無視 */ }
+}
+
+let _speedTab = 'score';
+function switchSpeedTab(tab) {
+  _speedTab = tab;
+  document.getElementById('speedPanelScore').style.display  = tab === 'score'  ? '' : 'none';
+  document.getElementById('speedPanelReport').style.display = tab === 'report' ? '' : 'none';
+  document.getElementById('speedPanelResult').style.display = tab === 'result' ? '' : 'none';
+  document.getElementById('speedTabScore').className  = 'btn btn-sm ' + (tab === 'score'  ? 'btn-primary' : 'btn-outline');
+  document.getElementById('speedTabReport').className = 'btn btn-sm ' + (tab === 'report' ? 'btn-primary' : 'btn-outline');
+  document.getElementById('speedTabResult').className = 'btn btn-sm ' + (tab === 'result' ? 'btn-primary' : 'btn-outline');
+  // 新着ドットを消す（見たのでクリア）
+  const dotId = { score:'newDotScore', report:'newDotReport', result:'newDotResult' }[tab];
+  if (dotId) { document.getElementById(dotId).style.display = 'none'; }
+  // 最終確認時刻を記録
+  localStorage.setItem('speedSeen_' + tab, Date.now());
+  if (tab === 'report') renderSpeedReport();
+  if (tab === 'result') renderSpeedResult();
+}
+
+// 新着チェック: 各タブのデータ最新createdAtと最終確認時刻を比較
+function checkSpeedNewBadges(allScoresData, allReportsData, allWishesData) {
+  const tabs = [
+    { key: 'score',  dot: 'newDotScore',  data: allScoresData },
+    { key: 'report', dot: 'newDotReport', data: allReportsData },
+    { key: 'result', dot: 'newDotResult', data: allWishesData },
+  ];
+  tabs.forEach(t => {
+    if (!t.data || !t.data.length) return;
+    const lastSeen = Number(localStorage.getItem('speedSeen_' + t.key) || 0);
+    // createdAtが文字列の場合はDateに変換
+    const latestMs = t.data.reduce((mx, d) => {
+      const ts = d.createdAt ? new Date(d.createdAt).getTime() : 0;
+      return ts > mx ? ts : mx;
+    }, 0);
+    const dot = document.getElementById(t.dot);
+    if (dot) dot.style.display = (latestMs > lastSeen && latestMs > 0) ? '' : 'none';
+  });
+}
+
+async function renderSpeedResult() {
+  const tbody = document.getElementById('speedResultBody');
+  tbody.innerHTML = '<tr><td colspan="26" class="noData">読み込み中...</td></tr>';
+  const campus = document.getElementById('spCampus').value;
+  const grade  = document.getElementById('spGrade').value;
+  try {
+    const r = await api({ action: 'getAllWishes' });
+    let wishes = r.wishes || [];
+    if (campus) wishes = wishes.filter(w => w.campus === campus);
+    if (grade)  wishes = wishes.filter(w => gradeMatchesGroup(w.grade, grade));
+    wishes = wishes.filter(w => w.pub1name || w.pub2name || w.pub3name || w.pri1name || w.pri2name || w.pri3name);
+    wishes = [...wishes].sort((a,b) => String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')));
+    if (!wishes.length) {
+      tbody.innerHTML = '<tr><td colspan="26" class="noData">志望校登録データなし</td></tr>';
+      return;
+    }
+    const res = w => w.results || {};
+    const tdName = (v, bg, border) => `<td style="padding:3px 5px;text-align:left${bg?';background:'+bg:''}${border?';'+border:''};font-size:.75rem">${v||'-'}</td>`;
+    const tdType = (r2, key, bg) => {
+      const v = r2[key+'type']||'';
+      const c = v==='一般'?'#1a56a0':v==='推薦'?'#7c3aed':'#94a3b8';
+      return `<td style="padding:3px 4px;text-align:center${bg?';background:'+bg:''};font-size:.7rem;color:${c};font-weight:${v?'700':'400'}">${v||'ー'}</td>`;
+    };
+    const tdResult = (r2, key, bg) => {
+      const v = r2[key]||'-';
+      const c = v==='合格'?'#10b981':v==='不合格'?'#ef4444':'#94a3b8';
+      const bgg = v==='合格'?'#dcfce7':v==='不合格'?'#fee2e2':'transparent';
+      return `<td style="padding:3px 4px;text-align:center${bg?';background:'+bg:''};font-size:.7rem;color:${c};font-weight:${v!=='-'?'700':'400'};background:${bgg}">${v}</td>`;
+    };
+    const tdEnroll = (r2, key, bg) => {
+      const v = r2[key+'enroll'];
+      return `<td style="padding:3px 4px;text-align:center${bg?';background:'+bg:''}">${v?'<span style="color:#1a56a0;font-weight:700;font-size:.8rem">✓</span>':'<span style="color:#e2e8f0">ー</span>'}</td>`;
+    };
+    tbody.innerHTML = wishes.map(w => {
+      const r2 = res(w);
+      return `<tr>
+        <td style="padding:4px 8px;font-weight:600;color:#1a56a0;cursor:pointer;text-decoration:underline" onclick="goToCompare('${htmlEsc(w.studentId)}')" title="成績×通知表へ">${htmlEsc(w.name)}</td>
+        <td style="padding:4px 4px;text-align:center">${w.grade||'-'}</td>
+        ${tdName(w.pub1name?w.pub1name+(w.pub1dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub1dept+'</span>':''):null,'#dde8ff','border-left:3px solid #4f46e5')}${tdType(r2,'pub1','#dde8ff')}${tdResult(r2,'pub1','#dde8ff')}${tdEnroll(r2,'pub1','#dde8ff')}
+        ${tdName(w.pub2name?w.pub2name+(w.pub2dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub2dept+'</span>':''):null,'#dde8ff','border-left:3px solid #4f46e5')}${tdType(r2,'pub2','#dde8ff')}${tdResult(r2,'pub2','#dde8ff')}${tdEnroll(r2,'pub2','#dde8ff')}
+        ${tdName(w.pub3name?w.pub3name+(w.pub3dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pub3dept+'</span>':''):null,'#dde8ff','border-left:3px solid #4f46e5')}${tdType(r2,'pub3','#dde8ff')}${tdResult(r2,'pub3','#dde8ff')}${tdEnroll(r2,'pub3','#dde8ff')}
+        ${tdName(w.pri1name?w.pri1name+(w.pri1dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri1dept+'</span>':''):null,'#fef5d0','border-left:3px solid #d97706')}${tdType(r2,'pri1','#fef5d0')}${tdResult(r2,'pri1','#fef5d0')}${tdEnroll(r2,'pri1','#fef5d0')}
+        ${tdName(w.pri2name?w.pri2name+(w.pri2dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri2dept+'</span>':''):null,'#fef5d0','border-left:3px solid #d97706')}${tdType(r2,'pri2','#fef5d0')}${tdResult(r2,'pri2','#fef5d0')}${tdEnroll(r2,'pri2','#fef5d0')}
+        ${tdName(w.pri3name?w.pri3name+(w.pri3dept?'<br><span style="color:#94a3b8;font-size:.68rem">'+w.pri3dept+'</span>':''):null,'#fef5d0','border-left:3px solid #d97706')}${tdType(r2,'pri3','#fef5d0')}${tdResult(r2,'pri3','#fef5d0')}${tdEnroll(r2,'pri3','#fef5d0')}
+        <td style="padding:3px 6px;font-size:.68rem;color:#94a3b8;white-space:nowrap">${w.updatedAt?w.updatedAt.slice(0,10):'-'}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="26" class="noData">読み込みに失敗しました</td></tr>';
+  }
+}
+
+async function renderSpeedReport() {
+  const tbody = document.getElementById('speedReportBody');
+  tbody.innerHTML = '<tr><td colspan="13" class="noData">読み込み中...</td></tr>';
+  const campus = document.getElementById('spCampus').value;
+  const grade  = document.getElementById('spGrade').value;
+  const year   = document.getElementById('spYear').value;
+  try {
+    const r = await api({ action:'getAllReports', campus, year });
+    let reports = r.data || [];
+    if (grade) reports = reports.filter(d => gradeMatchesGroup(d.grade, grade));
+    reports.sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+    if (!reports.length) {
+      tbody.innerHTML = '<tr><td colspan="13" class="noData">データなし</td></tr>';
+      return;
+    }
+    const rpColor = v => { const n=Number(v); return n===5?'#059669':n===4?'var(--primary)':n===3?'#d97706':(n===2||n===1)?'#dc2626':'#94a3b8'; };
+    const rTd = v => `<td style="text-align:center;color:${rpColor(v)};font-weight:${(v!=null&&v!=='')?'700':'400'}">${(v!=null&&v!=='')?v:'-'}</td>`;
+    const rp5k = ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng'];
+    const rp9k = [...rp5k,'rp_mus','rp_art','rp_pe','rp_tech'];
+    tbody.innerHTML = reports.map(d => {
+      const r5 = rp5k.every(k=>d[k]!==''&&d[k]!=null) ? rp5k.reduce((s,k)=>s+Number(d[k]),0) : '';
+      const r9 = rp9k.every(k=>d[k]!==''&&d[k]!=null) ? rp9k.reduce((s,k)=>s+Number(d[k]),0) : '';
+      return `<tr>
+        <td style="text-align:left;font-weight:600;color:var(--primary);cursor:pointer" onclick="goToCompare('${htmlEsc(d.studentId)}')">${htmlEsc(d.name)}</td>
+        <td>${htmlEsc(d.grade)}</td><td>${htmlEsc(d.campus)}</td><td>${htmlEsc(d.semester)}</td>
+        ${rTd(d.rp_jpn)}${rTd(d.rp_soc)}${rTd(d.rp_math)}${rTd(d.rp_sci)}${rTd(d.rp_eng)}
+        <td style="text-align:center;font-weight:700;color:var(--primary)">${r5!==''?r5:'-'}</td>
+        ${rTd(d.rp_mus)}${rTd(d.rp_art)}${rTd(d.rp_pe)}${rTd(d.rp_tech)}
+        <td style="text-align:center;font-weight:700;color:var(--primary)">${r9!==''?r9:'-'}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="13" class="noData">読み込みに失敗しました</td></tr>';
+  }
+}
+
+let showPrevBar = false;
+
+function togglePrevBar() {
+  showPrevBar = !showPrevBar;
+  const btn = document.getElementById('prevToggleBtn');
+  btn.textContent = showPrevBar ? '📊 前回を非表示' : '📊 前回を表示';
+  btn.style.background = showPrevBar ? '#e8f0fb' : '';
+  btn.style.color = showPrevBar ? 'var(--primary)' : '';
+  redrawSpeedChart();
+}
+
+const SUBJ_MAP = {
+  total5:{ label:'5科合計', max:500 },
+  jpn:   { label:'国語',   max:100 },
+  soc:   { label:'社会',   max:100 },
+  math:  { label:'数学',   max:100 },
+  sci:   { label:'理科',   max:100 },
+  eng:   { label:'英語',   max:100 },
+  total9:{ label:'9科合計', max:900 },
+};
+
+let speedChartLibraryWaiting = false;
+function redrawSpeedChart() {
+  // Data rendering must continue even while the graph library is loading.
+  if (typeof Chart === 'undefined') {
+    if (!speedChartLibraryWaiting) {
+      speedChartLibraryWaiting = true;
+      const script = document.querySelector('script[src="assets/vendor/chart-4.4.1.umd.min.js"]');
+      script?.addEventListener('load', () => {
+        speedChartLibraryWaiting = false;
+        redrawSpeedChart();
+      }, { once: true });
+    }
+    return;
+  }
+  const campus = document.getElementById('chartCampus').value;
+  const grade  = document.getElementById('chartGrade').value;
+  const subj   = document.getElementById('chartSubj').value;
+  let filtered = allScores;
+  if (campus) filtered = filtered.filter(s => s.campus === campus);
+  if (grade)  filtered = filtered.filter(s => gradeMatchesGroup(s.grade, grade));
+  // タイトル更新
+  const titleEl = document.getElementById('chartTitle');
+  if (titleEl) titleEl.textContent = SUBJ_MAP[subj]?.label || subj;
+  drawSpeedChart(filtered, subj);
+}
+
+// 前回データを生徒IDから探す（年度またぎ対応）
+function getPrevScore(s, subj) {
+  const curYear = Number(s.year), curTerm = Number(s.term);
+  const key = subj || document.getElementById('chartSubj')?.value || 'total5';
+  const hist = (window._allScoresFull || [])
+    .filter(p => String(p.studentId) === String(s.studentId) &&
+      (Number(p.year) < curYear || (Number(p.year) === curYear && Number(p.term) < curTerm)) &&
+      Number(p[key]) > 0)  // 選択科目に値があるレコードのみ
+    .sort((a,b) => Number(b.year) !== Number(a.year) ? Number(b.year)-Number(a.year) : Number(b.term)-Number(a.term));
+  return hist.length ? hist[0] : null;
+}
+
+// 前回→今回の点線を引くカスタムプラグイン
+const prevLinePlugin = {
+  id: 'prevLinePlugin',
+  afterDatasetsDraw(chart) {
+    if (!showPrevBar || chart.data.datasets.length < 2) return;
+    const ctx = chart.ctx;
+    // datasets[0]=前回（左）、datasets[1]=今回（右）
+    // labelで確実に特定する
+    const prevDsIdx = chart.data.datasets.findIndex(d => d.label === '前回');
+    const nowDsIdx  = chart.data.datasets.findIndex(d => d.label === '今回');
+    if (prevDsIdx < 0 || nowDsIdx < 0) return;
+    const prevMeta = chart.getDatasetMeta(prevDsIdx);
+    const nowMeta  = chart.getDatasetMeta(nowDsIdx);
+    const prevVals = chart.data.datasets[prevDsIdx].data;
+    const nowVals  = chart.data.datasets[nowDsIdx].data;
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.lineWidth = 1.5;
+    nowMeta.data.forEach((nowBar, i) => {
+      const prevBar = prevMeta.data[i];
+      const nowVal  = nowVals[i];
+      const prevVal = prevVals[i];
+      if (!prevVal || !nowVal) return;
+      // 前回バーの頂点 → 今回バーの頂点へ点線（左→右）
+      ctx.strokeStyle = nowVal > prevVal ? '#10b981' : nowVal < prevVal ? '#ef4444' : '#94a3b8';
+      ctx.beginPath();
+      ctx.moveTo(prevBar.x, prevBar.y);  // 前回バー頂点（左）
+      ctx.lineTo(nowBar.x,  nowBar.y);   // 今回バー頂点（右）
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+};
+
+function drawSpeedChart(data, subj) {
+  subj = subj || document.getElementById('chartSubj')?.value || 'total5';
+  const subjInfo = SUBJ_MAP[subj] || SUBJ_MAP.total5;
+  let sorted = [...data].filter(s => Number(s[subj]) > 0)
+    .sort((a,b) => Number(a[subj]) - Number(b[subj]));
+  const labels = sorted.map(s => s.name);
+  const vals   = sorted.map(s => Number(s[subj]) || 0);
+  const yMax = subjInfo.max;
+  const ratio = v => v / yMax;
+  const getColor = v => ratio(v) >= 0.8 ? '#10b981' : ratio(v) >= 0.6 ? '#1a56a0' : ratio(v) >= 0.4 ? '#f59e0b' : '#ef4444';
+  const colors = vals.map(getColor);
+
+  // 前回データ計算（表示非表示関係なく先に計算）
+  const prevVals = sorted.map(s => { const p = getPrevScore(s, subj); return p ? Number(p[subj])||0 : 0; });
+
+  const datasets = [];
+
+  if (showPrevBar) {
+    // 前回を左（先）に追加
+    datasets.push({
+      label: '前回',
+      data: prevVals,
+      backgroundColor: prevVals.map(v => v > 0 ? '#94a3b8' : 'transparent'),
+      borderColor:     prevVals.map(v => v > 0 ? '#64748b' : 'transparent'),
+      borderWidth: 1,
+      borderRadius: 2,
+      barPercentage: 0.4,
+      categoryPercentage: 0.85,
+      datalabels: {
+        display: ctx => (ctx.dataset.data[ctx.dataIndex]||0) > 0,
+        anchor: 'end', align: 'top',
+        font: { size: 9 }, color: '#94a3b8',
+        formatter: v => v > 0 ? v : ''
+      }
+    });
+  }
+
+  // 今回を右（後）に追加
+  datasets.push({
+    label: '今回',
+    data: vals,
+    backgroundColor: colors,
+    borderRadius: showPrevBar ? 2 : 4,
+    barPercentage: showPrevBar ? 0.55 : 0.8,
+    categoryPercentage: 0.85,
+    datalabels: {
+      display: true, anchor: 'end', align: 'top',
+      font: { size: 10, weight: '600' }, color: '#475569',
+      formatter: v => v > 0 ? v : ''
+    }
+  });
+
+  if (speedChartInst) speedChartInst.destroy();
+  const chartCanvas = document.getElementById('speedChart');
+  chartCanvas.style.width = '';
+  chartCanvas.style.minWidth = '';
+  speedChartInst = new Chart(chartCanvas, {
+    type: 'bar',
+    plugins: [prevLinePlugin],
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 28 } },
+      plugins: {
+        legend: { display: showPrevBar, position: 'top' },
+        tooltip: { callbacks: { label: ctx => ctx.parsed ? ctx.dataset.label + ': ' + ctx.parsed.y + '点' : '' } },
+        datalabels: {}
+      },
+      scales: {
+        x: { ticks: { color: '#64748b', font: { size: 9 }, maxRotation: 90, minRotation: 45 }, grid: { color: 'rgba(0,0,0,0.06)' } },
+        y: { min: 0, max: yMax, ticks: { color: '#64748b' }, grid: { color: 'rgba(0,0,0,0.06)' } }
+      },
+      onClick: () => {}  // クリックはcanvas直接イベントで処理
+    }
+  });
+  // canvas直接クリックイベント（バー・ラベル両対応）
+  const canvas = document.getElementById('speedChart');
+  canvas.style.cursor = 'pointer';
+  const _sorted = sorted;
+
+  // ホバーで生徒名ポップアップ
+  const tooltip = document.getElementById('barTooltip');
+  canvas.onmousemove = function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const pts = speedChartInst.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+    if (pts.length && tooltip) {
+      const idx = pts[0].index;
+      const name = speedChartInst.data.labels[idx];
+      const subj = document.getElementById('chartSubj')?.value || 'total5';
+      const val  = _sorted[idx] ? (_sorted[idx][subj] || '') : '';
+      tooltip.textContent = '👤 ' + name + '　' + val + '点';
+      tooltip.style.display = 'block';
+      tooltip.style.left = x + 'px';
+      tooltip.style.top  = Math.max(4, pts[0].element.y - 44) + 'px';
+    } else if (tooltip) {
+      tooltip.style.display = 'none';
+    }
+  };
+  canvas.onmouseleave = () => { if (tooltip) tooltip.style.display = 'none'; };
+
+  // onclickに直接代入（重複登録を防ぐ）
+  // _sorted は上で定義済み // クロージャでsortedを固定
+  canvas.onclick = function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    // バークリック・ラベルクリック両対応
+    const pts = speedChartInst.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+    let idx = -1;
+    if (pts.length) {
+      idx = pts[0].index;
+    } else {
+      const xScale = speedChartInst.scales.x;
+      let minDist = 60;
+      xScale.ticks.forEach((_, i) => {
+        const px = xScale.getPixelForTick(i);
+        if (Math.abs(px - x) < minDist) { minDist = Math.abs(px - x); idx = i; }
+      });
+    }
+    if (idx < 0 || idx >= _sorted.length) return;
+    // グラフのラベル（生徒名）から生徒一覧のstudentsで正確にIDを特定
+    const labelName = speedChartInst.data.labels[idx];
+    // studentsから名前で探す（最も確実）
+    let targetId = null;
+    if (students && students.length > 0) {
+      const found = students.find(s => s.name === labelName);
+      if (found) targetId = found.id;
+    }
+    // studentsにない場合はsortedから
+    if (!targetId) {
+      const s = _sorted.find(sc => sc.name === labelName) || _sorted[idx];
+      targetId = s.studentId;
+    }
+    if (!targetId) return;
+    goToCompare(targetId);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+}
+
+// ===== 生徒 =====
+const STU_GRADE_GROUPS = {
+  elementary: ['小1','小2','小3','小4','小5','小6'],
+  junior: ['中1','中2','中3'],
+  high: ['高1','高2','高3']
+};
+const STU_ALL_GRADES = [...STU_GRADE_GROUPS.elementary, ...STU_GRADE_GROUPS.junior, ...STU_GRADE_GROUPS.high];
+const _stuGrades = new Set(STU_ALL_GRADES);
+
+function selectedStuGrades() {
+  return [..._stuGrades];
+}
+
+function _sameStuGrades(grades) {
+  return grades.length === _stuGrades.size && grades.every(g => _stuGrades.has(g));
+}
+
+function _renderStuGradeButtons() {
+  document.querySelectorAll('[data-grade]').forEach(btn => btn.classList.toggle('on', _stuGrades.has(btn.dataset.grade)));
+  document.querySelectorAll('[data-grade-group]').forEach(btn => {
+    const key = btn.dataset.gradeGroup;
+    const grades = key === 'all' ? STU_ALL_GRADES : (STU_GRADE_GROUPS[key] || []);
+    btn.classList.toggle('on', grades.length > 0 && grades.every(g => _stuGrades.has(g)));
+  });
+  const summary = document.getElementById('stuGradeSummary');
+  if (summary) {
+    const grades = selectedStuGrades();
+    summary.textContent = grades.length === 0 || grades.length === STU_ALL_GRADES.length
+      ? '全学年'
+      : grades.join('・');
+  }
+}
+
+function _applyStuGradeChange() {
+  _renderStuGradeButtons();
+  _stuSchoolExclude.clear();
+  onStudentFilterChange();
+}
+
+function toggleStuGrade(grade) {
+  if (_stuGrades.has(grade)) _stuGrades.delete(grade);
+  else _stuGrades.add(grade);
+  _applyStuGradeChange();
+}
+
+function selectStuGradeGroup(group) {
+  if (group === 'clear') {
+    _stuGrades.clear();
+  } else {
+    const grades = group === 'all' ? STU_ALL_GRADES : (STU_GRADE_GROUPS[group] || []);
+    const allSelected = grades.length > 0 && grades.every(g => _stuGrades.has(g));
+    grades.forEach(g => {
+      if (allSelected) _stuGrades.delete(g);
+      else _stuGrades.add(g);
+    });
+  }
+  _applyStuGradeChange();
+}
+
+_renderStuGradeButtons();
+
+function studentFilterParams() {
+  const grades = selectedStuGrades();
+  return {
+    campus: document.getElementById('stuCampus')?.value || '',
+    grades: grades.length > 0 && grades.length < STU_ALL_GRADES.length ? grades : [],
+    q: (document.getElementById('stuSearch')?.value || '').trim()
+  };
+}
+
+async function loadStudents(opts) {
+  setStudentSourceStatus('取得元: Supabase', false);
+  document.getElementById('stuLegacyBtn').style.display = 'none';
+  document.getElementById('stuPager').style.display = 'none';
+  const r = await api({ action: 'getStudentList' });
+  if (!r.success && r.error) {
+    setStudentSourceStatus('生徒一覧を取得できませんでした。', true);
+    return;
+  }
+  students = r.students || [];
+  buildSchoolDropdown();
+  filterStudents();
+}
+
+async function loadStudentsFromSupabase(append) {
+  const box = document.getElementById('stuList');
+  const pager = document.getElementById('stuPager');
+  const legacyBtn = document.getElementById('stuLegacyBtn');
+  if (!append) {
+    _studentPageOffset = 0;
+    studentPageOffset = 0;
+    students = [];
+    if (box) box.innerHTML = '<div class="noData">読込中...</div>';
+  }
+  if (enrollmentFilterIsEmpty('stuShowActive', 'stuShowWithdrawn')) {
+    if (box) box.innerHTML = '<div class="noData">表示する生徒区分を選択してください。</div>';
+    if (pager) pager.style.display = 'none';
+    return;
+  }
+  if (!hasValidAdminSessionToken()) {
+    setStudentSourceStatus('管理者セッションの有効期限が切れました。再ログインしてください。', true);
+    if (legacyBtn) legacyBtn.style.display = 'none';
+    if (box) box.innerHTML = '<div class="noData">再ログイン後に表示します</div>';
+    return;
+  }
+  const params = studentFilterParams();
+  const started = performance.now();
+  const r = await api({
+    action: 'getStudents',
+    ...params,
+    offset: _studentPageOffset,
+    limit: 50
+  });
+  const ms = Math.round(performance.now() - started);
+  if (!r.success) {
+    setStudentSourceStatus(r.error || 'Supabaseから取得できませんでした。', true);
+    if (legacyBtn) legacyBtn.style.display = 'none';
+    if (box) box.innerHTML = '<div class="noData"><button class="btn btn-outline btn-sm" onclick="loadStudents()">再試行</button></div>';
+    return;
+  }
+  const rows = r.students || [];
+  students = append ? students.concat(rows) : rows;
+  _studentPageOffset += rows.length;
+  studentPageOffset = _studentPageOffset;
+  _studentHasMore = !!r.hasMore;
+  setStudentSourceStatus(`取得元: Supabase / ${ms}ms / 表示 ${students.length}件`, false);
+  if (legacyBtn) legacyBtn.style.display = '';
+  if (pager) pager.style.display = _studentHasMore ? 'flex' : 'none';
+  buildSchoolDropdown();
+  filterStudents({ skipClientFilters: true });
+}
+
+function loadMoreStudents() {
+  loadStudents({ append: true });
+}
+
+function onStudentFilterChange() {
+  filterStudents();
+}
+
+function onStudentEnrollmentChange() {
+  filterStudents();
+}
+
+function openStudentsWithLegacy() {
+  setStudentSourceStatus('成績データはSupabaseへ移行済みです。再読込します。', false);
   loadStudents();
 }
 function printStudentList() {
