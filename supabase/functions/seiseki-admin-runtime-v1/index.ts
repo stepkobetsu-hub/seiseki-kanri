@@ -789,6 +789,17 @@ async function putDirectoryDetails(details: JsonObject[], fetchedAt: string): Pr
     seen.add(id);
     return { student_code: id, detail: item, source_fetched_at: fetchedAt, updated_at: new Date().toISOString() };
   });
+  // The same verified snapshot must also maintain the index used by search and grades.
+  // Only public master fields are updated; UUIDs, admissions and all grade rows remain intact.
+  const indexRows=rows.map(row=>{
+    const s=row.detail.student as JsonObject,flag=String(s.flag??'').trim();
+    return {student_code:row.student_code,name:String(s.name??'').trim(),name_kana:String(s.kana??'').trim()||null,
+      campus:String(s.campus??'').trim()||null,grade:String(s.grade??'').trim()||null,school_name:String(s.school??'').trim()||null,
+      active:flag==='1',enrollment_status:flag==='1'?'active':flag==='0'?'withdrawal_scheduled':'withdrawn',source_updated_at:fetchedAt};
+  }).filter(row=>row.name);
+  for(let i=0;i<indexRows.length;i+=50)await pg(query('students',{on_conflict:'student_code'}),{
+    method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(indexRows.slice(i,i+50)),
+  });
   for (let i = 0; i < rows.length; i += 50) {
     await pg(query('student_directory_details', { on_conflict: 'student_code' }), {
       method:'POST', headers:{ Prefer:'resolution=merge-duplicates,return=minimal' }, body:JSON.stringify(rows.slice(i, i + 50)),
