@@ -68,6 +68,7 @@ header #logout{color:#175443;background:#fff;border-color:#def5e7}.card{backgrou
 
 #masterConfirm{width:min(1000px,96vw);padding:0;max-height:92vh}#masterConfirm .confirmHead{position:sticky;top:0;z-index:1;background:#fff;padding:16px 28px 10px;border-bottom:1px solid #dce7eb}#masterConfirm .confirmHead .muted{margin:7px 0 0}#masterConfirm h2{font-size:1.65rem;margin:0 0 6px}.confirmStudent{font-size:1.15rem;font-weight:700;line-height:1.6}.confirmRows{padding:4px 28px 8px}.confirmRow{display:grid;grid-template-columns:minmax(130px,.8fr) minmax(0,1fr) 30px minmax(0,1fr);gap:8px;border-bottom:1px solid #dce7eb;padding:8px 0;align-items:center}.confirmArrow{display:flex;align-items:center;justify-content:center;font-size:1.8rem;font-weight:900;line-height:1;color:#175443}.confirmField{font-size:1.1rem;font-weight:700;padding-top:0}.confirmValue{min-width:0;border-radius:9px;display:flex;align-items:baseline;gap:10px;padding:7px 10px;background:#f3f5f7;white-space:pre-wrap;overflow-wrap:anywhere;font-size:1.25rem;line-height:1.4}.confirmValue>span:last-child{min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}.confirmValue.after{background:#eaf8ef;color:#175443;font-weight:700;border:1px solid #b6dcc5}.confirmValueLabel{display:inline-block;flex:none;font-size:.8rem;font-weight:600;color:#627683;margin-bottom:0}.confirmFooter{position:sticky;bottom:0;background:#fff;border-top:1px solid #dce7eb;padding:12px 28px;display:flex;justify-content:flex-end;gap:12px}.confirmFooter .btn{font-size:1.15rem;padding:13px 24px;min-height:52px}@media(max-width:600px){#masterConfirm .confirmHead{padding:14px 16px 10px}#masterConfirm h2{font-size:1.35rem}.confirmRows{padding:2px 16px 8px}.confirmRow{grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr);gap:4px;padding:8px 0}.confirmField{grid-column:1/-1;padding:0}.confirmValue{font-size:1.08rem;padding:6px 8px;gap:6px}.confirmValueLabel{font-size:.72rem}.confirmFooter{padding:14px 16px}.confirmFooter .btn{flex:1;font-size:1rem;padding:12px 8px}.confirmStudent{font-size:1rem}}
 .entrySummary{margin-top:18px;border:1px solid #dce7eb;border-radius:12px;padding:12px 16px;background:#f8fbfd}.entrySummaryHead{display:flex;align-items:center;justify-content:space-between;gap:8px}.entrySummary h3{margin:0;font-size:1.1rem}.entrySummaryGrid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px;margin-top:8px}.entrySummaryRow{display:grid;grid-template-columns:120px minmax(0,1fr);gap:8px;padding:5px 0;border-bottom:1px solid #e4edf1;font-size:.9rem;line-height:1.5}.entrySummaryRow strong{color:#60727c;font-size:.82rem}.entrySummaryRow span{white-space:pre-wrap;overflow-wrap:anywhere}.entrySummaryRow.wide{grid-column:1/-1}.entryFamily{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:6px}.entryFamily th,.entryFamily td{padding:5px 8px;text-align:left;border-bottom:1px solid #e4edf1;white-space:pre-wrap}.entryUnregistered{display:inline-block;margin:10px 0 2px;padding:8px 14px;border:1px solid #e5a632;border-radius:8px;background:#fff3d6;color:#8b4c0c;font-size:1rem;font-weight:700}.entrySummary .muted{font-size:.82rem;margin:6px 0}.entryFamilyWrap{overflow-x:auto}@media(max-width:600px){.entrySummary{padding:10px 12px}.entrySummaryGrid{grid-template-columns:1fr}.entrySummaryRow{grid-template-columns:105px minmax(0,1fr)}}
+.academicMemoEmpty{border:2px solid #43a783;background:#edf9f2}.academicMemoEmpty .academicHead>a{background:#25866a;color:#fff;border-color:#25866a;font-size:1rem;padding:12px 20px}.entryEditDialog{width:min(1000px,95vw);max-height:88vh}.entryEditGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px}.entryEditGrid label{margin:0}.entryEditGrid textarea{min-height:58px;width:100%;box-sizing:border-box}.entryEditFamily input{width:100%;min-width:85px;box-sizing:border-box;padding:6px}.entryEditFamily td{padding:4px}.entryEditActions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.entryEditFamily{width:100%;margin:10px 0;border-collapse:collapse}@media(max-width:600px){.entryEditGrid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -566,7 +567,8 @@ const DirectoryAcademic = (() => {
       update.onclick=()=>load(true);wrap.reloadGrades.push(()=>load(true));load();
     }
     const memoBox=panel('🗒️ 面談・メモ','getMeetingMemos',(area,rows)=>{
-      if(!rows.length){area.closest('.academicPanel').hidden=true;return;}
+      const empty=!rows.length;area.closest('.academicPanel').classList.toggle('academicMemoEmpty',empty);
+      if(empty){area.append(make('p','面談メモはまだ登録されていません。','muted'));return;}
       const sorted=rows.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
       for(const memo of sorted.slice(0,5)) {
         const item=make('article',null,'academicMemo');
@@ -587,7 +589,7 @@ const DirectoryEntry = (() => {
   const reads=new Map(),gradeImports=new Map();
   const make=(tag,text,cls)=>{const n=document.createElement(tag);if(text!=null)n.textContent=String(text);if(cls)n.className=cls;return n;};
   const has=v=>v!=null&&String(v).trim()!=='';
-  function clear(){for(const e of reads.values())e.controller.abort();reads.clear();gradeImports.clear();}
+  function clear(){for(const e of reads.values())e.controller.abort();reads.clear();gradeImports.clear();for(const dialog of document.querySelectorAll('.entryEditDialog'))dialog.close();}
   function read(id,session,force){
     const key=session+':'+id,old=reads.get(key);
     if(!force&&old&&Date.now()-old.at<60000)return old.promise;
@@ -595,10 +597,10 @@ const DirectoryEntry = (() => {
     for(const [k,e] of reads)if(k!==key){e.controller.abort();reads.delete(k);}
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);
     const e={controller,at:Date.now(),promise:null};
-    e.promise=api('getEntrySheetData',{studentId:id,systemPortalSessionToken:session},controller.signal).then(r=>{
+    e.promise=mirrorApi('getEntrySheetData',{studentId:id},controller.signal).then(r=>{
       if(!r.success)throw Error(r.error||'取得できませんでした。');
       if(r.data&&String(r.data.studentId)!==id)throw Error('生徒番号が一致しません。');
-      controller.signal.throwIfAborted();e.at=Date.now();return r.data;
+      controller.signal.throwIfAborted();e.at=Date.now();return {...r.data,_entryRevision:r.revision||'',_entrySourceVersion:r.sourceVersion};
     }).catch(error=>{if(reads.get(key)===e)reads.delete(key);throw error;}).finally(()=>clearTimeout(timer));
     reads.set(key,e);return e.promise;
   }
@@ -627,10 +629,33 @@ const DirectoryEntry = (() => {
   }
   function mount(card,s){
     const id=String(s.id),session=token(),area=make('section',null,'entrySummary');area.setAttribute('aria-label','エントリーシートの追加情報');
-    const head=make('div',null,'entrySummaryHead'),button=make('button','再取得','btn secondary small');button.type='button';head.append(make('h3','📝 入塾時情報'),button);const body=make('div');area.append(head,body);card.append(area);
+    let current=null;
+    const head=make('div',null,'entrySummaryHead'),button=make('button','再取得','btn secondary small'),edit=make('button','✏️ 入塾時情報を編集','btn small'),controls=make('div',null,'entryEditActions');button.type=edit.type='button';edit.disabled=true;controls.append(edit,button);head.append(make('h3','📝 入塾時情報'),controls);const body=make('div');area.append(head,body);card.append(area);
     const active=()=>area.isConnected&&String(selectedId)===id&&token()===session;
-    const load=async force=>{button.disabled=true;body.replaceChildren(make('p','読み込み中…','muted'));try{
-      const d=await read(id,session,force);if(!active())return;render(body,d,s);
+    edit.onclick=()=>{
+      if(!active()||!current)return;
+      const d=current,dialog=make('dialog',null,'entryEditDialog');
+      dialog.append(make('h2',s.name+'（No.'+id+'） 入塾時情報を編集'),make('p','部活動・習い事・家族情報などを編集できます。保存には権限4のログインが必要です。','muted'));
+      let ai={};const memo=String(d.ocrMemo||''),pos=memo.indexOf('AI_JSON:');try{if(pos>=0)ai=JSON.parse(memo.slice(pos+8));}catch{}
+      const fields=[['club','部活動'],['nickname','ニックネーム'],['commuteMethod','通塾方法'],['currentLessons','現在の習い事・塾'],['pastLessons','過去の習い事・塾'],['familyRequest','ご家庭の要望・希望'],['notes','シートのメモ']],inputs={},grid=make('div',null,'entryEditGrid');
+      for(const [key,label]of fields){const wrap=make('label',label),input=make('textarea');input.value=String(key==='notes'?(ai.notes||''):(ai.entryInfo?.[key]??d[key]??''));input.maxLength=5000;wrap.append(input);grid.append(wrap);inputs[key]=input;}dialog.append(grid,make('h3','家族情報'));
+      const familyWrap=make('div',null,'entryFamilyWrap'),table=make('table',null,'entryEditFamily'),thead=make('thead'),tr=make('tr'),tbody=make('tbody');for(const label of ['氏名','続柄','職業','勤務先・学校','学年',''])tr.append(make('th',label));thead.append(tr);table.append(thead,tbody);familyWrap.append(table);dialog.append(familyWrap);
+      function addFamily(f={}){const row=make('tr');for(const key of ['name','relation','job','workplace','grade']){const td=make('td'),input=make('input');input.value=String(f[key]||'');input.maxLength=300;input.dataset.field=key;input.setAttribute('aria-label',key==='name'?'家族の氏名':key==='relation'?'続柄':key==='job'?'職業':key==='workplace'?'勤務先・学校':'学年');td.append(input);row.append(td);}const td=make('td'),remove=make('button','削除','btn secondary small');remove.type='button';remove.onclick=()=>row.remove();td.append(remove);row.append(td);tbody.append(row);}
+      for(const f of (Array.isArray(ai.family)?ai.family:Array.isArray(d.family)?d.family:[]))addFamily(f);
+      const add=make('button','＋ 家族を追加','btn secondary small');add.type='button';add.onclick=()=>{if(tbody.children.length<30)addFamily();};dialog.append(add);
+      const status=make('p','','error');status.setAttribute('role','status');const actions=make('div',null,'entryEditActions'),cancel=make('button','キャンセル','btn secondary'),save=make('button','この内容で保存','btn');cancel.type=save.type='button';cancel.onclick=()=>dialog.close();actions.append(cancel,save);dialog.append(status,actions);
+      save.onclick=async()=>{
+        const values={};for(const [key]of fields)values[key]=inputs[key].value;
+        values.family=Array.from(tbody.children).map(row=>Object.fromEntries(Array.from(row.querySelectorAll('input')).map(input=>[input.dataset.field,input.value]))).filter(row=>Object.values(row).some(v=>v.trim()));
+        save.disabled=cancel.disabled=true;status.textContent='保存しています…';
+        try{if(!active())throw Error('生徒が切り替わっています。');const r=await mirrorApi('saveEntrySheetInfo',{studentId:id,values,sourceVersion:d._entrySourceVersion,revision:d._entryRevision,mutationId:crypto.randomUUID()});if(!r.success)throw Error(r.error||'保存できませんでした。');
+          if(active()){current={...r.data,_entrySourceVersion:r.sourceVersion,_entryRevision:r.revision};reads.delete(session+':'+id);render(body,current,s);body.append(make('p','入塾時情報を保存しました。','muted'));}dialog.close();
+        }catch(error){status.textContent=error.message;}finally{save.disabled=cancel.disabled=false;}
+      };
+      dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
+    };
+    const load=async force=>{button.disabled=edit.disabled=true;body.replaceChildren(make('p','読み込み中…','muted'));try{
+      const d=await read(id,session,force);if(!active())return;current=d;render(body,d,s);edit.disabled=false;
       const memo=String(d?.ocrMemo||''),pos=memo.indexOf('AI_JSON:');let ai=null;try{if(pos>=0)ai=JSON.parse(memo.slice(pos+8));}catch{}
       if(ai&&[...(Array.isArray(ai.scores)?ai.scores:[]),...(Array.isArray(ai.reports)?ai.reports:[])].length){
         const status=make('p','成績の未登録分を確認中…','muted');body.append(status);
@@ -653,11 +678,11 @@ const MEETING_API='https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki
 let directorySyncBusy=false,directorySyncedAt=0;
 async function mirrorApi(action,extra={},signal){
   let requestToken=token();
-  if(action==='saveStudentDirectory'){const studentId=String(extra.studentId||'');requestToken=await ensureEditorSession();if(!requestToken)throw Error('保存をキャンセルしました。');if(!token()||String(selectedId)!==studentId)throw Error('生徒が切り替わったため保存を中止しました。');}
+  if(['saveStudentDirectory','saveEntrySheetInfo'].includes(action)){const studentId=String(extra.studentId||'');requestToken=await ensureEditorSession();if(!requestToken)throw Error('保存をキャンセルしました。');if(!token()||String(selectedId)!==studentId)throw Error('生徒が切り替わったため保存を中止しました。');}
 
   const response=await StepStaffAuth.fetchRuntime({action,permissionAppId:'student-directory',...extra,token:requestToken},signal);
   const data=await response.json().catch(()=>({}));
-  if(!response.ok){if(action==='saveStudentDirectory'&&(response.status===401||response.status===403)){await logoutEditor();}throw Error(data.error||'生徒情報の通信に失敗しました。');}
+  if(!response.ok){if(['saveStudentDirectory','saveEntrySheetInfo'].includes(action)&&(response.status===401||response.status===403)){await logoutEditor();}throw Error(data.error||'生徒情報の通信に失敗しました。');}
   return data;
 }
 let directoryAutoSyncSetupAttempted=false;
