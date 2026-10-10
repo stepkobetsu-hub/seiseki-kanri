@@ -60,6 +60,7 @@ textarea{width:100%;min-height:120px;border:1px solid #d8e0ea;border-radius:8px;
   </div>
 </main>
 
+<script src="assets/js/staff-auth.js?v=20261009-single-read"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
@@ -177,16 +178,16 @@ function normalizeResult(d){
 
 function normalizeScore(s,idx){
   s=s||{};
-  const year=String(s.year||'').replace(/[^\d]/g,'')||'2026';
-  const term=String(s.term||s.testNo||s.round||idx+1).replace(/[^\d]/g,'')||String(idx+1);
+  const year=String(s.year||'').normalize('NFKC').replace(/[^\d]/g,'');
+  const term=String(s.term||s.testNo||s.round||'').normalize('NFKC').replace(/[^\d]/g,'');
   return Object.assign({},s,{year,term});
 }
 
 function normalizeReport(r,idx){
   r=r||{};
-  const year=String(r.year||'').replace(/[^\d]/g,'')||'2026';
+  const year=String(r.year||'').normalize('NFKC').replace(/[^\d]/g,'');
   let semester=String(r.semester||r.term||'').trim();
-  if(!semester) semester=(idx+1)+'学期';
+  semester=semester.normalize('NFKC');
   if(/^\d$/.test(semester)) semester=semester+'学期';
   return Object.assign({},r,{year,semester});
 }
@@ -229,7 +230,7 @@ async function saveAll(){
     try{results=JSON.parse($('jsonBox').value);results.forEach(r=>r&&!r.error&&normalizeResult(r));editMode=false;$('editBtn').textContent='編集';$('jsonBox').readOnly=true;renderResults();}
     catch(e){say('AI JSONの形式が正しくありません: '+e.message,'err');return}
   }
-  let ok=0, ng=0;
+  let ok=0, ng=0;const gradeWarnings=[];
   setBusy(true);entrySaved=false;
   $('saveBtn').disabled=true;
   for(const r of results){
@@ -242,12 +243,13 @@ async function saveAll(){
       const res=await api(payload);
       if(!res.success)throw new Error(res.error||'保存失敗');
       ok++;
+      try{const token=localStorage.getItem('adminSystemPortalSessionToken')||sessionStorage.getItem('adminSystemPortalSessionToken');if(!token)throw Error('ログインが必要です');const response=await StepStaffAuth.fetchRuntime({action:'importMissingEntryGrades',studentId:String(r.studentId),token,permissionAppId:'student-directory',mutationId:crypto.randomUUID()});const imported=await response.json();if(!response.ok||!imported.success)throw Error(imported.error||'成績補完失敗');if(imported.warnings?.length)gradeWarnings.push(r.studentId+'：'+imported.warnings.join(' '));}catch(error){gradeWarnings.push(r.studentId+'：書類は保存済みです。生徒情報検索で再取得すると成績の未登録分を補完します。');}
     }catch(e){ng++;r.error=e.message}
   }
   setBusy(false);entrySaved=ok>0 && ng===0;
   $('editBtn').disabled=!results.some(r=>r && !r.error && r.studentId);
   renderResults();
-  say(`保存しました。成功 ${ok} 件 / 失敗 ${ng} 件。\n管理画面の「入塾時情報」で確認してください。`,ok?'ok':'err');
+  say(`保存しました。成功 ${ok} 件 / 失敗 ${ng} 件。\n管理画面の「入塾時情報」で確認してください。${gradeWarnings.length?'\n'+gradeWarnings.join('\n'):''}`,ok?'ok':'err');
   $('saveBtn').disabled=false;
 }
 
