@@ -69,6 +69,7 @@ header #logout{color:#175443;background:#fff;border-color:#def5e7}.card{backgrou
 #masterConfirm{width:min(1000px,96vw);padding:0;max-height:92vh}#masterConfirm .confirmHead{position:sticky;top:0;z-index:1;background:#fff;padding:16px 28px 10px;border-bottom:1px solid #dce7eb}#masterConfirm .confirmHead .muted{margin:7px 0 0}#masterConfirm h2{font-size:1.65rem;margin:0 0 6px}.confirmStudent{font-size:1.15rem;font-weight:700;line-height:1.6}.confirmRows{padding:4px 28px 8px}.confirmRow{display:grid;grid-template-columns:minmax(130px,.8fr) minmax(0,1fr) 30px minmax(0,1fr);gap:8px;border-bottom:1px solid #dce7eb;padding:8px 0;align-items:center}.confirmArrow{display:flex;align-items:center;justify-content:center;font-size:1.8rem;font-weight:900;line-height:1;color:#175443}.confirmField{font-size:1.1rem;font-weight:700;padding-top:0}.confirmValue{min-width:0;border-radius:9px;display:flex;align-items:baseline;gap:10px;padding:7px 10px;background:#f3f5f7;white-space:pre-wrap;overflow-wrap:anywhere;font-size:1.25rem;line-height:1.4}.confirmValue>span:last-child{min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}.confirmValue.after{background:#eaf8ef;color:#175443;font-weight:700;border:1px solid #b6dcc5}.confirmValueLabel{display:inline-block;flex:none;font-size:.8rem;font-weight:600;color:#627683;margin-bottom:0}.confirmFooter{position:sticky;bottom:0;background:#fff;border-top:1px solid #dce7eb;padding:12px 28px;display:flex;justify-content:flex-end;gap:12px}.confirmFooter .btn{font-size:1.15rem;padding:13px 24px;min-height:52px}@media(max-width:600px){#masterConfirm .confirmHead{padding:14px 16px 10px}#masterConfirm h2{font-size:1.35rem}.confirmRows{padding:2px 16px 8px}.confirmRow{grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr);gap:4px;padding:8px 0}.confirmField{grid-column:1/-1;padding:0}.confirmValue{font-size:1.08rem;padding:6px 8px;gap:6px}.confirmValueLabel{font-size:.72rem}.confirmFooter{padding:14px 16px}.confirmFooter .btn{flex:1;font-size:1rem;padding:12px 8px}.confirmStudent{font-size:1rem}}
 .entrySummary{margin-top:18px;border:1px solid #dce7eb;border-radius:12px;padding:12px 16px;background:#f8fbfd}.entrySummaryHead{display:flex;align-items:center;justify-content:space-between;gap:8px}.entrySummary h3{margin:0;font-size:1.1rem}.entrySummaryGrid{display:grid;grid-template-columns:1fr 1fr;gap:0 18px;margin-top:8px}.entrySummaryRow{display:grid;grid-template-columns:120px minmax(0,1fr);gap:8px;padding:5px 0;border-bottom:1px solid #e4edf1;font-size:.9rem;line-height:1.5}.entrySummaryRow strong{color:#60727c;font-size:.82rem}.entrySummaryRow span{white-space:pre-wrap;overflow-wrap:anywhere}.entrySummaryRow.wide{grid-column:1/-1}.entryFamily{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:6px}.entryFamily th,.entryFamily td{padding:5px 8px;text-align:left;border-bottom:1px solid #e4edf1;white-space:pre-wrap}.entryUnregistered{display:inline-block;margin:10px 0 2px;padding:8px 14px;border:1px solid #e5a632;border-radius:8px;background:#fff3d6;color:#8b4c0c;font-size:1rem;font-weight:700}.entrySummary .muted{font-size:.82rem;margin:6px 0}.entryFamilyWrap{overflow-x:auto}@media(max-width:600px){.entrySummary{padding:10px 12px}.entrySummaryGrid{grid-template-columns:1fr}.entrySummaryRow{grid-template-columns:105px minmax(0,1fr)}}
 .academicMemoEmpty{border:2px solid #43a783;background:#edf9f2}.academicMemoEmpty .academicHead>a{background:#25866a;color:#fff;border-color:#25866a;font-size:1rem;padding:12px 20px}.entryEditDialog{width:min(1000px,95vw);max-height:88vh}.entryEditGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px}.entryEditGrid label{margin:0}.entryEditGrid textarea{min-height:58px;width:100%;box-sizing:border-box}.entryEditFamily input{width:100%;min-width:85px;box-sizing:border-box;padding:6px}.entryEditFamily td{padding:4px}.entryEditActions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.entryEditFamily{width:100%;margin:10px 0;border-collapse:collapse}@media(max-width:600px){.entryEditGrid{grid-template-columns:1fr}}
+.academicMemoPanel .academicHead{flex-wrap:wrap}.academicMemoPanel .academicControls{margin-left:auto}.academicMemoPanel .academicBody[hidden]{display:none}.academicMemoPanel .academicControls button[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -367,6 +368,7 @@ async function loadDetail(id){
 // This module is independent of the removed directory-records-v2 panels.
 const DirectoryAcademic = (() => {
   const reads = new Map();
+  let memosHidden=false;
   const subjects = ['jpn','soc','math','sci','eng','mus','art','pe','tech'];
   const labels = ['国語','社会','数学','理科','英語','音楽','美術','保体','技家'];
   const make = (tag, text, cls) => {
@@ -568,6 +570,8 @@ const DirectoryAcademic = (() => {
     }
     const memoBox=panel('🗒️ 面談・メモ','getMeetingMemos',(area,rows)=>{
       const empty=!rows.length;area.closest('.academicPanel').classList.toggle('academicMemoEmpty',empty);
+      memoToggle.hidden=empty;area.hidden=!empty&&memosHidden;
+      memoToggle.textContent=memosHidden?'面談メモを表示する':'面談メモを隠す';memoToggle.setAttribute('aria-expanded',String(!memosHidden));
       if(empty){area.append(make('p','面談メモはまだ登録されていません。','muted'));return;}
       const sorted=rows.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
       for(const memo of sorted.slice(0,5)) {
@@ -579,7 +583,12 @@ const DirectoryAcademic = (() => {
     },wrap,true);
     const memoLink=make('a','この生徒にメモを追加','btn secondary small');
     memoLink.href='meeting_memo.html?studentId='+encodeURIComponent(id);memoLink.target='_blank';memoLink.rel='noopener';
-    memoBox.children[0].append(memoLink);
+    memoBox.classList.add('academicMemoPanel');
+    const memoHead=memoBox.children[0],memoBody=memoBox.children[1],memoControls=make('div',null,'academicControls');
+    const memoToggle=make('button',memosHidden?'面談メモを表示する':'面談メモを隠す','btn secondary small');
+    memoToggle.type='button';memoToggle.hidden=true;memoToggle.setAttribute('aria-expanded',String(!memosHidden));memoBody.hidden=memosHidden;
+    memoToggle.onclick=()=>{memosHidden=!memosHidden;memoBody.hidden=memosHidden;memoToggle.textContent=memosHidden?'面談メモを表示する':'面談メモを隠す';memoToggle.setAttribute('aria-expanded',String(!memosHidden));};
+    memoControls.append(memoHead.querySelector('button'),memoToggle);memoHead.append(memoControls,memoLink);
   }
   function refreshGrades(card){const wrap=card.querySelector('.directoryAcademic');for(const reload of wrap?.reloadGrades||[])reload();}
   return {mount,clear,refreshGrades};
