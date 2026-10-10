@@ -1,3 +1,4 @@
+import {entryGradeRows,missingEntryRows} from './entry-grade-import.ts';
 import { CORS_HEADERS, preflightResponse } from './storage.ts';
 import {checkPermissionBridge} from './permission-bridge.ts';
 
@@ -11,9 +12,9 @@ const ADMIN_ACTIONS = new Set([
   'getMeetingBootstrap', 'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
   'getStaffMembers', 'addStaffMember', 'deleteStaffMember',
   'reconcileLegacy', 'persistAdminSession', 'logoutAdmin',
-  'syncStudentDirectory', 'getStudentDirectoryDetail', 'saveStudentDirectory', 'enableStudentDirectoryAutoSync',
+  'importMissingEntryGrades', 'syncStudentDirectory', 'getStudentDirectoryDetail', 'saveStudentDirectory', 'enableStudentDirectoryAutoSync',
 ]);
-const WRITE_ACTIONS = new Set(['saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember', 'saveStudentDirectory']);
+const WRITE_ACTIONS = new Set(['importMissingEntryGrades', 'saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember', 'saveStudentDirectory']);
 const ADMIN_PERMISSION_LEVELS = new Set(['2', '3', '4']);
 const STAFF_PERMISSION_LEVELS = new Set(['1', '2', '3', '4']);
 // Grade-only sessions never authorize the directory or other management apps.
@@ -311,6 +312,40 @@ async function readWishes(payload: JsonObject, all: boolean): Promise<JsonObject
   const rows = await pg(query('school_preferences_with_students', params)) as JsonObject[];
   const wishes = rows.map(wish);
   return all ? { success: true, wishes, source: 'supabase' } : { success: true, wish: wishes[0] ?? null, source: 'supabase' };
+}
+
+async function importMissingEntryGrades(payload: JsonObject): Promise<JsonObject> {
+ const id=String(payload.studentId||'');
+ if(!/^\d{1,10}$/.test(id))throw new ResponseError(400,'STUDENT_REQUIRED','生徒番号が必要です。');
+ const students=await pg(query('students',{select:'id,grade',student_code:`eq.${id}`,limit:1})) as JsonObject[];
+ if(!students[0])throw new ResponseError(404,'STUDENT_NOT_FOUND','生徒が見つかりません。');
+ // Only use the saved sheet for this exact student; no client-provided grades.
+ const entry=await gas('getEntrySheetData',{studentId:id,systemPortalSessionToken:payload.token});
+ const d=entry.data as JsonObject|null;
+ if(!d)return {success:true,addedScores:0,addedReports:0,protectedScores:0,protectedReports:0,warnings:[]};
+ if(String(d.studentId)!==id)throw new ResponseError(400,'STUDENT_MISMATCH','生徒番号が一致しません。');
+ const memo=String(d.ocrMemo||''),pos=memo.indexOf('AI_JSON:');
+ if(pos<0)return {success:true,addedScores:0,addedReports:0,protectedScores:0,protectedReports:0,warnings:[]};
+ let ai:JsonObject;try{ai=JSON.parse(memo.slice(pos+8));}catch{throw new ResponseError(400,'ENTRY_JSON_INVALID','エントリーシートの読み取りデータが不正です。');}
+ const now=new Date(),jp=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tokyo',year:'numeric',month:'numeric'}).formatToParts(now);
+ const year=Number(jp.find(p=>p.type==='year')?.value),month=Number(jp.find(p=>p.type==='month')?.value);
+ const rows=entryGradeRows(ai,students[0],year-(month<4?1:0));
+ if(!rows.scores.length&&!rows.reports.length)return {success:true,addedScores:0,addedReports:0,protectedScores:0,protectedReports:0,warnings:rows.warnings};
+ // Legacy reads must succeed too: an unavailable old store never means blank.
+ const [dbScores,dbReports,legacyScores,legacyReports]=await Promise.all([
+  pg(query('test_scores',{select:'school_year,test_number',student_id:`eq.${students[0].id}`})) as Promise<JsonObject[]>,
+  pg(query('report_cards',{select:'school_year,term',student_id:`eq.${students[0].id}`})) as Promise<JsonObject[]>,
+  gas('getStudentScores',{studentId:id,systemPortalSessionToken:payload.token}),
+  gas('getReports',{studentId:id,systemPortalSessionToken:payload.token})
+ ]);
+ if(!Array.isArray(legacyScores.scores)||!Array.isArray(legacyReports.data))throw new Error('Legacy grade response is invalid');
+ const scores=missingEntryRows(rows.scores,dbScores,legacyScores.scores as JsonObject[],false);
+ const reports=missingEntryRows(rows.reports,dbReports,legacyReports.data as JsonObject[],true);
+ // Unique constraints enforce DO NOTHING even if a teacher saves concurrently.
+ const insert=async(table:string,keys:string,data:JsonObject[])=>data.length?await pg(query(table,{on_conflict:keys}),{method:'POST',headers:{Prefer:'resolution=ignore-duplicates,return=representation'},body:JSON.stringify(data)}) as JsonObject[]:[];
+ const addedScores=await insert('test_scores','student_id,school_year,test_number',scores);
+ const addedReports=await insert('report_cards','student_id,school_year,term',reports);
+ return {success:true,addedScores:addedScores.length,addedReports:addedReports.length,protectedScores:rows.scores.length-addedScores.length,protectedReports:rows.reports.length-addedReports.length,warnings:rows.warnings,source:'supabase'};
 }
 
 async function saveScore(payload: JsonObject): Promise<JsonObject> {
@@ -793,6 +828,7 @@ async function ingestDirectorySnapshot(payload: JsonObject): Promise<JsonObject>
 
 async function dispatch(payload: JsonObject): Promise<JsonObject> {
   switch (payload.action) {
+    case 'importMissingEntryGrades': return importMissingEntryGrades(payload);
     case 'getStudents': case 'getStudentList': return getStudents(payload);
     case 'syncStudentDirectory': return syncDirectory(payload);
     case 'enableStudentDirectoryAutoSync': return enableDirectoryAutoSync(payload);
@@ -885,5 +921,3 @@ Deno.serve(async request => {
     return json({ success: false, code: 'INTERNAL_ERROR', error: 'Internal server error' }, 500);
   }
 });
-
-
