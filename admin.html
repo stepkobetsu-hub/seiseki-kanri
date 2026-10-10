@@ -1,7 +1,4 @@
-Warning: truncated output (original token count: 101467)
-Total output lines: 5819
-
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -1423,7 +1420,152 @@ function matchesEnrollmentFilter(student, showActive, showWithdrawn) {
 function matchesEnrollmentRecord(studentId, activeId, withdrawnId) {
   const { showActive, showWithdrawn } = enrollmentSelection(activeId, withdrawnId);
   const flag = enrollmentByStudentId.get(String(studentId));
-  return matche…1467 tokens truncated…    content: sbValue(row.content),
+  return matchesEnrollmentFilter({ flag }, showActive, showWithdrawn);
+}
+
+function withdrawnBadgeForStudentId(studentId) {
+  const key = String(studentId);
+  if (!enrollmentByStudentId.has(key)) return '';
+  const flag = enrollmentByStudentId.get(key);
+  if (flag === '0') return '<span class="withdrawalScheduledBadge">退塾予定</span>';
+  if (flag === '') return '<span class="withdrawnBadge">退塾</span>';
+  return '';
+}
+
+function enrollmentFilterIsEmpty(activeId, withdrawnId) {
+  const { showActive, showWithdrawn } = enrollmentSelection(activeId, withdrawnId);
+  return !showActive && !showWithdrawn;
+}
+
+// 生徒一覧専用。☆マスタB列の 1 / 0 / 空欄を3状態のまま扱う。
+function studentListEnrollmentStatus(student) {
+  let value;
+  if (student && Object.prototype.hasOwnProperty.call(student, 'enrollmentFlag')) value = student.enrollmentFlag;
+  else if (student && Object.prototype.hasOwnProperty.call(student, 'flag')) value = student.flag;
+  else value = student?.active;
+  if (value === null || value === undefined) return 'withdrawn';
+  const flag = String(value).trim();
+  if (flag === '1') return 'active';
+  if (flag === '0') return 'withdrawalScheduled';
+  if (flag === '') return 'withdrawn';
+  return 'unknown';
+}
+
+function matchesStudentListEnrollment(student, showActive, showWithdrawn) {
+  const status = studentListEnrollmentStatus(student);
+  if (status === 'active' || status === 'withdrawalScheduled') return showActive;
+  if (status === 'withdrawn') return showWithdrawn;
+  return false;
+}
+
+function studentListStatusBadge(student) {
+  const status = studentListEnrollmentStatus(student);
+  if (status === 'withdrawalScheduled') return '<span class="withdrawalScheduledBadge">退塾予定</span>';
+  if (status === 'withdrawn') return '<span class="withdrawnBadge">退塾</span>';
+  return '';
+}
+
+function studentListPrintName(student) {
+  const status = studentListEnrollmentStatus(student);
+  const suffix = status === 'withdrawalScheduled' ? '（退塾予定）' : status === 'withdrawn' ? '（退塾）' : '';
+  return `${student.name}${suffix}`;
+}
+
+// 全画面共通の生徒検索：漢字・ひらがな・カタカナ・ローマ字・生徒番号に対応
+function matchesUnifiedStudentSearch_(record, query) {
+  const q = normalizeCmpStudentSearch_(query);
+  if (!q) return true;
+  const studentId = String(record?.studentId ?? record?.id ?? record?.studentCode ?? record?.student_code ?? '').trim();
+  const master = studentSearchById.get(studentId)
+    || students.find(s => String(s.id ?? s.studentId ?? s.studentCode ?? '') === studentId)
+    || {};
+  const name = record?.name ?? master.name ?? '';
+  const kana = record?.nameKana ?? record?.kana ?? record?.furigana
+    ?? master.nameKana ?? master.kana ?? master.furigana ?? '';
+  return [studentId, name, kana, cmpKanaToRomaji_(kana)]
+    .map(normalizeCmpStudentSearch_)
+    .some(value => value.includes(q));
+}
+
+async function ensureEnrollmentIndex(force) {
+  if (enrollmentIndexReady && !force) return;
+  const result = await api({ action: 'getStudents', limit: 1000 });
+  if (!result.success) throw new Error(result.error || '在籍情報を取得できませんでした');
+  const rows = result.students || [];
+  enrollmentByStudentId = new Map();
+  studentSearchById = new Map();
+  rows.forEach(student => {
+    const id = String(student.id ?? student.studentId ?? student.student_code ?? '').trim();
+    const flag = normalizedEnrollmentFlag(student);
+    if (id) {
+      enrollmentByStudentId.set(id, flag);
+      studentSearchById.set(id, student);
+    }
+  });
+  // 面談画面の生徒選択にも同じ全件データを再利用し、二重取得と競合を防ぐ
+  if (!students.length) students = rows;
+  enrollmentIndexReady = true;
+}
+
+function sbScore(row) {
+  return {
+    id: row.id,
+    studentId: sbValue(row.student_code || row.student_id),
+    name: sbValue(row.student_name || row.name),
+    campus: sbValue(row.campus),
+    grade: sbValue(row.grade),
+    school: sbValue(row.school_name),
+    year: row.school_year,
+    term: row.test_number,
+    jpn: row.japanese, soc: row.social, math: row.math, sci: row.science, eng: row.english,
+    mus: row.music, art: row.art, pe: row.health_pe, tech: row.technology_home,
+    total5: row.total_5, total9: row.total_9, rank5: row.rank_5, rank9: row.rank_9,
+    avg_jpn: row.avg_japanese, avg_soc: row.avg_social, avg_math: row.avg_math,
+    avg_sci: row.avg_science, avg_eng: row.avg_english, avg_total5: row.avg_total_5,
+    createdAt: sbValue(row.created_at), updatedAt: sbValue(row.updated_at)
+  };
+}
+
+function sbReport(row) {
+  return {
+    id: row.id,
+    studentId: sbValue(row.student_code || row.student_id),
+    name: sbValue(row.student_name || row.name),
+    campus: sbValue(row.campus),
+    grade: sbValue(row.grade),
+    school: sbValue(row.school_name),
+    year: row.school_year,
+    semester: row.term,
+    rp_jpn: row.japanese, rp_soc: row.social, rp_math: row.math, rp_sci: row.science, rp_eng: row.english,
+    rp_mus: row.music, rp_art: row.art, rp_pe: row.health_pe, rp_tech: row.technology_home,
+    createdAt: sbValue(row.created_at), updatedAt: sbValue(row.updated_at)
+  };
+}
+
+function sbWish(row) {
+  const wishes = row.wishes || {};
+  return Object.assign({
+    id: row.id,
+    studentId: sbValue(row.student_code || row.student_id),
+    name: sbValue(row.student_name || row.name),
+    campus: sbValue(row.campus),
+    grade: sbValue(row.grade),
+    updatedAt: sbValue(row.updated_at),
+    results: row.results || {}
+  }, wishes);
+}
+
+function sbMemo(row) {
+  return {
+    id: row.id,
+    date: row.memo_date,
+    studentId: sbValue(row.student_code || row.student_id),
+    name: sbValue(row.student_name || row.name),
+    campus: sbValue(row.campus),
+    grade: sbValue(row.grade),
+    school: sbValue(row.school_name),
+    counterpart: sbValue(row.contact_person),
+    content: sbValue(row.content),
     staff: sbValue(row.staff_name),
     staffEmail: sbValue(row.staff_email),
     createdAt: sbValue(row.created_at),
