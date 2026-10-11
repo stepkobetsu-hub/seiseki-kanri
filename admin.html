@@ -4112,6 +4112,7 @@ async function initCompare() {
 function normalizeCmpStudentSearch_(value) {
   return String(value || '')
     .normalize('NFKC')
+    .replace(/髙/g, '高')
     .toLowerCase()
     .replace(/[ァ-ヶ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60))
     .replace(/[\\s　]+/g, '');
