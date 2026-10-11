@@ -372,6 +372,16 @@ async function loadDetail(id){
 const DirectoryAcademic = (() => {
   const reads = new Map();
   let memosHidden=false;
+  // A new visit, including browser history restoration, starts with memos visible.
+  window.addEventListener('pageshow', () => {
+    memosHidden=false;
+    for (const panel of document.querySelectorAll('.academicMemoPanel')) {
+      const body=panel.querySelector('.academicBody');
+      const toggle=panel.querySelector('.academicMemoToggle');
+      if(body)body.hidden=false;
+      if(toggle){toggle.textContent='面談メモを隠す';toggle.setAttribute('aria-expanded','true');}
+    }
+  });
   const subjects = ['jpn','soc','math','sci','eng','mus','art','pe','tech'];
   const labels = ['国語','社会','数学','理科','英語','音楽','美術','保体','技家'];
   const make = (tag, text, cls) => {
