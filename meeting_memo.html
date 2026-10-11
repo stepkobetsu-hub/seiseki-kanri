@@ -374,6 +374,14 @@ body.auth-locked > #toast{display:none!important}
   }
   .headActions .reportLink{gap:3px;box-shadow:0 2px 0 #8c2e0b}
 }
+/* Compact navigation labels stay in the title row on small screens. */
+@media(max-width:600px){
+  .head h1{font-size:.9rem}
+  .headActions{flex:1}
+  .headActions .home{height:40px;min-height:40px;white-space:normal;font-size:.65rem;padding:0 4px;flex:1 1 0;text-align:center;overflow-wrap:anywhere}
+  .headActions .reportLink{max-width:8em}
+  .headActions .logoutButton{height:40px;min-height:40px;font-size:.65rem;padding:0 4px}
+}
 </style>
 </head>
 <body class="auth-locked">
@@ -414,10 +422,11 @@ body.auth-locked > #toast{display:none!important}
     <h1>面談メモ</h1>
     <div class="headActions">
       <span id="meetingSessionStaff" class="sessionStaff"></span>
+      <a class="home studentSearchLink" href="student_directory.html">生徒情報検索へ</a>
       <a class="home reportLink" href="classroom_reports.html"><span aria-hidden="true">★</span>良い事や行事予定へ</a>
       <button class="installMeetingButton" type="button" data-install-meeting>アプリ追加</button>
       <button class="logoutButton" type="button" onclick="meetingLogout()">ログアウト</button>
-      <a class="home" href="index.html">トップへ</a>
+      <a class="home staffHomeLink" href="index.html">スタッフ用アプリへ</a>
     </div>
   </div>
 </header>
