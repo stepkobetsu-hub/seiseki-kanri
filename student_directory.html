@@ -138,7 +138,7 @@ function showApp(){updateEditorSessionUI();el('login').classList.add('hidden');e
 async function logout(){const t=token();clearSession();showLogin();if(t)api('logoutSystemPortal',{systemPortalSessionToken:t}).catch(()=>{})}
 async function start(){if(!token()){showLogin();return}showApp()}
 async function login(){const code=el('code').value.trim(),password=el('password').value;if(!code||!password){el('loginError').textContent='講師番号とパスワードを入力してください。';return}el('loginButton').disabled=true;el('loginError').textContent='確認しています…';try{const r=await api('staffLogin',{code,password});if(!r.success||!r.systemPortalSessionToken)throw Error(r.error||'この画面には管理権限が必要です。');const store=storage();store.setItem('adminDeviceMode',mode);store.setItem('adminLoggedIn','1');store.setItem('adminStaffCode',r.code||code);store.setItem('adminStaffName',r.name||'');store.setItem(TOKEN,r.systemPortalSessionToken);store.setItem(EXPIRY,r.systemPortalExpiresAt||'');StepStaffAuth.persist(r.systemPortalSessionToken).then(()=>{if(token()===r.systemPortalSessionToken)store.setItem(EXPIRY,'2100-01-01T00:00:00.000Z')}).catch(()=>{});el('password').value='';showApp()}catch(e){el('loginError').textContent=e.message}finally{el('loginButton').disabled=false}}
-function normalize(v){return String(v||'').normalize('NFKC').toLowerCase().replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-96)).replace(/[\s　]+/g,'')}
+function normalize(v){return String(v||'').normalize('NFKC').replace(/髙/g,'高').toLowerCase().replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-96)).replace(/[\s　]+/g,'')}
 const PAIRS = {
   'きゃ':'kya','きゅ':'kyu','きょ':'kyo','ぎゃ':'gya','ぎゅ':'gyu','ぎょ':'gyo',
   'しゃ':'sha','しゅ':'shu','しょ':'sho','じゃ':'ja','じゅ':'ju','じょ':'jo',
