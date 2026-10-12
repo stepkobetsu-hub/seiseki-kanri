@@ -657,7 +657,7 @@ tr:hover td{background:#f8fafc}
               <button type="button" class="stuGradeBtn group" data-grade-group="high" onclick="selectStuGradeGroup('high')">高校生</button>
               <button type="button" class="stuGradeBtn group" data-grade-group="all" onclick="selectStuGradeGroup('all')">全員</button>
               <button type="button" class="stuGradeBtn clear" onclick="selectStuGradeGroup('clear')">クリア</button>
-              <span id="stuGradeSummary" class="stuGradeSummary">全学年</span>
+              <span id="stuGradeSummary" class="stuGradeSummary">未選択（全員）</span>
             </div>
             <div class="stuGradeFilterRow">
               <span class="stuGradeFilterLabel">個別</span>
@@ -3040,7 +3040,8 @@ const STU_GRADE_GROUPS = {
   high: ['高1','高2','高3']
 };
 const STU_ALL_GRADES = [...STU_GRADE_GROUPS.elementary, ...STU_GRADE_GROUPS.junior, ...STU_GRADE_GROUPS.high];
-const _stuGrades = new Set(STU_ALL_GRADES);
+// 学年未選択は絞り込みなし（全員）。最初の選択から対象学年だけを追加する。
+const _stuGrades = new Set();
 
 function selectedStuGrades() {
   return [..._stuGrades];
@@ -3060,9 +3061,9 @@ function _renderStuGradeButtons() {
   const summary = document.getElementById('stuGradeSummary');
   if (summary) {
     const grades = selectedStuGrades();
-    summary.textContent = grades.length === 0 || grades.length === STU_ALL_GRADES.length
-      ? '全学年'
-      : grades.join('・');
+    summary.textContent = grades.length === 0
+      ? '未選択（全員）'
+      : grades.length === STU_ALL_GRADES.length ? '全学年' : grades.join('・');
   }
 }
 
