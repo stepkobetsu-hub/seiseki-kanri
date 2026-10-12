@@ -157,7 +157,11 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 .filterRow{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:center}
 .filterRow select,.filterRow input[type=text]{background:#fff;border:1px solid var(--border2);border-radius:8px;padding:7px 10px;color:#1e293b;font-size:.8rem;outline:none}
 .filterRow select:focus,.filterRow input[type=text]:focus{border-color:var(--primary)}
-.stuGradeFilter{display:flex;flex-direction:column;gap:6px;padding:8px 10px;background:#f8fafc;border:1px solid var(--border);border-radius:10px;flex-basis:100%}
+.stuGradeFilter{display:grid;grid-template-columns:104px minmax(0,1fr);gap:6px 10px;padding:8px 10px;background:#f8fafc;border:1px solid var(--border);border-radius:10px;flex-basis:100%;min-width:0}
+.stuCampusFilter{grid-column:1;grid-row:1 / span 2;display:flex;align-items:center;padding-right:10px;border-right:1px solid var(--border)}
+.stuCampusFilter #stuCampus{width:100%;min-height:64px;padding:10px 8px;font-weight:700;cursor:pointer}
+.stuGradeFilter>.stuGradeFilterRow{grid-column:2;min-width:0}
+@media(max-width:540px){.stuGradeFilter{grid-template-columns:88px minmax(0,1fr);column-gap:8px}.stuCampusFilter{padding-right:8px}.stuCampusFilter #stuCampus{padding:8px 5px}}
 .stuGradeFilterRow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .stuGradeFilterLabel{font-size:.72rem;color:var(--sub);font-weight:700;min-width:34px}
 .stuGradeBtn{border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:7px;padding:5px 10px;font-size:.76rem;font-weight:700;cursor:pointer;transition:.15s}
@@ -636,11 +640,6 @@ tr:hover td{background:#f8fafc}
           <div class="searchWrap">
             <input type="text" id="stuSearch" placeholder="氏名・かな・ローマ字・IDで検索" oninput="onStudentFilterChange()">
           </div>
-          <select id="stuCampus" onchange="onStudentFilterChange();buildSchoolDropdown()">
-            <option value="">全校舎</option>
-            <option>神領</option>
-            <option>大手</option>
-          </select>
           <span class="enrollmentFilter">
             <label><input type="checkbox" id="stuShowActive" checked onchange="onStudentEnrollmentChange()">在籍生</label>
             <label><input type="checkbox" id="stuShowWithdrawn" onchange="onStudentEnrollmentChange()">退塾生</label>
@@ -650,6 +649,13 @@ tr:hover td{background:#f8fafc}
             <button type="button" class="btn btn-primary btn-sm student-sync-button" onclick="openStudentSyncPreview()" onpointerdown="this.classList.add('is-pressed')" onpointerup="this.classList.remove('is-pressed')" onpointercancel="this.classList.remove('is-pressed')" onpointerleave="this.classList.remove('is-pressed')"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7a9 9 0 0 0-15-1L2 9m0-6v6h6M4 17a9 9 0 0 0 15 1l3-3m0 6v-6h-6"/></svg><span>同期</span></button>
           </div>
           <div class="stuGradeFilter" aria-label="学年（複数選択可）">
+            <div class="stuCampusFilter">
+              <select id="stuCampus" aria-label="校舎" onchange="onStudentFilterChange();buildSchoolDropdown()">
+                <option value="">全校舎</option>
+                <option>神領</option>
+                <option>大手</option>
+              </select>
+            </div>
             <div class="stuGradeFilterRow">
               <span class="stuGradeFilterLabel">学年</span>
               <button type="button" class="stuGradeBtn group" data-grade-group="elementary" onclick="selectStuGradeGroup('elementary')">小学生</button>
