@@ -165,6 +165,14 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 .stuGradeBtn.group.on{background:#2563eb;border-color:#2563eb;color:#fff}
 .stuGradeBtn.grade.on{background:#e87918;border-color:#e87918;color:#fff}
 .stuGradeBtn.clear{background:#aebbc1;border-color:#aebbc1;color:#fff}
+.stuListActions{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.student-print-button{min-height:46px;padding:10px 24px;background:#b45309;color:#fff;border:2px solid #92400e;font-size:1rem;font-weight:800;box-shadow:0 3px 8px rgba(180,83,9,.22)}
+.student-print-button span{font-size:1.25rem}
+.student-print-button:hover{background:#92400e}
+.student-print-button:focus-visible{outline:3px solid #fbbf24;outline-offset:3px}
+.stuListActions .student-sync-button{min-height:40px;padding:8px 14px;font-size:.82rem}
+.stuGradeFilterRow #stuSchoolDropWrap{margin-left:8px}
+@media(max-width:760px){.stuListActions{flex-basis:100%}.stuGradeFilterRow #stuSchoolDropWrap{margin-left:0}}
 .stuGradeSummary{font-size:.72rem;color:var(--primary);font-weight:700;margin-left:4px}
 
 /* SEARCH INPUT */
@@ -633,6 +641,10 @@ tr:hover td{background:#f8fafc}
             <label><input type="checkbox" id="stuShowActive" checked onchange="onStudentEnrollmentChange()">在籍生</label>
             <label><input type="checkbox" id="stuShowWithdrawn" onchange="onStudentEnrollmentChange()">退塾生</label>
           </span>
+          <div class="stuListActions">
+            <button type="button" class="btn student-print-button" onclick="printStudentList()"><span aria-hidden="true">🖨️</span> 印刷</button>
+            <button class="btn btn-primary btn-sm student-sync-button" onclick="openStudentSyncPreview()" onpointerdown="this.classList.add('is-pressed')" onpointerup="this.classList.remove('is-pressed')" onpointercancel="this.classList.remove('is-pressed')" onpointerleave="this.classList.remove('is-pressed')">🔄 同期</button>
+          </div>
           <div class="stuGradeFilter" aria-label="学年（複数選択可）">
             <div class="stuGradeFilterRow">
               <span class="stuGradeFilterLabel">学年</span>
@@ -646,28 +658,24 @@ tr:hover td{background:#f8fafc}
             <div class="stuGradeFilterRow">
               <span class="stuGradeFilterLabel">個別</span>
               <button type="button" class="stuGradeBtn grade" data-grade="小1" onclick="toggleStuGrade('小1')">小1</button><button type="button" class="stuGradeBtn grade" data-grade="小2" onclick="toggleStuGrade('小2')">小2</button><button type="button" class="stuGradeBtn grade" data-grade="小3" onclick="toggleStuGrade('小3')">小3</button><button type="button" class="stuGradeBtn grade" data-grade="小4" onclick="toggleStuGrade('小4')">小4</button><button type="button" class="stuGradeBtn grade" data-grade="小5" onclick="toggleStuGrade('小5')">小5</button><button type="button" class="stuGradeBtn grade" data-grade="小6" onclick="toggleStuGrade('小6')">小6</button><button type="button" class="stuGradeBtn grade" data-grade="中1" onclick="toggleStuGrade('中1')">中1</button><button type="button" class="stuGradeBtn grade" data-grade="中2" onclick="toggleStuGrade('中2')">中2</button><button type="button" class="stuGradeBtn grade" data-grade="中3" onclick="toggleStuGrade('中3')">中3</button><button type="button" class="stuGradeBtn grade" data-grade="高1" onclick="toggleStuGrade('高1')">高1</button><button type="button" class="stuGradeBtn grade" data-grade="高2" onclick="toggleStuGrade('高2')">高2</button><button type="button" class="stuGradeBtn grade" data-grade="高3" onclick="toggleStuGrade('高3')">高3</button>
+              <!-- 学校チェックボックスドロップダウン -->
+              <div id="stuSchoolDropWrap" style="position:relative">
+                <button id="stuSchoolDropBtn" onclick="toggleSchoolDrop(event)"
+                  style="padding:7px 10px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font-size:.8rem;color:#1e293b;cursor:pointer;white-space:nowrap;min-width:100px;text-align:left;display:flex;align-items:center;gap:6px">
+                  <span id="stuSchoolDropLabel">全学校</span>
+                  <span style="margin-left:auto;color:#94a3b8;font-size:.7rem">▼</span>
+                </button>
+                <div id="stuSchoolDropMenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:300;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:180px;padding:8px 0">
+                  <div style="display:flex;gap:6px;padding:6px 12px 8px;border-bottom:1px solid #f1f5f9">
+                    <button onclick="stuSchoolAll(true)"  style="flex:1;padding:3px 0;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;font-size:.73rem;cursor:pointer;color:#475569">すべて✔</button>
+                    <button onclick="stuSchoolAll(false)" style="flex:1;padding:3px 0;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;font-size:.73rem;cursor:pointer;color:#475569">すべて外す</button>
+                  </div>
+                  <div id="stuSchoolCheckList" style="max-height:220px;overflow-y:auto;padding:4px 0"></div>
             </div>
           </div>
-
-          <!-- 学校チェックボックスドロップダウン -->
-          <div id="stuSchoolDropWrap" style="position:relative">
-            <button id="stuSchoolDropBtn" onclick="toggleSchoolDrop(event)"
-              style="padding:7px 10px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;font-size:.8rem;color:#1e293b;cursor:pointer;white-space:nowrap;min-width:100px;text-align:left;display:flex;align-items:center;gap:6px">
-              <span id="stuSchoolDropLabel">全学校</span>
-              <span style="margin-left:auto;color:#94a3b8;font-size:.7rem">▼</span>
-            </button>
-            <div id="stuSchoolDropMenu" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:300;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:180px;padding:8px 0">
-              <div style="display:flex;gap:6px;padding:6px 12px 8px;border-bottom:1px solid #f1f5f9">
-                <button onclick="stuSchoolAll(true)"  style="flex:1;padding:3px 0;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;font-size:.73rem;cursor:pointer;color:#475569">すべて✔</button>
-                <button onclick="stuSchoolAll(false)" style="flex:1;padding:3px 0;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;font-size:.73rem;cursor:pointer;color:#475569">すべて外す</button>
-              </div>
-              <div id="stuSchoolCheckList" style="max-height:220px;overflow-y:auto;padding:4px 0"></div>
             </div>
           </div>
-
-          <button class="btn btn-outline btn-sm" onclick="printStudentList()">🖨️ 印刷</button>
           <button id="stuLegacyBtn" class="btn btn-ghost btn-sm" style="display:none" onclick="openStudentsWithLegacy()">従来方式で開く</button>
-          <button class="btn btn-primary btn-sm student-sync-button" onclick="openStudentSyncPreview()" onpointerdown="this.classList.add('is-pressed')" onpointerup="this.classList.remove('is-pressed')" onpointercancel="this.classList.remove('is-pressed')" onpointerleave="this.classList.remove('is-pressed')">🔄 同期</button>
         </div>
 
         <!-- 並び順行 -->
