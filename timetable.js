@@ -14,7 +14,7 @@ async function run(fn){if(busy)return;busy=true;document.querySelectorAll('#app 
 async function load(quiet=false){const id=++loading;const r=await api('bootstrap');if(id!==loading)return;days=r.days;students=r.students;$('masterStamp').textContent='マスタ同期：'+(r.masterUpdatedAt?new Date(r.masterUpdatedAt).toLocaleString('ja-JP'):'未同期');$('masterRefresh').hidden=r.permission==='1';if(!messageDirty)render();if(!quiet)status('読み込みました。変更はスタッフ間で共有されます。');}
 function render(){const d=current(),day=$('day').value,campus=$('campus').value;
  $('heading').textContent=(campus==='神領'?'神領校':'大手町校')+'　'+day.replace(/-/g,'/')+'（'+W[new Date(day+'T00:00:00Z').getUTCDay()]+'）';
- $('printTime').textContent='';$('dates').innerHTML=Array.from({length:35},(_,i)=>{const day=plus(nowDay(),i),exists=days.some(d=>d.day===day);return `<button class="${day===$('day').value?'active ':''}${exists?'':'empty'}" data-day="${day}">${day.slice(5).replace('-','/')}（${W[new Date(day+'T00:00:00Z').getUTCDay()]}）${exists?'':' 未作成'}</button>`}).join('');
+ $('printTime').textContent='';$('dates').innerHTML=Array.from({length:42},(_,i)=>{const day=plus(nowDay(),i),exists=days.some(d=>d.day===day);return `<button class="${day===$('day').value?'active ':''}${exists?'':'empty'}" data-day="${day}">${day.slice(5).replace('-','/')}（${W[new Date(day+'T00:00:00Z').getUTCDay()]}）${exists?'':' 未作成'}</button>`}).join('');
  $('dates').querySelectorAll('button').forEach(b=>b.onclick=()=>chooseDay(b.dataset.day));
  $('studentMessage').value=d?.data.studentMessage||'';$('teacherMessage').value=d?.data.teacherMessage||'';
  if(!d){$('schedule').innerHTML='<p class="emptySlot">この日は未作成です。「未作成の日を追加する」で時間割を作成してください。</p>';$('warnings').hidden=true;return;}

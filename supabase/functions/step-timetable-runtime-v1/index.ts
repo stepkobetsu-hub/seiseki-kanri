@@ -26,11 +26,11 @@ Deno.serve(async req=>{
  const user=await auth(String(p.token||''));let out:unknown;
  const campus=p.campus;if(!['神領','大手'].includes(campus))throw Error('校舎を選択してください');
  if(p.action==='bootstrap'){
-  const [days,students,state]=await Promise.all([pg('step_timetable_days?campus=eq.'+encodeURIComponent(campus)+'&day=gte.'+today()+'&day=lte.'+dayPlus(today(),34)+'&order=day.asc'),pg('students?select=student_code,name,grade,campus&enrollment_status=in.(active,withdrawal_scheduled)&limit=1000'),pg('student_directory_sync_state?select=last_success_at&limit=1')]);
+  const [days,students,state]=await Promise.all([pg('step_timetable_days?campus=eq.'+encodeURIComponent(campus)+'&day=gte.'+today()+'&day=lte.'+dayPlus(today(),41)+'&order=day.asc'),pg('students?select=student_code,name,grade,campus&enrollment_status=in.(active,withdrawal_scheduled)&limit=1000'),pg('student_directory_sync_state?select=last_success_at&limit=1')]);
   for(const d of days){try{validate(d.data)}catch(e){d.warning=e.message}}
   out={success:true,days,students,masterUpdatedAt:state[0]?.last_success_at,permission:user.permission_level};
  }else if(p.action==='generate'){
-  if(![2,3,4,5].includes(Number(p.weeks)))throw Error('2～5週間を選択してください');
+  if(![1,2,3,4,5,6].includes(Number(p.weeks)))throw Error('1～6週間を選択してください');
   const state=await pg('student_directory_sync_state?select=last_success_at&limit=1');if(!state[0]?.last_success_at||Date.now()-Date.parse(state[0].last_success_at)>30*60000)throw Error('マスタ同期が30分以上前です。「マスタを更新」を押してから作成してください。');
   const [details,rules]=await Promise.all([pg('student_directory_details?select=student_code,detail&limit=1000'),pg('step_timetable_rules?select=*&limit=1000')]);
   const rows=[];for(let i=0;i<Number(p.weeks)*7;i++){const day=dayPlus(today(),i);rows.push({campus,day,updated_by:user.staff_code,data:{lessons:baseLessons(details,rules,campus,day),studentMessage:'',teacherMessage:''}});}
