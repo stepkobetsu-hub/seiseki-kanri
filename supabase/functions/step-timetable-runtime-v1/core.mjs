@@ -33,7 +33,7 @@ export function baseLessons(details,rules,campus,day){
  return out.sort((a,b)=>a.time.localeCompare(b.time)||a.position-b.position||a.name.localeCompare(b.name,'ja'));
 }
 export function parseHistory(h,students){
- if(!/特訓/.test(h.titleLine||''))return [];
+ if(!/特訓部屋/.test(h.titleLine||''))return [];
  const title=String(h.titleLine),m=title.match(/(20\d{2})[年\/-](\d{1,2})[月\/-](\d{1,2})/),t=title.match(/\d{1,2}[：:]\d{2}\s*[-–—~〜～]\s*\d{1,2}[：:]\d{2}/);
  if(!m||!t)return [];const day=m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');if(!Number.isFinite(Date.parse(day))||day<today())return [];
  const names=String(h.targetLine||'').split(' / ')[0].split(/[、,]/).map(s=>norm(s.replace(/^[小中高][１２３４５６1-6]\s*/, '').replace(/さん$/,''))).filter(Boolean),out=[];
