@@ -281,7 +281,20 @@ async function getStudents(payload: JsonObject): Promise<JsonObject> {
     if (safe) params.or = `(name.ilike.*${safe}*,student_code.ilike.*${safe}*)`;
   }
   const rows = await pg(query('students', params)) as JsonObject[];
-  return { success: true, students: rows.map(student), hasMore: rows.length === limit, limit, offset, source: 'supabase' };
+  // The directory mirror already contains timetable AI (standard course).
+  // Return only course, never contact details or editable master data.
+  const courses = new Map<string, string>();
+  if (rows.length) {
+    const codes = rows.map(row => String(row.student_code)).filter(code => /^\d{1,10}$/.test(code));
+    if (codes.length) {
+      const details = await pg(query('student_directory_details', {
+        select: 'student_code,course:detail->student->>course',
+        student_code: `in.(${codes.join(',')})`, limit: 1000,
+      })) as JsonObject[];
+      for (const detail of details) courses.set(String(detail.student_code), String(detail.course ?? ''));
+    }
+  }
+  return { success: true, students: rows.map(row => ({ ...student(row), course: courses.get(String(row.student_code)) || '' })), hasMore: rows.length === limit, limit, offset, source: 'supabase' };
 }
 
 async function readScores(payload: JsonObject, all: boolean): Promise<JsonObject> {
