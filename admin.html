@@ -667,7 +667,7 @@ tr:hover td{background:#f8fafc}
             </div>
             <div class="stuGradeFilterRow">
               <span class="stuGradeFilterLabel">個別</span>
-              <button type="button" class="stuGradeBtn grade" data-grade="小1" onclick="toggleStuGrade('小1')">小1</button><button type="button" class="stuGradeBtn grade" data-grade="小2" onclick="toggleStuGrade('小2')">小2</button><button type="button" class="stuGradeBtn grade" data-grade="小3" onclick="toggleStuGrade('小3')">小3</button><button type="button" class="stuGradeBtn grade" data-grade="小4" onclick="toggleStuGrade('小4')">小4</button><button type="button" class="stuGradeBtn grade" data-grade="小5" onclick="toggleStuGrade('小5')">小5</button><button type="button" class="stuGradeBtn grade" data-grade="小6" onclick="toggleStuGrade('小6')">小6</button><button type="button" class="stuGradeBtn grade" data-grade="中1" onclick="toggleStuGrade('中1')">中1</button><button type="button" class="stuGradeBtn grade" data-grade="中2" onclick="toggleStuGrade('中2')">中2</button><button type="button" class="stuGradeBtn grade" data-grade="中3" onclick="toggleStuGrade('中3')">中3</button><button type="button" class="stuGradeBtn grade" data-grade="高1" onclick="toggleStuGrade('高1')">高1</button><button type="button" class="stuGradeBtn grade" data-grade="高2" onclick="toggleStuGrade('高2')">高2</button><button type="button" class="stuGradeBtn grade" data-grade="高3" onclick="toggleStuGrade('高3')">高3</button>
+              <button type="button" id="stuProgrammingBtn" class="stuGradeBtn grade" aria-pressed="false" onclick="toggleStuProgramming()">プロ</button><button type="button" class="stuGradeBtn grade" data-grade="小1" onclick="toggleStuGrade('小1')">小1</button><button type="button" class="stuGradeBtn grade" data-grade="小2" onclick="toggleStuGrade('小2')">小2</button><button type="button" class="stuGradeBtn grade" data-grade="小3" onclick="toggleStuGrade('小3')">小3</button><button type="button" class="stuGradeBtn grade" data-grade="小4" onclick="toggleStuGrade('小4')">小4</button><button type="button" class="stuGradeBtn grade" data-grade="小5" onclick="toggleStuGrade('小5')">小5</button><button type="button" class="stuGradeBtn grade" data-grade="小6" onclick="toggleStuGrade('小6')">小6</button><button type="button" class="stuGradeBtn grade" data-grade="中1" onclick="toggleStuGrade('中1')">中1</button><button type="button" class="stuGradeBtn grade" data-grade="中2" onclick="toggleStuGrade('中2')">中2</button><button type="button" class="stuGradeBtn grade" data-grade="中3" onclick="toggleStuGrade('中3')">中3</button><button type="button" class="stuGradeBtn grade" data-grade="高1" onclick="toggleStuGrade('高1')">高1</button><button type="button" class="stuGradeBtn grade" data-grade="高2" onclick="toggleStuGrade('高2')">高2</button><button type="button" class="stuGradeBtn grade" data-grade="高3" onclick="toggleStuGrade('高3')">高3</button>
               <!-- 学校チェックボックスドロップダウン -->
               <div id="stuSchoolDropWrap" style="position:relative">
                 <button id="stuSchoolDropBtn" onclick="toggleSchoolDrop(event)"
@@ -3048,6 +3048,17 @@ const STU_GRADE_GROUPS = {
 const STU_ALL_GRADES = [...STU_GRADE_GROUPS.elementary, ...STU_GRADE_GROUPS.junior, ...STU_GRADE_GROUPS.high];
 // 学年未選択は絞り込みなし（全員）。最初の選択から対象学年だけを追加する。
 const _stuGrades = new Set();
+let _stuProgramming = false;
+
+function isProgrammingStudent(s) {
+  return /^プロ(?:\([^)]*\))?$/.test(String(s.course || "").normalize("NFKC").replace(/\s/g, ""));
+}
+
+function toggleStuProgramming() {
+  _stuProgramming = !_stuProgramming;
+  _stuGrades.clear();
+  _applyStuGradeChange();
+}
 
 function selectedStuGrades() {
   return [..._stuGrades];
@@ -3058,6 +3069,8 @@ function _sameStuGrades(grades) {
 }
 
 function _renderStuGradeButtons() {
+  const pro = document.getElementById('stuProgrammingBtn');
+  if (pro) { pro.classList.toggle('on', _stuProgramming); pro.setAttribute('aria-pressed', String(_stuProgramming)); }
   document.querySelectorAll('[data-grade]').forEach(btn => btn.classList.toggle('on', _stuGrades.has(btn.dataset.grade)));
   document.querySelectorAll('[data-grade-group]').forEach(btn => {
     const key = btn.dataset.gradeGroup;
@@ -3067,7 +3080,7 @@ function _renderStuGradeButtons() {
   const summary = document.getElementById('stuGradeSummary');
   if (summary) {
     const grades = selectedStuGrades();
-    summary.textContent = grades.length === 0
+    summary.textContent = _stuProgramming ? 'プロ（全学年）' : grades.length === 0
       ? '未選択（全員）'
       : grades.length === STU_ALL_GRADES.length ? '全学年' : grades.join('・');
   }
@@ -3080,12 +3093,14 @@ function _applyStuGradeChange() {
 }
 
 function toggleStuGrade(grade) {
+  _stuProgramming = false;
   if (_stuGrades.has(grade)) _stuGrades.delete(grade);
   else _stuGrades.add(grade);
   _applyStuGradeChange();
 }
 
 function selectStuGradeGroup(group) {
+  _stuProgramming = false;
   if (group === 'clear') {
     _stuGrades.clear();
   } else {
@@ -3199,6 +3214,7 @@ function printStudentList() {
   if (campus) conds.push(campus);  else conds.push('全校舎');
   if (grades.length > 0 && grades.length < STU_ALL_GRADES.length) conds.push(grades.join('・'));
   else conds.push('全学年');
+  if (_stuProgramming) conds.push('プログラミング');
   if (q) conds.push(`「${q}」で検索`);
   if (_stuSchoolExclude.size > 0) conds.push('学校絞込あり');
   const title = conds.join(' ／ ');
@@ -3274,7 +3290,7 @@ document.addEventListener('click', () => {
 function _stuSchoolList() {
   const campus = document.getElementById('stuCampus').value;
   const grades = selectedStuGrades();
-  let base = students;
+  let base = _stuProgramming ? students.filter(isProgrammingStudent) : students;
   if (campus) base = base.filter(s => s.campus === campus);
   if (grades.length > 0 && grades.length < STU_ALL_GRADES.length) base = base.filter(s => grades.includes(normalizeGrade(s.grade)));
   return [...new Set(base.map(s => s.school || '').filter(Boolean))].sort((a,b) => a.localeCompare(b,'ja'));
@@ -3359,6 +3375,7 @@ function _getFilteredSortedStudents() {
   const campus = document.getElementById('stuCampus').value;
   const { showActive, showWithdrawn } = enrollmentSelection('stuShowActive', 'stuShowWithdrawn');
   let list = students.filter(s => matchesStudentListEnrollment(s, showActive, showWithdrawn));
+  if (_stuProgramming) list = list.filter(isProgrammingStudent);
   if (q)      list = list.filter(s => matchesUnifiedStudentSearch_(s, q));
   if (grades.length > 0 && grades.length < STU_ALL_GRADES.length) list = list.filter(s => grades.includes(normalizeGrade(s.grade)));
   if (campus) list = list.filter(s => s.campus === campus);
@@ -3392,7 +3409,7 @@ function filterStudents() {
     <div class="listRow" onclick="goToCompare('${s.id}')" style="cursor:pointer">
       <div style="flex:1">
         <strong>${s.name}</strong>（${s.id}）${studentListStatusBadge(s)}
-        <div class="listRowSub">${s.campus} ／ ${s.grade} ／ ${s.school||'-'}</div>
+        <div class="listRowSub">${htmlEsc(s.campus)} ／ ${htmlEsc(s.grade)} ／ ${htmlEsc(s.school||'-')}${s.course ? ' ／ ' + htmlEsc(s.course) : ''}</div>
       </div>
       <div style="color:#94a3b8;font-size:.8rem">📊→</div>
     </div>`).join('');
