@@ -602,7 +602,7 @@ const DirectoryAcademic = (() => {
       }
       if(sorted.length>5)area.append(make('p','他 '+(sorted.length-5)+' 件は面談メモアプリで確認できます。','muted'));
     },wrap,true);
-    const memoLink=make('a','この生徒にメモを追加','btn secondary small');
+    const memoLink=make('a','この生徒のメモを追加・編集','btn secondary small');
     memoLink.href='meeting_memo.html?studentId='+encodeURIComponent(id);memoLink.target='_blank';memoLink.rel='noopener';
     memoBox.classList.add('academicMemoPanel');
     const memoHead=memoBox.children[0],memoBody=memoBox.children[1],memoControls=make('div',null,'academicControls');
