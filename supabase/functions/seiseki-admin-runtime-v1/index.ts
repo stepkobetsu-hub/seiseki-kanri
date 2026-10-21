@@ -150,6 +150,12 @@ class ResponseError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) { super(message); }
 }
 
+class DatabaseRequestError extends Error {
+  constructor(readonly status: number, readonly body: JsonObject) {
+    super(String(body.message ?? `Database request failed (${status})`));
+  }
+}
+
 function json(body: JsonObject, status = 200): Response {
   return Response.json(body, { status, headers: CORS_HEADERS });
 }
@@ -171,7 +177,7 @@ async function pg(path: string, init: RequestInit = {}): Promise<unknown> {
   });
   const text = await response.text();
   const body = text ? JSON.parse(text) : null;
-  if (!response.ok) throw new Error(`Database request failed (${response.status}): ${JSON.stringify(body)}`);
+  if (!response.ok) throw new DatabaseRequestError(response.status, (body && typeof body === 'object' ? body : { message:text }) as JsonObject);
   return body;
 }
 
@@ -457,11 +463,13 @@ async function saveReport(payload: JsonObject): Promise<JsonObject> {
   if (ratings.some(value => value !== null && (!Number.isInteger(value) || value < 1 || value > 5))) throw new ResponseError(400, 'INVALID_REPORT', 'Report ratings must be integers from 1 to 5');
   if (ratings.every(value => value === null)) throw new ResponseError(400, 'EMPTY_REPORT', '評定を1科目以上入力してください。');
   const studentId = await studentUuid(payload.studentId);
+  const total5 = completeTotal(ratings.slice(0, 5));
+  const total9 = completeTotal(ratings);
   const row = {
     student_id: studentId, school_year: schoolYear, term: semester,
     japanese: ratings[0], social: ratings[1], math: ratings[2], science: ratings[3], english: ratings[4],
     music: ratings[5], art: ratings[6], health_pe: ratings[7], technology_home: ratings[8],
-    total_5: completeTotal(ratings.slice(0, 5)), total_9: completeTotal(ratings), updated_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   };
   const originalYear = payload.originalYear == null ? null : Number(payload.originalYear);
   const originalSemester = payload.originalSemester == null ? null : String(payload.originalSemester);
@@ -474,7 +482,7 @@ async function saveReport(payload: JsonObject): Promise<JsonObject> {
   } else {
     await pg(query('report_cards', { on_conflict: 'student_id,school_year,term' }), { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(row) });
   }
-  return mirror({ ...payload, year:schoolYear, semester, total5:row.total_5, total9:row.total_9 });
+  return mirror({ ...payload, year:schoolYear, semester, total5, total9 });
 }
 
 async function saveWish(payload: JsonObject): Promise<JsonObject> {
@@ -1023,10 +1031,13 @@ Deno.serve(async request => {
   const preflight = preflightResponse(request);
   if (preflight) return preflight;
   if (request.method !== 'POST') return json({ success: false, code: 'METHOD_NOT_ALLOWED' }, 405);
+  let trace = crypto.randomUUID();
+  let action = '';
   try {
     const payload = await request.json() as JsonObject;
-    const action = String(payload.action ?? '');
-    const trace=String(payload.requestTrace||'');
+    action = String(payload.action ?? '');
+    const requestedTrace = String(payload.requestTrace || '');
+    if (/^[a-zA-Z0-9-]{8,64}$/.test(requestedTrace)) trace = requestedTrace;
     if(/^[a-zA-Z0-9-]{8,64}$/.test(trace))console.info(JSON.stringify({event:'request_received',trace,action}));
     if (action === 'staffLogin') return json(await loginStaff(payload));
     if (action === 'ingestStudentDirectory') return json(await ingestDirectorySnapshot(payload));
@@ -1046,9 +1057,20 @@ Deno.serve(async request => {
     if(/^[a-zA-Z0-9-]{8,64}$/.test(trace))console.info(JSON.stringify({event:'request_completed',trace,action}));
     return json(result);
   } catch (error) {
-    if (error instanceof ResponseError) return json({ success: false, code: error.code, error: error.message }, error.status);
-    console.error(error);
-    return json({ success: false, code: 'INTERNAL_ERROR', error: 'Internal server error' }, 500);
+    if (error instanceof ResponseError) {
+      console.warn(JSON.stringify({ event:'request_rejected', trace, action, code:error.code, status:error.status, message:error.message }));
+      return json({ success: false, code: error.code, error: error.message, trace }, error.status);
+    }
+    if (error instanceof DatabaseRequestError) {
+      console.error(JSON.stringify({ event:'database_request_failed', trace, action, status:error.status,
+        databaseCode:String(error.body.code ?? ''), message:String(error.body.message ?? ''),
+        details:error.body.details ?? null, hint:error.body.hint ?? null }));
+      return json({ success: false, code: 'DATABASE_ERROR', error: `保存先データベースでエラーが発生しました。参照ID: ${trace}`, trace }, 500);
+    }
+    console.error(JSON.stringify({ event:'request_failed', trace, action,
+      name:error instanceof Error ? error.name : typeof error,
+      message:error instanceof Error ? error.message : String(error) }));
+    return json({ success: false, code: 'INTERNAL_ERROR', error: `保存処理で予期しないエラーが発生しました。参照ID: ${trace}`, trace }, 500);
   }
 });
 

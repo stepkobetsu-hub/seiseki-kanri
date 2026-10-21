@@ -263,17 +263,24 @@ tr:hover td{background:#f8fafc}
 .modal{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:90%;max-width:560px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.15)}
 .modal h3{font-size:1rem;font-weight:700;margin-bottom:16px;color:var(--text)}
 .modalFoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}
-.gradeHistoryTable{border-collapse:collapse;min-width:1180px;width:100%;font-size:.74rem}
+.gradeHistoryModal{width:min(96vw,1120px)!important;max-width:1120px!important;max-height:92vh!important;padding:16px!important;overflow:hidden!important}
+.gradeHistoryModal[data-section="report"]{width:min(96vw,760px)!important;max-width:760px!important}
+.gradeHistoryTable{border-collapse:collapse;min-width:max-content;width:max-content;font-size:.7rem}
+.gradeHistoryTable th,.gradeHistoryTable td{padding:3px 2px}
 .gradeHistoryTable th{position:sticky;top:0;background:#f8fafc;z-index:1;white-space:nowrap}
-.gradeHistoryTable input,.gradeHistoryTable select{min-width:64px;width:100%;box-sizing:border-box;padding:5px 6px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;font-size:.76rem}
-.gradeHistoryTable input.keyField,.gradeHistoryTable select.keyField{min-width:84px;font-weight:700}
-.gradeHistoryTable input.totalField{background:#eff6ff;color:#1d4ed8;font-weight:800}
+.gradeHistoryTable input,.gradeHistoryTable select{min-width:0;width:48px;box-sizing:border-box;padding:4px;border:1px solid #cbd5e1;border-radius:5px;background:#fff;font-size:.72rem}
+.gradeHistoryTable input.yearField{width:68px;font-weight:700}
+.gradeHistoryTable select.termField{width:72px;font-weight:700}
+.gradeHistoryTable input.rankField{width:56px}
+.gradeHistoryTable input.totalField{width:52px;background:#eff6ff;color:#1d4ed8;font-weight:800}
+.gradeHistoryTable input.ratingField{width:42px}
 .gradeHistoryTable tr.is-new{background:#f0fdf4}
 .gradeHistoryTable tr.is-dirty{box-shadow:inset 3px 0 #f59e0b}
 .gradeEditorStatus{min-height:22px;font-size:.82rem;font-weight:700;color:#475569}
 .gradeEditorStatus.error{color:#dc2626}.gradeEditorStatus.success{color:#059669}
+.gradeHistoryModal .modalFoot{position:sticky;bottom:0;margin-top:8px;padding-top:8px;background:#fff}
 .gradeHeadAction{margin-left:8px;padding:3px 9px;border:1px solid #93c5fd;border-radius:999px;background:#fff;color:#1d4ed8;font-size:.68rem;font-weight:800;cursor:pointer}
-@media(max-width:680px){.gradeHistoryTable{font-size:.7rem}.gradeHistoryTable input,.gradeHistoryTable select{padding:6px 5px}.gradeHistoryModal{padding:12px!important}}
+@media(max-width:680px){.gradeHistoryModal,.gradeHistoryModal[data-section="report"]{width:calc(100vw - 16px)!important;max-width:none!important;padding:10px!important}.gradeHistoryTable input,.gradeHistoryTable select{padding:5px 4px}}
 
 /* COMPARE TABLE (通知表 vs 成績) */
 .compareGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -1172,7 +1179,7 @@ tr:hover td{background:#f8fafc}
 </div>
 
 <div class="overlay" id="gradeHistoryModal">
-  <div class="modal gradeHistoryModal" style="width:min(98vw,1480px);max-width:none;max-height:94vh;display:flex;flex-direction:column">
+  <div class="modal gradeHistoryModal" data-section="score" style="display:flex;flex-direction:column">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">
       <h3 id="gradeHistoryTitle" style="margin:0">成績・通知表の追加・編集</h3>
       <button class="btn btn-ghost btn-sm" type="button" onclick="closeGradeHistoryEditor()">閉じる</button>
@@ -1192,7 +1199,7 @@ tr:hover td{background:#f8fafc}
     </div>
     <div id="gradeHistoryReportSection" style="display:none;overflow:auto;flex:1">
       <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-success btn-sm" type="button" onclick="addGradeHistoryRow('report')">＋ 通知表評定を追加</button></div>
-      <table class="gradeHistoryTable" style="min-width:860px">
+      <table class="gradeHistoryTable">
         <thead><tr><th>年度</th><th>学期</th><th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>音</th><th>美</th><th>体</th><th>技</th><th>5計</th><th>9計</th></tr></thead>
         <tbody id="gradeHistoryReportBody"></tbody>
       </table>
@@ -1949,7 +1956,8 @@ async function adminSupabaseApi(data) {
         success: false,
         authRequired,
         code: result.code || 'SUPABASE_ERROR',
-        error: authRequired ? 'ログインの有効期限が切れました。再ログインしてください。' : (result.error || 'Supabaseから取得できませんでした。')
+        error: authRequired ? 'ログインの有効期限が切れました。再ログインしてください。' : (result.error || `Supabaseから取得できませんでした。参照ID: ${result.trace || payload.requestTrace}`),
+        referenceId: result.trace || payload.requestTrace
       };
     }
     return result;
@@ -5108,6 +5116,7 @@ function setGradeHistoryStatus(message, kind) {
 
 function showGradeHistorySection(type) {
   gradeHistoryActiveSection = type === 'report' ? 'report' : 'score';
+  document.querySelector('#gradeHistoryModal .gradeHistoryModal').dataset.section = gradeHistoryActiveSection;
   document.getElementById('gradeHistoryScoreSection').style.display = gradeHistoryActiveSection === 'score' ? 'block' : 'none';
   document.getElementById('gradeHistoryReportSection').style.display = gradeHistoryActiveSection === 'report' ? 'block' : 'none';
   document.getElementById('gradeHistoryScoreTab').className = 'btn ' + (gradeHistoryActiveSection === 'score' ? 'btn-primary' : 'btn-ghost') + ' btn-sm';
@@ -5126,10 +5135,10 @@ function scoreHistoryRowHtml(row, isNew) {
   const scoreKeys = ['jpn','soc','math','sci','eng','mus','art','pe','tech'];
   const total5 = gradeHistoryTotal(scoreKeys.slice(0, 5).map(key => row[key]));
   const total9 = gradeHistoryTotal(scoreKeys.map(key => row[key]));
-  const number = (field, value, max) => `<td>${gradeHistoryInput(field, value, `type="number" min="0" max="${max}" step="any"`)}</td>`;
+  const number = (field, value, max) => `<td>${gradeHistoryInput(field, value, `type="number" min="0" max="${max}" step="any" class="${field.startsWith('rank') ? 'rankField' : 'scoreField'}"`)}</td>`;
   return `<tr class="${isNew ? 'is-new is-dirty' : ''}" data-kind="score" data-new="${isNew ? '1' : '0'}" data-original-year="${htmlEsc(row.year ?? '')}" data-original-term="${htmlEsc(row.term ?? '')}">
-    <td>${gradeHistoryInput('year', row.year, 'type="number" min="2000" max="2100" class="keyField"')}</td>
-    <td><select data-field="term" class="keyField" onchange="gradeHistoryRowChanged(this)">${[1,2,3,4,5,6].map(n=>`<option value="${n}" ${String(row.term)===String(n)?'selected':''}>第${n}回</option>`).join('')}</select></td>
+    <td>${gradeHistoryInput('year', row.year, 'type="number" min="2000" max="2100" class="yearField"')}</td>
+    <td><select data-field="term" class="termField" onchange="gradeHistoryRowChanged(this)">${[1,2,3,4,5,6].map(n=>`<option value="${n}" ${String(row.term)===String(n)?'selected':''}>第${n}回</option>`).join('')}</select></td>
     ${number('jpn',row.jpn,100)}${number('soc',row.soc,100)}${number('math',row.math,100)}${number('sci',row.sci,100)}${number('eng',row.eng,100)}
     <td>${gradeHistoryInput('total5',total5,'type="number" readonly class="totalField"')}</td>${number('rank5',row.rank5,100000)}
     ${number('mus',row.mus,100)}${number('art',row.art,100)}${number('pe',row.pe,100)}${number('tech',row.tech,100)}
@@ -5140,11 +5149,11 @@ function scoreHistoryRowHtml(row, isNew) {
 
 function reportHistoryRowHtml(row, isNew) {
   const keys = ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech'];
-  const number = (field, value) => `<td>${gradeHistoryInput(field, value, 'type="number" min="1" max="5" step="1"')}</td>`;
+  const number = (field, value) => `<td>${gradeHistoryInput(field, value, 'type="number" min="1" max="5" step="1" class="ratingField"')}</td>`;
   const semesters = ['1学期','2学期','3学期','前期','後期'];
   return `<tr class="${isNew ? 'is-new is-dirty' : ''}" data-kind="report" data-new="${isNew ? '1' : '0'}" data-original-year="${htmlEsc(row.year ?? '')}" data-original-semester="${htmlEsc(row.semester ?? '')}">
-    <td>${gradeHistoryInput('year', row.year, 'type="number" min="2000" max="2100" class="keyField"')}</td>
-    <td><select data-field="semester" class="keyField" onchange="gradeHistoryRowChanged(this)">${semesters.map(term=>`<option ${String(row.semester)===term?'selected':''}>${term}</option>`).join('')}</select></td>
+    <td>${gradeHistoryInput('year', row.year, 'type="number" min="2000" max="2100" class="yearField"')}</td>
+    <td><select data-field="semester" class="termField" onchange="gradeHistoryRowChanged(this)">${semesters.map(term=>`<option ${String(row.semester)===term?'selected':''}>${term}</option>`).join('')}</select></td>
     ${keys.map(key=>number(key,row[key])).join('')}
     <td>${gradeHistoryInput('rp_total5',gradeHistoryTotal(keys.slice(0,5).map(key=>row[key])),'type="number" readonly class="totalField"')}</td>
     <td>${gradeHistoryInput('rp_total9',gradeHistoryTotal(keys.map(key=>row[key])),'type="number" readonly class="totalField"')}</td>

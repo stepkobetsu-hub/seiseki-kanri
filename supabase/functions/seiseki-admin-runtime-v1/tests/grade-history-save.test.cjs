@@ -56,9 +56,19 @@ vm.runInContext(code, context);
   context.pg = async (requestPath, init={}) => { writes.push({requestPath,init}); return [{id:'saved'}]; };
   result = await context.saveReport({studentId:'test',isNew:true,year:2024,semester:'1学期',rp_jpn:5,rp_soc:4,rp_math:3,rp_sci:2,rp_eng:1,rp_mus:5,rp_art:4,rp_pe:3,rp_tech:2});
   saved = JSON.parse(writes.pop().init.body);
-  assert.equal(saved.total_5, 15);
-  assert.equal(saved.total_9, 29);
+  assert.equal('total_5' in saved, false);
+  assert.equal('total_9' in saved, false);
+  assert.equal(result.payload.total5, 15);
   assert.equal(result.payload.total9, 29);
+
+  await context.saveReport({studentId:'test',year:2025,semester:'2学期',originalYear:2024,originalSemester:'1学期',rp_jpn:4});
+  const reportUpdate = writes.pop();
+  assert.equal(reportUpdate.init.method, 'PATCH');
+  assert.match(reportUpdate.requestPath, /school_year=eq\.2024/);
+  assert.match(reportUpdate.requestPath, /term=eq\.1%E5%AD%A6%E6%9C%9F/, 'original report term is included in the update filter');
+
+  context.pg = async () => [];
+  await assert.rejects(() => context.saveReport({studentId:'test',isNew:true,year:2024,semester:'1学期',rp_jpn:5}), error => error.code === 'DUPLICATE_REPORT');
   await assert.rejects(() => context.saveReport({studentId:'test',isNew:true,year:2024,semester:'1学期',rp_jpn:6}), error => error.code === 'INVALID_REPORT');
   console.log('PASS: historical inserts, key changes, duplicate protection, ranges and calculated totals');
 })().catch(error => { console.error(error); process.exitCode = 1; });

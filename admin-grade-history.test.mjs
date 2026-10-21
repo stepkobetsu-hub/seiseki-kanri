@@ -25,6 +25,10 @@ test('editor supports historical keys, additions, totals, status and compare ref
   assert.match(page, /件を保存中/);
   assert.match(page, /await loadCompare\(gradeHistoryStudentId\)/);
   assert.match(page, /overflow:auto;flex:1/);
+  assert.match(page, /gradeHistoryModal\[data-section="report"\]/);
+  assert.match(page, /input\.yearField\{width:68px/);
+  assert.match(page, /input\.ratingField\{width:42px/);
+  assert.match(page, /data-section="score"/);
 });
 
 test('client and server reject duplicates, invalid ranges and empty rows', () => {
@@ -43,5 +47,13 @@ test('natural-key edits patch the original row and mirror delete before save', (
   assert.match(runtime, /action:'deleteScore'[\s\S]*originalTerm/);
   assert.match(runtime, /action:'deleteReport'[\s\S]*originalSemester/);
   assert.match(runtime, /steps\.push\(payload\)/);
+});
+
+test('database failures are logged with a trace and shown without raw details', () => {
+  assert.match(runtime, /event:'database_request_failed'/);
+  assert.match(runtime, /code: 'DATABASE_ERROR'/);
+  assert.match(runtime, /参照ID: \$\{trace\}/);
+  assert.match(page, /referenceId: result\.trace \|\| payload\.requestTrace/);
+  assert.doesNotMatch(page, /closeGradeHistoryEditor\(true\)[\s\S]{0,300}catch \(error\)[\s\S]{0,100}closeGradeHistoryEditor/);
 });
 
