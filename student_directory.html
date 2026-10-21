@@ -92,6 +92,7 @@ header #logout{color:#175443;background:#fff;border-color:#def5e7}.card{backgrou
 <dialog id="masterConfirm" aria-labelledby="masterConfirmTitle"><div class="confirmHead"><h2 id="masterConfirmTitle">変更内容の確認</h2><div id="masterConfirmStudent" class="confirmStudent"></div><p class="muted">変更前と変更後を確認し、「この内容で保存」を押してください。</p></div><div id="masterConfirmRows" class="confirmRows"></div><div class="confirmFooter"><button id="masterConfirmCancel" class="btn secondary" type="button">戻って修正</button><button id="masterConfirmSave" class="btn" type="button">この内容で保存</button></div></dialog>
 <dialog id="editorLogin"><h2>生徒マスタ保存用ログイン</h2><p class="muted">保存には権限4のID・パスワードが必要です。この端末ではログアウトするまで保持します。</p><label>ID（講師番号）<input id="editorLoginCode" autocomplete="username" inputmode="numeric"></label><label>パスワード<input id="editorLoginPassword" type="password" autocomplete="current-password"></label><p id="editorLoginError" class="error" role="alert"></p><div class="actions"><button id="editorLoginSubmit" class="btn" type="button">ログインして保存へ進む</button><button id="editorLoginCancel" class="btn secondary" type="button">キャンセル</button></div></dialog>
 <script src="assets/js/staff-auth.js?v=20261009-single-read"></script>
+<script src="assets/js/meeting-memo-view.js?v=20261021-issue50"></script>
 <script>
 'use strict';
 const GAS='https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
@@ -482,6 +483,7 @@ const DirectoryAcademic = (() => {
     else area.append(list);
   }
   function mount(card,student) {
+    memosHidden=false;
     const id=String(student.id),session=token();
     if (!session || !/^\d{1,10}$/.test(id)) return;
     select(id,session);
@@ -591,23 +593,16 @@ const DirectoryAcademic = (() => {
     }
     const memoBox=panel('🗒️ 面談・メモ','getMeetingMemos',(area,rows)=>{
       const empty=!rows.length;area.closest('.academicPanel').classList.toggle('academicMemoEmpty',empty);
-      memoToggle.hidden=empty;area.hidden=!empty&&memosHidden;
+      memoToggle.disabled=empty;area.hidden=!empty&&memosHidden;
       memoToggle.textContent=memosHidden?'面談メモを表示する':'面談メモを隠す';memoToggle.setAttribute('aria-expanded',String(!memosHidden));
-      if(empty){area.append(make('p','面談メモはまだ登録されていません。','muted'));return;}
-      const sorted=rows.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
-      for(const memo of sorted.slice(0,5)) {
-        const item=make('article',null,'academicMemo');
-        item.append(make('div',String(memo.date||'').slice(0,10)+'　相手: '+(memo.counterpart||'－')+'　担当: '+(memo.staff||'－'),'academicMemoMeta'));
-        item.append(make('div',memo.content||'','academicMemoContent'));area.append(item);
-      }
-      if(sorted.length>5)area.append(make('p','他 '+(sorted.length-5)+' 件は面談メモアプリで確認できます。','muted'));
+      StepMeetingMemoView.render(area,rows,{emptyText:'面談メモはまだ登録されていません。'});
     },wrap,true);
     const memoLink=make('a','この生徒のメモを追加・編集','btn secondary small');
     memoLink.href='meeting_memo.html?studentId='+encodeURIComponent(id);memoLink.target='_blank';memoLink.rel='noopener';
     memoBox.classList.add('academicMemoPanel');
     const memoHead=memoBox.children[0],memoBody=memoBox.children[1],memoControls=make('div',null,'academicControls');
     const memoToggle=make('button',memosHidden?'面談メモを表示する':'面談メモを隠す','btn secondary small academicMemoToggle');
-    memoToggle.type='button';memoToggle.hidden=true;memoToggle.setAttribute('aria-expanded',String(!memosHidden));memoBody.hidden=memosHidden;
+    memoToggle.type='button';memoToggle.disabled=true;memoToggle.setAttribute('aria-expanded',String(!memosHidden));memoBody.hidden=memosHidden;
     memoToggle.onclick=()=>{memosHidden=!memosHidden;memoBody.hidden=memosHidden;memoToggle.textContent=memosHidden?'面談メモを表示する':'面談メモを隠す';memoToggle.setAttribute('aria-expanded',String(!memosHidden));};
     memoControls.append(memoHead.querySelector('button'),memoToggle);memoHead.append(memoControls,memoLink);
   }

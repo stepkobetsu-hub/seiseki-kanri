@@ -139,6 +139,21 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 .btn-ghost{background:#f1f5f9;color:var(--sub)}
 .btn-ghost:hover{background:#e2e8f0}
 .btn-sm{padding:5px 12px;font-size:.76rem}
+.cmpMeetingHead{align-items:center;flex-wrap:wrap;gap:8px}
+.cmpMeetingActions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:7px;margin-left:auto}
+.cmpMeetingActions .btn{min-height:32px;white-space:nowrap}
+.cmpMeetingActions .btn-outline{background:#fff;color:#256c50;border-color:#8dcfa7}
+.cmpMeetingActions .btn-outline:hover{background:#eafaef}
+.cmpMeetingToggle{background:#b45309;color:#fff;border:1px solid #92400e;font-weight:700}
+.cmpMeetingToggle:hover:not(:disabled){background:#92400e}
+.cmpMeetingToggle[aria-expanded="false"]{background:#1d4ed8;border-color:#1e40af}
+.cmpMeetingToggle[aria-expanded="false"]:hover:not(:disabled){background:#1e40af}
+.cmpMeetingStatus{min-height:1.35em;margin:0 0 7px;color:#64748b;font-size:.76rem}
+.cmpMeetingStatus.error{color:#b42318}
+#cmpMeetingBody .academicMemo{border-bottom:1px solid #edf2f7;padding:8px 0}
+#cmpMeetingBody .academicMemoMeta{display:flex;gap:10px;flex-wrap:wrap;color:#64748b;font-size:.76rem;margin-bottom:3px}
+#cmpMeetingBody .academicMemoContent{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7}
+@media(max-width:640px){.cmpMeetingActions{width:100%;justify-content:flex-start;margin-left:0}.cmpMeetingActions .btn{flex:1 1 auto}}
 #meetCampusJinryo,#meetCampusOte,#meetCampusAll,#meetGradeButtons .btn-sm{
   padding:3px 8px;font-size:.68rem;line-height:1.2;border-radius:6px;
 }
@@ -585,10 +600,15 @@ tr:hover td{background:#f8fafc}
       </div>
       <!-- ① 得点推移 -->
       <div id="cmpMeetingCard" class="card" style="display:none">
-        <div class="cardHead" style="justify-content:flex-start">
+        <div class="cardHead cmpMeetingHead" style="justify-content:flex-start">
           <span>🗒️ 面談・メモ</span>
-          <button class="btn btn-ghost btn-sm" onclick="openMeetingForCurrentStudent()">この生徒にメモを追加</button>
+          <div class="cmpMeetingActions">
+            <button id="cmpMeetingRefresh" type="button" class="btn btn-outline btn-sm" onclick="refreshCompareMeetings()">再取得</button>
+            <button id="cmpMeetingToggle" type="button" class="btn btn-sm cmpMeetingToggle" aria-expanded="true" onclick="toggleCompareMeetingVisibility()">面談メモを隠す</button>
+            <a id="cmpMeetingEdit" class="btn btn-outline btn-sm" target="_blank" rel="noopener">この生徒のメモを追加・編集</a>
+          </div>
         </div>
+        <p id="cmpMeetingStatus" class="cmpMeetingStatus" role="status" aria-live="polite"></p>
         <div id="cmpMeetingBody" style="font-size:.82rem;color:#334155;line-height:1.7"></div>
       </div>
 
@@ -1216,6 +1236,7 @@ tr:hover td{background:#f8fafc}
 
 <script src="assets/js/supabase-config.js"></script>
 <script src="assets/js/staff-auth.js?v=20261009-single-read"></script>
+<script src="assets/js/meeting-memo-view.js?v=20261021-issue50"></script>
 <script>
 if (location.hash === '#directory') location.replace('student_directory.html');
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
@@ -2364,7 +2385,11 @@ function aNav(name, el) {
   if (name === 'schools') loadSchools();
   if (name === 'scores') initAdminScoresTab();
   if (name === 'report') initAdminReportTab();
-  if (name === 'compare') initCompare();
+  if (name === 'compare') {
+    compareMeetingHidden = false;
+    updateCompareMeetingVisibility();
+    initCompare();
+  }
   if (name === 'wish') loadAllWishes();
   if (name === 'entry') initEntryTab();
   if (name === 'settings') loadStaffMembers();
@@ -4356,6 +4381,7 @@ function clearCmpStudentSelection() {
   renderCmpSelectedStudent_();
   updateCmpEntryButton('');
   updateCmpAdmissionDate('');
+  prepareCompareMeetingCard('');
   input?.focus();
 }
 function updateCmpAdmissionDate(sid) {
@@ -4374,9 +4400,10 @@ async function loadCompare(overrideSid) {
   const year = document.getElementById('cmpYear').value;
   updateCmpEntryButton(sid);
   updateCmpAdmissionDate(sid);
+  prepareCompareMeetingCard(sid);
   if (!sid) return;
   document.getElementById('cmpBody').innerHTML='<tr><td colspan="22" class="noData">選択した生徒の成績を読み込み中…</td></tr>';
-  const meetingCard=document.getElementById('cmpMeetingCard');if(meetingCard)meetingCard.style.display='none';
+  void loadCompareMeetings(sid);
   // 志望校を取得して表示
   const wishCard = document.getElementById('cmpWishCard');
   const wishBody = document.getElementById('cmpWishBody');
@@ -4449,7 +4476,6 @@ async function loadCompare(overrideSid) {
   }
   cmpScoreData = (scoreRes.scores || []).filter(s => !year || String(s.year) === String(year)).sort((a,b) => a.year !== b.year ? a.year - b.year : a.term - b.term);
   cmpRpData = (rpRes.data || []).filter(d => !year || String(d.year) === String(year));
-  loadCompareMeetings(sid);
   setTimeout(() => drawCompareCharts(), 50);
   // テーブル
   const len = Math.max(cmpScoreData.length, cmpRpData.length);
@@ -6058,43 +6084,107 @@ async function deleteMeetingMemo(id) {
   if (sid) loadCompareMeetings(sid);
 }
 
-async function loadCompareMeetings(studentId) {
+let compareMeetingRequestId = 0;
+let compareMeetingStudentId = '';
+let compareMeetingRows = [];
+let compareMeetingLoaded = false;
+let compareMeetingHidden = false;
+
+function prepareCompareMeetingCard(studentId) {
+  const sid = String(studentId || '');
   const card = document.getElementById('cmpMeetingCard');
   const body = document.getElementById('cmpMeetingBody');
+  const edit = document.getElementById('cmpMeetingEdit');
   if (!card || !body) return;
-  const r = await api({ action: 'getMeetingMemos', studentId });
-  const list = r.memos || [];
-  if (!list.length) {
-    card.style.display = 'none';
-    body.innerHTML = '';
-    return;
+  if (compareMeetingStudentId !== sid) {
+    compareMeetingRequestId++;
+    compareMeetingStudentId = sid;
+    compareMeetingRows = [];
+    compareMeetingLoaded = false;
+    compareMeetingHidden = false;
+    body.hidden = false;
+    body.replaceChildren();
+    if (sid) {
+      const loading = document.createElement('p');
+      loading.className = 'muted';
+      loading.textContent = '面談メモを読み込み中…';
+      body.append(loading);
+    }
   }
-  card.style.display = 'block';
-  body.innerHTML = list.slice(0, 5).map(m => `
-    <div style="border-bottom:1px solid #edf2f7;padding:8px 0">
-      <div style="display:flex;gap:10px;flex-wrap:wrap;color:#64748b;font-size:.76rem">
-        <span>${htmlEsc(formatEntryValue(m.date))}</span>
-        <span>相手: ${htmlEsc(m.counterpart || '-')}</span>
-        <span>担当: ${htmlEsc(m.staff || '-')}</span>
-      </div>
-      <div style="white-space:pre-wrap;margin-top:3px">${htmlEsc(m.content || '')}</div>
-    </div>
-  `).join('') + (list.length > 5 ? `<div style="margin-top:8px;color:#64748b;font-size:.76rem">他 ${list.length - 5} 件は「面談・メモ」一覧で確認できます。</div>` : '');
+  card.style.display = sid ? 'block' : 'none';
+  if (edit) edit.href = sid ? `meeting_memo.html?studentId=${encodeURIComponent(sid)}` : '#';
+  updateCompareMeetingVisibility();
 }
 
-async function openMeetingForCurrentStudent() {
-  const sid = document.getElementById('cmpStudent')?.value;
-  if (!sid) return;
-  const btn = [...document.querySelectorAll('.sideItem')].find(el => el.getAttribute('onclick')?.includes("'meetings'"));
-  if (btn) aNav('meetings', btn);
-  await initMeetings();
-  clearMeetingStudentFilters();
-  const sel = document.getElementById('meetStudent');
-  if (sel) sel.value = sid;
-  updateMeetingSelectedStudent();
-  const content = document.getElementById('meetContent');
-  if (content) content.focus();
+function updateCompareMeetingVisibility() {
+  const body = document.getElementById('cmpMeetingBody');
+  const toggle = document.getElementById('cmpMeetingToggle');
+  if (!body || !toggle) return;
+  const empty = compareMeetingLoaded && compareMeetingRows.length === 0;
+  toggle.disabled = !compareMeetingLoaded || empty;
+  body.hidden = compareMeetingHidden && !empty;
+  toggle.textContent = compareMeetingHidden ? '面談メモを表示する' : '面談メモを隠す';
+  toggle.setAttribute('aria-expanded', String(!compareMeetingHidden));
 }
+
+function toggleCompareMeetingVisibility() {
+  if (!compareMeetingLoaded || !compareMeetingRows.length) return;
+  compareMeetingHidden = !compareMeetingHidden;
+  updateCompareMeetingVisibility();
+}
+
+function refreshCompareMeetings() {
+  const sid = String(document.getElementById('cmpStudent')?.value || '');
+  if (sid) void loadCompareMeetings(sid);
+}
+
+async function loadCompareMeetings(studentId) {
+  const sid = String(studentId || '');
+  if (!sid) return;
+  prepareCompareMeetingCard(sid);
+  const card = document.getElementById('cmpMeetingCard');
+  const body = document.getElementById('cmpMeetingBody');
+  const status = document.getElementById('cmpMeetingStatus');
+  const refresh = document.getElementById('cmpMeetingRefresh');
+  if (!card || !body || !status || !refresh) return;
+  const requestId = ++compareMeetingRequestId;
+  const preserveExisting = compareMeetingLoaded;
+  refresh.disabled = true;
+  status.classList.remove('error');
+  status.textContent = preserveExisting ? '最新の面談メモを再取得しています…' : '面談メモを読み込み中…';
+  try {
+    const result = await api({ action: 'getMeetingMemos', studentId: sid });
+    if (requestId !== compareMeetingRequestId || compareMeetingStudentId !== sid ||
+        String(document.getElementById('cmpStudent')?.value || '') !== sid) return;
+    if (result.success !== true) throw new Error(result.error || '面談メモを取得できませんでした。');
+    const rows = Array.isArray(result.memos) ? result.memos : [];
+    if (rows.some(memo => String(memo.studentId || '') !== sid)) {
+      throw new Error('生徒番号と取得した面談メモが一致しません。');
+    }
+    compareMeetingRows = StepMeetingMemoView.render(body, rows, { emptyText: '面談メモはまだ登録されていません。' });
+    compareMeetingLoaded = true;
+    status.textContent = '';
+    updateCompareMeetingVisibility();
+  } catch (error) {
+    if (requestId !== compareMeetingRequestId || compareMeetingStudentId !== sid) return;
+    status.classList.add('error');
+    status.textContent = '面談メモを取得できませんでした：' + (error.message || '時間をおいて再取得してください。');
+    if (!preserveExisting) {
+      body.replaceChildren();
+      const message = document.createElement('p');
+      message.className = 'muted';
+      message.textContent = '再取得すると、もう一度読み込みを試せます。';
+      body.append(message);
+    }
+  } finally {
+    if (requestId === compareMeetingRequestId && compareMeetingStudentId === sid) refresh.disabled = false;
+  }
+}
+
+window.addEventListener('pageshow', () => {
+  compareMeetingHidden = false;
+  updateCompareMeetingVisibility();
+});
 
 // ===== 設定 =====
 function changeAdminPass() {
