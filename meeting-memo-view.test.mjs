@@ -40,6 +40,10 @@ view.render(empty, [], { emptyText: '面談メモはまだ登録されていま�
 assert.equal(empty.children[0].textContent, '面談メモはまだ登録されていません。');
 
 const admin = fs.readFileSync('admin.html', 'utf8');
+assert.ok(
+  admin.indexOf("let compareMeetingStudentId = '';") < admin.indexOf('function showMain()'),
+  '直接リンクでshowMainが先に動いても比較画面の状態は初期化済み'
+);
 const refreshAt = admin.indexOf('id="cmpMeetingRefresh"');
 const toggleAt = admin.indexOf('id="cmpMeetingToggle"');
 const editAt = admin.indexOf('id="cmpMeetingEdit"');

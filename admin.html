@@ -1301,6 +1301,12 @@ let cmpDiffChartInst = null;
 let reportChartInst = null;
 let cmpScoreData = [];
 let cmpRpData = [];
+// showMain() は非同期初期化の途中で呼ばれるため、比較画面が使う状態は先に初期化する。
+let compareMeetingRequestId = 0;
+let compareMeetingStudentId = '';
+let compareMeetingRows = [];
+let compareMeetingLoaded = false;
+let compareMeetingHidden = false;
 let currentEntryInfoStudentId = '';
 let currentEntryGuardian2 = null;
 let currentEntryAiReview = null;
@@ -6085,12 +6091,6 @@ async function deleteMeetingMemo(id) {
   const sid = document.getElementById('cmpStudent')?.value;
   if (sid) loadCompareMeetings(sid);
 }
-
-let compareMeetingRequestId = 0;
-let compareMeetingStudentId = '';
-let compareMeetingRows = [];
-let compareMeetingLoaded = false;
-let compareMeetingHidden = false;
 
 function prepareCompareMeetingCard(studentId) {
   const sid = String(studentId || '');
