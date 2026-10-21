@@ -14,5 +14,6 @@ const searchTitle = directory.match(/<div class="searchTitle">[\s\S]*?<div class
 assert.match(searchTitle, /class="btn directoryGradeLink gradeManagementShortcut" href="admin\.html#compare">📊 成績管理システムへ<\/a>/);
 assert.doesNotMatch(searchTitle, /<br\s*\/?\s*>/i, '検索見出しに新しい行を追加しない');
 assert.match(directory, /class="btn studentRosterLink" href="admin\.html#students">[\s\S]*?<span>生徒名簿作成・印刷<\/span><\/a>/);
+assert.match(directory, /\.searchTitle \.gradeManagementShortcut,\.searchRow \.studentRosterLink\{width:220px;min-height:52px;justify-content:center\}/);
 
 console.log('navigation shortcut tests passed');
