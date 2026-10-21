@@ -26,9 +26,10 @@ test('editor supports historical keys, additions, totals, status and compare ref
   assert.match(page, /await loadCompare\(gradeHistoryStudentId\)/);
   assert.match(page, /overflow:auto;flex:1/);
   assert.match(page, /gradeHistoryModal\[data-section="report"\]/);
-  assert.match(page, /gradeHistoryModal\{width:min\(96vw,1200px\)/);
-  assert.match(page, /input\.yearField\{width:68px/);
-  assert.match(page, /input\.ratingField\{width:42px/);
+  assert.match(page, /gradeHistoryModal\{box-sizing:border-box;width:min\(96vw,1100px\)/);
+  assert.match(page, /input\.yearField\{width:60px/);
+  assert.match(page, /input\.ratingField\{width:38px/);
+  assert.match(page, /<span>5科<\/span><span>順位<\/span>/);
   assert.match(page, /data-section="score"/);
 });
 
