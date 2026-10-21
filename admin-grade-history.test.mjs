@@ -19,6 +19,8 @@ test('editor supports historical keys, additions, totals, status and compare ref
   assert.match(page, /data-original-semester/);
   assert.match(page, /addGradeHistoryRow\('score'\)/);
   assert.match(page, /addGradeHistoryRow\('report'\)/);
+  assert.match(page, /insertAdjacentHTML\('afterbegin'/);
+  assert.match(page, /firstElementChild\?\.scrollIntoView/);
   assert.match(page, /gradeHistoryTotal/);
   assert.match(page, /件を保存中/);
   assert.match(page, /await loadCompare\(gradeHistoryStudentId\)/);

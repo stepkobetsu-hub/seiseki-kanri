@@ -5207,8 +5207,8 @@ function addGradeHistoryRow(type) {
   const body = document.getElementById(type === 'score' ? 'gradeHistoryScoreBody' : 'gradeHistoryReportBody');
   body.querySelector('.noData')?.closest('tr')?.remove();
   const row = type === 'score' ? {year:NOW_YEAR,term:1} : {year:NOW_YEAR,semester:'1学期'};
-  body.insertAdjacentHTML('beforeend', type === 'score' ? scoreHistoryRowHtml(row, true) : reportHistoryRowHtml(row, true));
-  body.lastElementChild?.scrollIntoView({block:'nearest',behavior:'smooth'});
+  body.insertAdjacentHTML('afterbegin', type === 'score' ? scoreHistoryRowHtml(row, true) : reportHistoryRowHtml(row, true));
+  body.firstElementChild?.scrollIntoView({block:'nearest',behavior:'smooth'});
   setGradeHistoryStatus('新しい行を追加しました。入力後に「変更を保存」を押してください。');
 }
 
