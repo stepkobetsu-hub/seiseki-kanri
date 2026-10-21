@@ -139,6 +139,9 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 .btn-ghost{background:#f1f5f9;color:var(--sub)}
 .btn-ghost:hover{background:#e2e8f0}
 .btn-sm{padding:5px 12px;font-size:.76rem}
+.pageDirectoryShortcut{margin-left:auto;flex:0 0 auto;white-space:nowrap;background:#25735a;color:#fff;border:1px solid #175443}
+.pageDirectoryShortcut:hover{background:#175443;color:#fff}
+.pageDirectoryShortcut:focus-visible{outline:3px solid #80d3a4;outline-offset:3px}
 .cmpMeetingHead{align-items:center;flex-wrap:wrap;gap:8px}
 .cmpMeetingActions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:7px;margin-left:auto}
 .cmpMeetingActions .btn{min-height:32px;white-space:nowrap}
@@ -563,6 +566,7 @@ tr:hover td{background:#f8fafc}
           </div>
           <select id="cmpYear" onchange="loadCompare()"></select>
           <button id="cmpEntryBtn" class="btn btn-ghost btn-sm" onclick="openEntryInfoModal()" disabled>入塾時情報</button>
+          <a class="btn btn-sm pageDirectoryShortcut" href="student_directory.html">生徒情報管理へ</a>
         </div>
       </div>
       <!-- 志望校 -->
@@ -671,7 +675,7 @@ tr:hover td{background:#f8fafc}
     <!-- 生徒一覧 -->
     <div id="aTab_students" style="display:none">
       <div class="card">
-        <div class="cardHead">👥 生徒一覧・印刷</div>
+        <div class="cardHead"><span>👥 生徒一覧・印刷</span><a class="btn btn-sm pageDirectoryShortcut" href="student_directory.html">生徒情報管理へ</a></div>
         <div id="stuSourceStatus" style="display:none;margin:-4px 0 12px;color:#64748b;font-size:.74rem"></div>
 
         <!-- 絞り込み行 -->
