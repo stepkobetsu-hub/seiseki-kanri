@@ -1237,6 +1237,7 @@ tr:hover td{background:#f8fafc}
 <script src="assets/js/supabase-config.js"></script>
 <script src="assets/js/staff-auth.js?v=20261009-single-read"></script>
 <script src="assets/js/meeting-memo-view.js?v=20261021-issue50"></script>
+<script src="assets/js/grade-order.js?v=20261021-newest-first"></script>
 <script>
 if (location.hash === '#directory') location.replace('student_directory.html');
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
@@ -2719,10 +2720,10 @@ async function loadSpeed() {
   // グラフ（分布）
   redrawSpeedChart();
 
-  // テーブル（登録日時の新しい順）
+  // テーブル（年度・回次の新しい順）
   const tbody = document.getElementById('speedBody');
   if (!allScores.length) { tbody.innerHTML = '<tr><td colspan="16" class="noData">データなし</td></tr>'; return; }
-  const sortedScores = [...allScores].sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  const sortedScores = StepGradeOrder.scoresNewest(allScores);
   tbody.innerHTML = sortedScores.map(s => {
     const termLabel = s.year && s.term ? String(s.year).slice(2) + '年度' + '第' + s.term + '回' : '-';
     const sc5k = ['jpn','soc','math','sci','eng'];
@@ -2859,7 +2860,7 @@ async function renderSpeedReport() {
     const r = await api({ action:'getAllReports', campus, year });
     let reports = r.data || [];
     if (grade) reports = reports.filter(d => gradeMatchesGroup(d.grade, grade));
-    reports.sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+    reports = StepGradeOrder.reportsNewest(reports);
     if (!reports.length) {
       tbody.innerHTML = '<tr><td colspan="13" class="noData">データなし</td></tr>';
       return;
@@ -3999,7 +4000,7 @@ function filterAdminScores() {
     matchesEnrollmentRecord(d.studentId, 'scAShowActive', 'scAShowWithdrawn') &&
     (!grade || gradeMatchesGroup(d.grade, grade)) &&
     matchesUnifiedStudentSearch_(d, q)
-  ).sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  ).sort(StepGradeOrder.compareScoreNewest);
   renderAdminScores(scores);
 }
 function renderAdminScores(scores, emptyMessage) {
@@ -4101,7 +4102,7 @@ function filterAdminReport() {
     matchesEnrollmentRecord(d.studentId, 'rpAShowActive', 'rpAShowWithdrawn') &&
     (!grade || gradeMatchesGroup(d.grade, grade)) &&
     matchesUnifiedStudentSearch_(d, q)
-  ).sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  ).sort(StepGradeOrder.compareReportNewest);
   renderAdminReport(reports);
 }
 function renderAdminReport(reports, emptyMessage) {
@@ -4169,11 +4170,7 @@ function drawReportChart() {
   const subKey = document.getElementById('rpASubject').value;
   const subName = document.getElementById('rpASubject').options[document.getElementById('rpASubject').selectedIndex].text;
   if (!sid) return;
-  const rows = allReports.filter(d => d.studentId === sid).sort((a, b) => {
-    if (a.year !== b.year) return a.year - b.year;
-    const order = {'1学期':1,'前期':1,'2学期':2,'後期':2,'3学期':3};
-    return (order[a.semester]||0) - (order[b.semester]||0);
-  });
+  const rows = allReports.filter(d => d.studentId === sid).sort(StepGradeOrder.compareReportOldest);
   const labels = rows.map(d => `${d.year}年${d.semester}`);
   const data = rows.map(d => Number(d[subKey]) || null);
   if (reportChartInst) reportChartInst.destroy();
@@ -4474,16 +4471,19 @@ async function loadCompare(overrideSid) {
     document.getElementById('cmpBody').innerHTML='<tr><td colspan="22" class="noData">'+htmlEsc(scoreRes.error||rpRes.error||'成績情報を取得できませんでした。')+'</td></tr>';
     return;
   }
-  cmpScoreData = (scoreRes.scores || []).filter(s => !year || String(s.year) === String(year)).sort((a,b) => a.year !== b.year ? a.year - b.year : a.term - b.term);
-  cmpRpData = (rpRes.data || []).filter(d => !year || String(d.year) === String(year));
+  // グラフは時系列（古い順）、一覧は見つけやすい最新順で表示する。
+  cmpScoreData = (scoreRes.scores || []).filter(s => !year || String(s.year) === String(year)).sort(StepGradeOrder.compareScoreOldest);
+  cmpRpData = (rpRes.data || []).filter(d => !year || String(d.year) === String(year)).sort(StepGradeOrder.compareReportOldest);
   setTimeout(() => drawCompareCharts(), 50);
   // テーブル
-  const len = Math.max(cmpScoreData.length, cmpRpData.length);
+  const displayScores = StepGradeOrder.scoresNewest(cmpScoreData);
+  const displayReports = StepGradeOrder.reportsNewest(cmpRpData);
+  const len = Math.max(displayScores.length, displayReports.length);
   const tbody = document.getElementById('cmpBody');
   if (!len) { tbody.innerHTML = '<tr><td colspan="22" class="noData">データなし</td></tr>'; return; }
   tbody.innerHTML = Array.from({length: len}, (_, i) => {
-    const sc = cmpScoreData[i] || {};
-    const rp = cmpRpData[i] || {};
+    const sc = displayScores[i] || {};
+    const rp = displayReports[i] || {};
     const _cmpSt = students.find(s => String(s.id) === String(sid)) || {};
     const _cmpGradeRaw = (_cmpSt.grade || '').replace(/１/g,'1').replace(/２/g,'2').replace(/３/g,'3');
     const _cmpGradeNum = _cmpGradeRaw.includes('中1') ? 1 : _cmpGradeRaw.includes('中2') ? 2 : _cmpGradeRaw.includes('中3') ? 3 : 0;
@@ -5188,11 +5188,13 @@ function reportHistoryRowHtml(row, isNew) {
 }
 
 function renderGradeHistory(scores, reports) {
-  document.getElementById('gradeHistoryScoreBody').innerHTML = scores.length
-    ? scores.map(row => scoreHistoryRowHtml(row, false)).join('')
+  const sortedScores = StepGradeOrder.scoresNewest(scores);
+  const sortedReports = StepGradeOrder.reportsNewest(reports);
+  document.getElementById('gradeHistoryScoreBody').innerHTML = sortedScores.length
+    ? sortedScores.map(row => scoreHistoryRowHtml(row, false)).join('')
     : '<tr><td colspan="21" class="noData">登録済みデータはありません</td></tr>';
-  document.getElementById('gradeHistoryReportBody').innerHTML = reports.length
-    ? reports.map(row => reportHistoryRowHtml(row, false)).join('')
+  document.getElementById('gradeHistoryReportBody').innerHTML = sortedReports.length
+    ? sortedReports.map(row => reportHistoryRowHtml(row, false)).join('')
     : '<tr><td colspan="13" class="noData">登録済みデータはありません</td></tr>';
 }
 
