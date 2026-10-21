@@ -204,6 +204,22 @@ function numberOrNull(value: unknown): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
+function requiredInt(value: unknown, min: number, max: number, code: string, message: string): number {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < min || number > max) throw new ResponseError(400, code, message);
+  return number;
+}
+
+function boundedNumberOrNull(value: unknown, min: number, max: number, code: string, message: string): number | null {
+  const number = numberOrNull(value);
+  if (number !== null && (!Number.isFinite(number) || number < min || number > max)) throw new ResponseError(400, code, message);
+  return number;
+}
+
+function completeTotal(values: Array<number | null>): number | null {
+  return values.every(value => value !== null) ? values.reduce<number>((sum, value) => sum + (value ?? 0), 0) : null;
+}
+
 function parseObject(value: unknown): JsonObject {
   if (value && typeof value === 'object' && !Array.isArray(value)) return value as JsonObject;
   if (typeof value !== 'string' || !value.trim()) return {};
@@ -399,28 +415,66 @@ async function importMissingEntryGrades(payload: JsonObject): Promise<JsonObject
 }
 
 async function saveScore(payload: JsonObject): Promise<JsonObject> {
+  const schoolYear = requiredInt(payload.year, 2000, 2100, 'INVALID_SCORE_KEY', '年度を正しく入力してください。');
+  const testNumber = requiredInt(payload.term, 1, 6, 'INVALID_SCORE_KEY', '回次は1〜6で入力してください。');
+  const subjects = ['jpn','soc','math','sci','eng','mus','art','pe','tech']
+    .map(key => boundedNumberOrNull(payload[key], 0, 100, 'INVALID_SCORE', '点数は0〜100で入力してください。'));
+  if (subjects.every(value => value === null)) throw new ResponseError(400, 'EMPTY_SCORE', '点数を1科目以上入力してください。');
+  const rank5 = payload.rank5 === '' || payload.rank5 == null ? null : requiredInt(payload.rank5, 1, 100000, 'INVALID_SCORE', '順位は1以上の整数で入力してください。');
+  const rank9 = payload.rank9 === '' || payload.rank9 == null ? null : requiredInt(payload.rank9, 1, 100000, 'INVALID_SCORE', '順位は1以上の整数で入力してください。');
+  const averages = ['avg_jpn','avg_soc','avg_math','avg_sci','avg_eng']
+    .map(key => boundedNumberOrNull(payload[key], 0, 100, 'INVALID_SCORE', '平均点は0〜100で入力してください。'));
+  const averageTotal5 = boundedNumberOrNull(payload.avg_total5, 0, 500, 'INVALID_SCORE', '5科平均は0〜500で入力してください。');
+  const studentId = await studentUuid(payload.studentId);
   const row = {
-    student_id: await studentUuid(payload.studentId), school_year: Number(payload.year), test_number: Number(payload.term),
-    japanese: numberOrNull(payload.jpn), social: numberOrNull(payload.soc), math: numberOrNull(payload.math), science: numberOrNull(payload.sci), english: numberOrNull(payload.eng),
-    music: numberOrNull(payload.mus), art: numberOrNull(payload.art), health_pe: numberOrNull(payload.pe), technology_home: numberOrNull(payload.tech),
-    total_5: numberOrNull(payload.total5), total_9: numberOrNull(payload.total9), rank_5: numberOrNull(payload.rank5), rank_9: numberOrNull(payload.rank9),
-    avg_japanese: numberOrNull(payload.avg_jpn), avg_social: numberOrNull(payload.avg_soc), avg_math: numberOrNull(payload.avg_math),
-    avg_science: numberOrNull(payload.avg_sci), avg_english: numberOrNull(payload.avg_eng), avg_total_5: numberOrNull(payload.avg_total5),
+    student_id: studentId, school_year: schoolYear, test_number: testNumber,
+    japanese: subjects[0], social: subjects[1], math: subjects[2], science: subjects[3], english: subjects[4],
+    music: subjects[5], art: subjects[6], health_pe: subjects[7], technology_home: subjects[8],
+    total_5: completeTotal(subjects.slice(0, 5)), total_9: completeTotal(subjects), rank_5: rank5, rank_9: rank9,
+    avg_japanese: averages[0], avg_social: averages[1], avg_math: averages[2],
+    avg_science: averages[3], avg_english: averages[4], avg_total_5: averageTotal5,
+    updated_at: new Date().toISOString(),
   };
-  await pg(query('test_scores', { on_conflict: 'student_id,school_year,test_number' }), { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(row) });
-  return mirror(payload);
+  const originalYear = payload.originalYear == null ? null : Number(payload.originalYear);
+  const originalTerm = payload.originalTerm == null ? null : Number(payload.originalTerm);
+  if (payload.isNew === true) {
+    const inserted = await pg(query('test_scores', { on_conflict: 'student_id,school_year,test_number' }), { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify(row) }) as JsonObject[];
+    if (!inserted.length) throw new ResponseError(409, 'DUPLICATE_SCORE', '同じ年度・回次のテスト成績が既にあります。');
+  } else if (Number.isInteger(originalYear) && Number.isInteger(originalTerm)) {
+    const updated = await pg(query('test_scores', { student_id:`eq.${studentId}`, school_year:`eq.${originalYear}`, test_number:`eq.${originalTerm}` }), { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) }) as JsonObject[];
+    if (!updated.length) throw new ResponseError(409, 'SCORE_CHANGED', '対象の成績が変更または削除されています。再読み込みしてください。');
+  } else {
+    await pg(query('test_scores', { on_conflict: 'student_id,school_year,test_number' }), { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(row) });
+  }
+  return mirror({ ...payload, year:schoolYear, term:testNumber, total5:row.total_5, total9:row.total_9 });
 }
 
 async function saveReport(payload: JsonObject): Promise<JsonObject> {
+  const schoolYear = requiredInt(payload.year, 2000, 2100, 'INVALID_REPORT_KEY', '年度を正しく入力してください。');
+  const semester = String(payload.semester ?? '').trim();
+  if (!['1学期','2学期','3学期','前期','後期'].includes(semester)) throw new ResponseError(400, 'INVALID_REPORT_KEY', '学期を正しく選択してください。');
   const ratings = ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech'].map(key => numberOrNull(payload[key]));
   if (ratings.some(value => value !== null && (!Number.isInteger(value) || value < 1 || value > 5))) throw new ResponseError(400, 'INVALID_REPORT', 'Report ratings must be integers from 1 to 5');
+  if (ratings.every(value => value === null)) throw new ResponseError(400, 'EMPTY_REPORT', '評定を1科目以上入力してください。');
+  const studentId = await studentUuid(payload.studentId);
   const row = {
-    student_id: await studentUuid(payload.studentId), school_year: Number(payload.year), term: String(payload.semester),
+    student_id: studentId, school_year: schoolYear, term: semester,
     japanese: ratings[0], social: ratings[1], math: ratings[2], science: ratings[3], english: ratings[4],
     music: ratings[5], art: ratings[6], health_pe: ratings[7], technology_home: ratings[8],
+    total_5: completeTotal(ratings.slice(0, 5)), total_9: completeTotal(ratings), updated_at: new Date().toISOString(),
   };
-  await pg(query('report_cards', { on_conflict: 'student_id,school_year,term' }), { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(row) });
-  return mirror(payload);
+  const originalYear = payload.originalYear == null ? null : Number(payload.originalYear);
+  const originalSemester = payload.originalSemester == null ? null : String(payload.originalSemester);
+  if (payload.isNew === true) {
+    const inserted = await pg(query('report_cards', { on_conflict: 'student_id,school_year,term' }), { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' }, body: JSON.stringify(row) }) as JsonObject[];
+    if (!inserted.length) throw new ResponseError(409, 'DUPLICATE_REPORT', '同じ年度・学期の通知表が既にあります。');
+  } else if (Number.isInteger(originalYear) && originalSemester) {
+    const updated = await pg(query('report_cards', { student_id:`eq.${studentId}`, school_year:`eq.${originalYear}`, term:`eq.${originalSemester}` }), { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(row) }) as JsonObject[];
+    if (!updated.length) throw new ResponseError(409, 'REPORT_CHANGED', '対象の通知表が変更または削除されています。再読み込みしてください。');
+  } else {
+    await pg(query('report_cards', { on_conflict: 'student_id,school_year,term' }), { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(row) });
+  }
+  return mirror({ ...payload, year:schoolYear, semester, total5:row.total_5, total9:row.total_9 });
 }
 
 async function saveWish(payload: JsonObject): Promise<JsonObject> {
@@ -703,9 +757,22 @@ async function deliverMirror(row: JsonObject): Promise<void> {
     if (payload.studentId) olderParams['payload->>studentId'] = `eq.${payload.studentId}`;
     const older = await pg(query('seiseki_admin_mirror_queue', olderParams)) as JsonObject[];
     if (older.length) return;
-    const response = await fetch(GRADE_GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(payload) });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || result?.success !== true) throw new Error(result?.error || `mirror HTTP ${response.status}`);
+    const steps: JsonObject[] = [];
+    if (payload.action === 'saveScore' && payload.originalYear != null && payload.originalTerm != null &&
+        (String(payload.originalYear) !== String(payload.year) || String(payload.originalTerm) !== String(payload.term))) {
+      steps.push({ action:'deleteScore', studentId:payload.studentId, year:payload.originalYear, term:payload.originalTerm, allowMissing:true });
+    }
+    if (payload.action === 'saveReport' && payload.originalYear != null && payload.originalSemester != null &&
+        (String(payload.originalYear) !== String(payload.year) || String(payload.originalSemester) !== String(payload.semester))) {
+      steps.push({ action:'deleteReport', studentId:payload.studentId, year:payload.originalYear, semester:payload.originalSemester, allowMissing:true });
+    }
+    steps.push(payload);
+    for (const step of steps) {
+      const response = await fetch(GRADE_GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(step) });
+      const result = await response.json().catch(() => ({}));
+      const missingDelete = step.allowMissing === true && result?.success !== true && /見つかりません/.test(String(result?.error ?? ''));
+      if (!response.ok || (result?.success !== true && !missingDelete)) throw new Error(result?.error || `mirror HTTP ${response.status}`);
+    }
     await pg(query('seiseki_admin_mirror_queue', { mutation_id: `eq.${mutationId}` }), {
       method: 'PATCH', headers: { Prefer: 'return=minimal' },
       body: JSON.stringify({ status: 'mirrored', attempts: Number(row.attempts ?? 0) + 1, last_error: null, updated_at: new Date().toISOString() }),
@@ -984,3 +1051,4 @@ Deno.serve(async request => {
     return json({ success: false, code: 'INTERNAL_ERROR', error: 'Internal server error' }, 500);
   }
 });
+

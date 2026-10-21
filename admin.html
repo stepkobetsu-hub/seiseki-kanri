@@ -263,6 +263,17 @@ tr:hover td{background:#f8fafc}
 .modal{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:90%;max-width:560px;max-height:80vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.15)}
 .modal h3{font-size:1rem;font-weight:700;margin-bottom:16px;color:var(--text)}
 .modalFoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap}
+.gradeHistoryTable{border-collapse:collapse;min-width:1180px;width:100%;font-size:.74rem}
+.gradeHistoryTable th{position:sticky;top:0;background:#f8fafc;z-index:1;white-space:nowrap}
+.gradeHistoryTable input,.gradeHistoryTable select{min-width:64px;width:100%;box-sizing:border-box;padding:5px 6px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;font-size:.76rem}
+.gradeHistoryTable input.keyField,.gradeHistoryTable select.keyField{min-width:84px;font-weight:700}
+.gradeHistoryTable input.totalField{background:#eff6ff;color:#1d4ed8;font-weight:800}
+.gradeHistoryTable tr.is-new{background:#f0fdf4}
+.gradeHistoryTable tr.is-dirty{box-shadow:inset 3px 0 #f59e0b}
+.gradeEditorStatus{min-height:22px;font-size:.82rem;font-weight:700;color:#475569}
+.gradeEditorStatus.error{color:#dc2626}.gradeEditorStatus.success{color:#059669}
+.gradeHeadAction{margin-left:8px;padding:3px 9px;border:1px solid #93c5fd;border-radius:999px;background:#fff;color:#1d4ed8;font-size:.68rem;font-weight:800;cursor:pointer}
+@media(max-width:680px){.gradeHistoryTable{font-size:.7rem}.gradeHistoryTable input,.gradeHistoryTable select{padding:6px 5px}.gradeHistoryModal{padding:12px!important}}
 
 /* COMPARE TABLE (通知表 vs 成績) */
 .compareGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -363,8 +374,8 @@ tr:hover td{background:#f8fafc}
     <div class="sideItem" onclick="aNav('students',this)"><span class="ico">👥</span> 生徒一覧・印刷</div>
     <div class="sideItem" onclick="aNav('meetings',this)"><span class="ico">🗒️</span> 面談・メモ</div>
     <div class="sideItem" onclick="aNav('schools',this)"><span class="ico">🏫</span> 学校</div>
-    <div class="sideItem" onclick="aNav('scores',this)"><span class="ico">🧾</span> テスト成績</div>
-    <div class="sideItem" onclick="aNav('report',this)"><span class="ico">📒</span> 通知表</div>
+    <div class="sideItem" onclick="openGradeHistoryFromNav('score',this)"><span class="ico">🧾</span> テスト成績</div>
+    <div class="sideItem" onclick="openGradeHistoryFromNav('report',this)"><span class="ico">📒</span> 通知表評定</div>
     <div class="sideItem" onclick="aNav('wish',this)"><span class="ico">🏫</span> 志望校</div>
     <div class="sideSection">システム</div>
     <div class="sideItem" onclick="aNav('entry',this)"><span class="ico">📝</span> 入塾書類</div>
@@ -549,8 +560,8 @@ tr:hover td{background:#f8fafc}
         <div class="tblWrap" style="overflow-x:auto">
           <table style="font-size:.72rem;border-collapse:collapse;width:100%">
             <thead><tr>
-              <th colspan="10" onclick="goToScoresForCurrentStudent()" title="テスト成績一覧でこの生徒を見る" style="background:#eef2ff;padding:4px;cursor:pointer;text-decoration:underline">テスト成績</th>
-              <th colspan="12" onclick="goToReportsForCurrentStudent()" title="通知表一覧でこの生徒を見る" style="background:#fef9ee;padding:4px;cursor:pointer;text-decoration:underline">通知表評定</th>
+              <th colspan="10" style="background:#eef2ff;padding:4px">テスト成績 <button type="button" class="gradeHeadAction" onclick="openGradeHistoryEditor('score')">追加・編集</button></th>
+              <th colspan="12" style="background:#fef9ee;padding:4px">通知表評定 <button type="button" class="gradeHeadAction" onclick="openGradeHistoryEditor('report')">追加・編集</button></th>
             </tr>
             <tr style="white-space:nowrap">
               <th style="padding:4px 3px">年度・回次</th>
@@ -1156,6 +1167,39 @@ tr:hover td{background:#f8fafc}
     <div class="modalFoot">
       <button class="btn btn-primary btn-sm" onclick="saveEditModal()">保存する</button>
       <button class="btn btn-ghost btn-sm" onclick="closeEditModal()">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="gradeHistoryModal">
+  <div class="modal gradeHistoryModal" style="width:min(98vw,1480px);max-width:none;max-height:94vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px">
+      <h3 id="gradeHistoryTitle" style="margin:0">成績・通知表の追加・編集</h3>
+      <button class="btn btn-ghost btn-sm" type="button" onclick="closeGradeHistoryEditor()">閉じる</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+      <button id="gradeHistoryScoreTab" class="btn btn-primary btn-sm" type="button" onclick="showGradeHistorySection('score')">🧾 テスト成績</button>
+      <button id="gradeHistoryReportTab" class="btn btn-ghost btn-sm" type="button" onclick="showGradeHistorySection('report')">📒 通知表評定</button>
+    </div>
+    <div id="gradeHistoryStatus" class="gradeEditorStatus" role="status" aria-live="polite"></div>
+    <div id="gradeHistoryLoading" style="padding:36px;text-align:center;color:#64748b">読み込み中...</div>
+    <div id="gradeHistoryScoreSection" style="display:none;overflow:auto;flex:1">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-success btn-sm" type="button" onclick="addGradeHistoryRow('score')">＋ テスト成績を追加</button></div>
+      <table class="gradeHistoryTable">
+        <thead><tr><th>年度</th><th>回次</th><th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>5計</th><th>5科順</th><th>音</th><th>美</th><th>体</th><th>技</th><th>9計</th><th>9科順</th><th>平均 国</th><th>平均 社</th><th>平均 数</th><th>平均 理</th><th>平均 英</th><th>平均 5計</th></tr></thead>
+        <tbody id="gradeHistoryScoreBody"></tbody>
+      </table>
+    </div>
+    <div id="gradeHistoryReportSection" style="display:none;overflow:auto;flex:1">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-success btn-sm" type="button" onclick="addGradeHistoryRow('report')">＋ 通知表評定を追加</button></div>
+      <table class="gradeHistoryTable" style="min-width:860px">
+        <thead><tr><th>年度</th><th>学期</th><th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>音</th><th>美</th><th>体</th><th>技</th><th>5計</th><th>9計</th></tr></thead>
+        <tbody id="gradeHistoryReportBody"></tbody>
+      </table>
+    </div>
+    <div class="modalFoot">
+      <button id="gradeHistorySaveBtn" class="btn btn-primary btn-sm" type="button" onclick="saveGradeHistory()">変更を保存</button>
+      <button class="btn btn-ghost btn-sm" type="button" onclick="closeGradeHistoryEditor()">取消</button>
     </div>
   </div>
 </div>
@@ -5039,6 +5083,214 @@ async function runSync() {
 function openStudentSyncPreview() { return runSync(); }
 function closeSyncModal() { document.getElementById('syncModal').classList.remove('show'); }
 
+// ===== 成績・通知表 過年度一括編集 =====
+let gradeHistoryStudentId = '';
+let gradeHistoryActiveSection = 'score';
+
+async function openGradeHistoryFromNav(type) {
+  const sid = currentCompareStudentId() || new URLSearchParams(location.search).get('studentId') || '';
+  if (!sid) {
+    const compareBtn = navButtonFor('compare');
+    if (compareBtn) aNav('compare', compareBtn);
+    toast('生徒を選択してから「追加・編集」を押してください');
+    return;
+  }
+  await goToCompare(sid);
+  await openGradeHistoryEditor(type);
+}
+
+function setGradeHistoryStatus(message, kind) {
+  const el = document.getElementById('gradeHistoryStatus');
+  if (!el) return;
+  el.textContent = message || '';
+  el.className = 'gradeEditorStatus' + (kind ? ' ' + kind : '');
+}
+
+function showGradeHistorySection(type) {
+  gradeHistoryActiveSection = type === 'report' ? 'report' : 'score';
+  document.getElementById('gradeHistoryScoreSection').style.display = gradeHistoryActiveSection === 'score' ? 'block' : 'none';
+  document.getElementById('gradeHistoryReportSection').style.display = gradeHistoryActiveSection === 'report' ? 'block' : 'none';
+  document.getElementById('gradeHistoryScoreTab').className = 'btn ' + (gradeHistoryActiveSection === 'score' ? 'btn-primary' : 'btn-ghost') + ' btn-sm';
+  document.getElementById('gradeHistoryReportTab').className = 'btn ' + (gradeHistoryActiveSection === 'report' ? 'btn-primary' : 'btn-ghost') + ' btn-sm';
+}
+
+function gradeHistoryInput(field, value, attrs) {
+  return `<input data-field="${field}" ${attrs || ''} value="${htmlEsc(value ?? '')}" oninput="gradeHistoryRowChanged(this)">`;
+}
+
+function gradeHistoryTotal(values) {
+  return values.every(value => value !== '' && value != null) ? values.reduce((sum, value) => sum + Number(value), 0) : '';
+}
+
+function scoreHistoryRowHtml(row, isNew) {
+  const scoreKeys = ['jpn','soc','math','sci','eng','mus','art','pe','tech'];
+  const total5 = gradeHistoryTotal(scoreKeys.slice(0, 5).map(key => row[key]));
+  const total9 = gradeHistoryTotal(scoreKeys.map(key => row[key]));
+  const number = (field, value, max) => `<td>${gradeHistoryInput(field, value, `type="number" min="0" max="${max}" step="any"`)}</td>`;
+  return `<tr class="${isNew ? 'is-new is-dirty' : ''}" data-kind="score" data-new="${isNew ? '1' : '0'}" data-original-year="${htmlEsc(row.year ?? '')}" data-original-term="${htmlEsc(row.term ?? '')}">
+    <td>${gradeHistoryInput('year', row.year, 'type="number" min="2000" max="2100" class="keyField"')}</td>
+    <td><select data-field="term" class="keyField" onchange="gradeHistoryRowChanged(this)">${[1,2,3,4,5,6].map(n=>`<option value="${n}" ${String(row.term)===String(n)?'selected':''}>第${n}回</option>`).join('')}</select></td>
+    ${number('jpn',row.jpn,100)}${number('soc',row.soc,100)}${number('math',row.math,100)}${number('sci',row.sci,100)}${number('eng',row.eng,100)}
+    <td>${gradeHistoryInput('total5',total5,'type="number" readonly class="totalField"')}</td>${number('rank5',row.rank5,100000)}
+    ${number('mus',row.mus,100)}${number('art',row.art,100)}${number('pe',row.pe,100)}${number('tech',row.tech,100)}
+    <td>${gradeHistoryInput('total9',total9,'type="number" readonly class="totalField"')}</td>${number('rank9',row.rank9,100000)}
+    ${number('avg_jpn',row.avg_jpn,100)}${number('avg_soc',row.avg_soc,100)}${number('avg_math',row.avg_math,100)}${number('avg_sci',row.avg_sci,100)}${number('avg_eng',row.avg_eng,100)}${number('avg_total5',row.avg_total5,500)}
+  </tr>`;
+}
+
+function reportHistoryRowHtml(row, isNew) {
+  const keys = ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech'];
+  const number = (field, value) => `<td>${gradeHistoryInput(field, value, 'type="number" min="1" max="5" step="1"')}</td>`;
+  const semesters = ['1学期','2学期','3学期','前期','後期'];
+  return `<tr class="${isNew ? 'is-new is-dirty' : ''}" data-kind="report" data-new="${isNew ? '1' : '0'}" data-original-year="${htmlEsc(row.year ?? '')}" data-original-semester="${htmlEsc(row.semester ?? '')}">
+    <td>${gradeHistoryInput('year', row.year, 'type="number" min="2000" max="2100" class="keyField"')}</td>
+    <td><select data-field="semester" class="keyField" onchange="gradeHistoryRowChanged(this)">${semesters.map(term=>`<option ${String(row.semester)===term?'selected':''}>${term}</option>`).join('')}</select></td>
+    ${keys.map(key=>number(key,row[key])).join('')}
+    <td>${gradeHistoryInput('rp_total5',gradeHistoryTotal(keys.slice(0,5).map(key=>row[key])),'type="number" readonly class="totalField"')}</td>
+    <td>${gradeHistoryInput('rp_total9',gradeHistoryTotal(keys.map(key=>row[key])),'type="number" readonly class="totalField"')}</td>
+  </tr>`;
+}
+
+function renderGradeHistory(scores, reports) {
+  document.getElementById('gradeHistoryScoreBody').innerHTML = scores.length
+    ? scores.map(row => scoreHistoryRowHtml(row, false)).join('')
+    : '<tr><td colspan="21" class="noData">登録済みデータはありません</td></tr>';
+  document.getElementById('gradeHistoryReportBody').innerHTML = reports.length
+    ? reports.map(row => reportHistoryRowHtml(row, false)).join('')
+    : '<tr><td colspan="13" class="noData">登録済みデータはありません</td></tr>';
+}
+
+async function openGradeHistoryEditor(type) {
+  const sid = currentCompareStudentId() || new URLSearchParams(location.search).get('studentId') || '';
+  if (!sid) { toast('生徒を選択してください'); return; }
+  gradeHistoryStudentId = String(sid);
+  showGradeHistorySection(type);
+  const student = students.find(item => String(item.id) === gradeHistoryStudentId) || {};
+  document.getElementById('gradeHistoryTitle').textContent = `成績・通知表の追加・編集：${student.name || 'No.' + gradeHistoryStudentId}（No.${gradeHistoryStudentId}）`;
+  document.getElementById('gradeHistoryLoading').style.display = 'block';
+  document.getElementById('gradeHistoryScoreSection').style.display = 'none';
+  document.getElementById('gradeHistoryReportSection').style.display = 'none';
+  document.getElementById('gradeHistoryModal').style.display = 'flex';
+  setGradeHistoryStatus('年度をまたいだ全履歴を読み込んでいます...');
+  const result = await api({ action:'getStudentGradeProfile', studentId:gradeHistoryStudentId });
+  document.getElementById('gradeHistoryLoading').style.display = 'none';
+  if (!result.success) {
+    setGradeHistoryStatus(result.error || '読み込みに失敗しました。', 'error');
+    return;
+  }
+  renderGradeHistory(result.scores || [], result.reports || []);
+  showGradeHistorySection(type);
+  setGradeHistoryStatus('年度・回次・学期を含めて編集できます。変更した行だけ保存します。');
+}
+
+function gradeHistoryRowChanged(input) {
+  const row = input.closest('tr');
+  if (!row) return;
+  row.classList.add('is-dirty');
+  const value = field => row.querySelector(`[data-field="${field}"]`)?.value ?? '';
+  const setTotal = (field, keys) => {
+    const values = keys.map(value);
+    const target = row.querySelector(`[data-field="${field}"]`);
+    if (target) target.value = values.every(item => item !== '') ? values.reduce((sum,item)=>sum+Number(item),0) : '';
+  };
+  if (row.dataset.kind === 'score') {
+    setTotal('total5',['jpn','soc','math','sci','eng']);
+    setTotal('total9',['jpn','soc','math','sci','eng','mus','art','pe','tech']);
+  } else {
+    setTotal('rp_total5',['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng']);
+    setTotal('rp_total9',['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech']);
+  }
+  setGradeHistoryStatus('未保存の変更があります。');
+}
+
+function addGradeHistoryRow(type) {
+  const body = document.getElementById(type === 'score' ? 'gradeHistoryScoreBody' : 'gradeHistoryReportBody');
+  body.querySelector('.noData')?.closest('tr')?.remove();
+  const row = type === 'score' ? {year:NOW_YEAR,term:1} : {year:NOW_YEAR,semester:'1学期'};
+  body.insertAdjacentHTML('beforeend', type === 'score' ? scoreHistoryRowHtml(row, true) : reportHistoryRowHtml(row, true));
+  body.lastElementChild?.scrollIntoView({block:'nearest',behavior:'smooth'});
+  setGradeHistoryStatus('新しい行を追加しました。入力後に「変更を保存」を押してください。');
+}
+
+function gradeHistoryValue(row, field) {
+  return row.querySelector(`[data-field="${field}"]`)?.value.trim() ?? '';
+}
+
+function validateGradeHistoryRows(rows) {
+  const keys = new Set();
+  for (const row of rows) {
+    const year = Number(gradeHistoryValue(row,'year'));
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) throw new Error('年度は2000〜2100の整数で入力してください。');
+    if (row.dataset.kind === 'score') {
+      const term = Number(gradeHistoryValue(row,'term'));
+      const key = `score:${year}:${term}`;
+      if (keys.has(key)) throw new Error(`${year}年度 第${term}回のテスト成績が重複しています。`);
+      keys.add(key);
+      const scoreFields = ['jpn','soc','math','sci','eng','mus','art','pe','tech'];
+      const values = scoreFields.map(field=>gradeHistoryValue(row,field));
+      if (values.every(value=>value==='')) throw new Error(`${year}年度 第${term}回は点数を1科目以上入力してください。`);
+      if (values.some(value=>value!=='' && (!Number.isFinite(Number(value)) || Number(value)<0 || Number(value)>100))) throw new Error('点数は0〜100で入力してください。');
+    } else {
+      const semester = gradeHistoryValue(row,'semester');
+      const key = `report:${year}:${semester}`;
+      if (keys.has(key)) throw new Error(`${year}年度 ${semester}の通知表が重複しています。`);
+      keys.add(key);
+      const values = ['rp_jpn','rp_soc','rp_math','rp_sci','rp_eng','rp_mus','rp_art','rp_pe','rp_tech'].map(field=>gradeHistoryValue(row,field));
+      if (values.every(value=>value==='')) throw new Error(`${year}年度 ${semester}は評定を1科目以上入力してください。`);
+      if (values.some(value=>value!=='' && (!Number.isInteger(Number(value)) || Number(value)<1 || Number(value)>5))) throw new Error('通知表評定は1〜5の整数で入力してください。');
+    }
+  }
+}
+
+async function saveGradeHistory() {
+  const allRows = [...document.querySelectorAll('#gradeHistoryScoreBody tr[data-kind],#gradeHistoryReportBody tr[data-kind]')];
+  const dirtyRows = allRows.filter(row => row.classList.contains('is-dirty'));
+  if (!dirtyRows.length) { setGradeHistoryStatus('保存する変更はありません。'); return; }
+  try { validateGradeHistoryRows(allRows); }
+  catch (error) { setGradeHistoryStatus(error.message, 'error'); return; }
+  const button = document.getElementById('gradeHistorySaveBtn');
+  button.disabled = true;
+  setGradeHistoryStatus(`${dirtyRows.length}件を保存中...`);
+  try {
+    for (const row of dirtyRows) {
+      const value = field => gradeHistoryValue(row, field);
+      let payload;
+      if (row.dataset.kind === 'score') {
+        payload = { action:'saveScore', studentId:gradeHistoryStudentId, isNew:row.dataset.new==='1', originalYear:row.dataset.originalYear || null, originalTerm:row.dataset.originalTerm || null,
+          year:value('year'), term:value('term'), jpn:value('jpn'), soc:value('soc'), math:value('math'), sci:value('sci'), eng:value('eng'), rank5:value('rank5'),
+          mus:value('mus'), art:value('art'), pe:value('pe'), tech:value('tech'), rank9:value('rank9'),
+          avg_jpn:value('avg_jpn'), avg_soc:value('avg_soc'), avg_math:value('avg_math'), avg_sci:value('avg_sci'), avg_eng:value('avg_eng'), avg_total5:value('avg_total5') };
+      } else {
+        payload = { action:'saveReport', studentId:gradeHistoryStudentId, isNew:row.dataset.new==='1', originalYear:row.dataset.originalYear || null, originalSemester:row.dataset.originalSemester || null,
+          year:value('year'), semester:value('semester'), rp_jpn:value('rp_jpn'), rp_soc:value('rp_soc'), rp_math:value('rp_math'), rp_sci:value('rp_sci'), rp_eng:value('rp_eng'),
+          rp_mus:value('rp_mus'), rp_art:value('rp_art'), rp_pe:value('rp_pe'), rp_tech:value('rp_tech') };
+      }
+      const result = await api(payload);
+      if (!result.success) throw new Error(result.error || '保存に失敗しました。');
+      row.classList.remove('is-dirty','is-new');
+      row.dataset.new = '0';
+      row.dataset.originalYear = value('year');
+      if (row.dataset.kind === 'score') row.dataset.originalTerm = value('term');
+      else row.dataset.originalSemester = value('semester');
+    }
+    setGradeHistoryStatus('保存しました。データ一覧とグラフを更新しています...', 'success');
+    await loadCompare(gradeHistoryStudentId);
+    toast('✅ 成績・通知表を保存しました');
+    setTimeout(() => closeGradeHistoryEditor(true), 500);
+  } catch (error) {
+    setGradeHistoryStatus('保存できませんでした: ' + error.message, 'error');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function closeGradeHistoryEditor(force) {
+  const dirty = document.querySelector('#gradeHistoryModal tr.is-dirty');
+  if (!force && dirty && !confirm('未保存の変更を取り消して閉じますか？')) return;
+  document.getElementById('gradeHistoryModal').style.display = 'none';
+  gradeHistoryStudentId = '';
+}
+
 // ===== 編集モーダル =====
 let _editSc = null, _editRp = null, _editSid = null, _editWish = null;
 
@@ -5860,3 +6112,4 @@ function toast(msg) {
 </script>
 </body>
 </html>
+
