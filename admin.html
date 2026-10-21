@@ -142,6 +142,9 @@ header h1 span{background:var(--primary);color:#fff;font-size:.68rem;padding:2px
 .pageDirectoryShortcut{margin-left:auto;flex:0 0 auto;white-space:nowrap;background:#55ad86;color:#fff;border:1px solid #348764}
 .pageDirectoryShortcut:hover{background:#419a74;color:#fff}
 .pageDirectoryShortcut:focus-visible{outline:3px solid #80d3a4;outline-offset:3px}
+.cmpActionStack{display:flex;flex:0 0 auto;flex-direction:column;align-items:stretch;gap:6px}
+.cmpActionStack .pageDirectoryShortcut{margin-left:0;justify-content:center}
+.cmpActionStack #cmpEntryBtn{justify-content:center}
 .cmpMeetingHead{align-items:center;flex-wrap:wrap;gap:8px}
 .cmpMeetingActions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:7px;margin-left:auto}
 .cmpMeetingActions .btn{min-height:32px;white-space:nowrap}
@@ -565,8 +568,10 @@ tr:hover td{background:#f8fafc}
             </div>
           </div>
           <select id="cmpYear" onchange="loadCompare()"></select>
-          <button id="cmpEntryBtn" class="btn btn-ghost btn-sm" onclick="openEntryInfoModal()" disabled>入塾時情報</button>
-          <a class="btn btn-sm pageDirectoryShortcut" href="student_directory.html">生徒情報検索へ</a>
+          <div class="cmpActionStack">
+            <a class="btn btn-sm pageDirectoryShortcut" href="student_directory.html"><span aria-hidden="true">🔎</span>生徒情報検索へ</a>
+            <button id="cmpEntryBtn" class="btn btn-ghost btn-sm" onclick="openEntryInfoModal()" disabled>入塾時情報</button>
+          </div>
         </div>
       </div>
       <!-- 志望校 -->
@@ -675,7 +680,7 @@ tr:hover td{background:#f8fafc}
     <!-- 生徒一覧 -->
     <div id="aTab_students" style="display:none">
       <div class="card">
-        <div class="cardHead"><span>👥 生徒一覧・印刷</span><a class="btn btn-sm pageDirectoryShortcut" href="student_directory.html">生徒情報検索へ</a></div>
+        <div class="cardHead"><span>👥 生徒一覧・印刷</span><a class="btn btn-sm pageDirectoryShortcut" href="student_directory.html"><span aria-hidden="true">🔎</span>生徒情報検索へ</a></div>
         <div id="stuSourceStatus" style="display:none;margin:-4px 0 12px;color:#64748b;font-size:.74rem"></div>
 
         <!-- 絞り込み行 -->
