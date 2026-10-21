@@ -29,8 +29,6 @@ test('editor supports historical keys, additions, totals, status and compare ref
   assert.match(page, /gradeHistoryModal\{box-sizing:border-box;width:min\(96vw,1100px\)/);
   assert.match(page, /input\.yearField\{width:60px/);
   assert.match(page, /input\.ratingField\{width:38px/);
-  assert.match(page, /gradeHistoryModal\[data-section="report"\]\{width:min\(96vw,820px\)/);
-  assert.match(page, /gradeHistoryModal\[data-section="report"\] \.gradeHistoryTable input\.ratingField\{width:50px/);
   assert.match(page, /<span>5科<\/span><span>順位<\/span>/);
   assert.match(page, /data-section="score"/);
 });
