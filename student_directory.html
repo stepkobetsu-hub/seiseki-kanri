@@ -523,7 +523,43 @@ const DirectoryAcademic = (() => {
       const update=make('button','再取得','btn secondary small');update.type='button';
       update.setAttribute('aria-label',title+'を再取得');
       const heading=make('h3',title);
-      if (action === 'getWish') {box.classList.add('academicWishPanel');heading.append(make('span','','academicWishDate'));}
+      if (action === 'getWish') {
+        box.classList.add('academicWishPanel');heading.append(make('span','','academicWishDate'));
+        const edit=make('button','追加・編集','btn secondary small');edit.type='button';
+        edit.onclick=async()=>{
+          edit.disabled=true;
+          try {
+            const rows=await read(action,id,session,false);if(!live())return;
+            const wish=rows[0]||{},dialog=make('dialog'),form=make('form');
+            form.append(make('h2','志望校の追加・編集：'+(student.name||'No.'+id)));
+            const fields=[];
+            for(const [key,label] of [['pub1','公立 第1志望'],['pub2','公立 第2志望'],['pub3','公立 第3志望'],['pri1','私立 第1志望'],['pri2','私立 第2志望'],['pri3','私立 第3志望']]) {
+              form.append(make('h3',label));
+              for(const [suffix,label] of [['name','高校名'],['dept','学科・コース']]) {
+                const wrap=make('label',label,'edit-field'),input=make('input');input.value=wish[key+suffix]||'';
+                fields.push([key+suffix,input]);wrap.append(input);form.append(wrap);
+              }
+            }
+            const status=make('p','','error'),actions=make('div',null,'row');
+            const save=make('button','保存','btn'),close=make('button','閉じる','btn secondary');save.type='submit';close.type='button';close.onclick=()=>dialog.close();
+            actions.append(save,close);form.append(status,actions);dialog.append(form);document.body.append(dialog);
+            dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
+            form.onsubmit=async event=>{
+              event.preventDefault();if(save.disabled)return;save.disabled=true;
+              try {
+                const editorToken=await ensureEditorSession();if(!editorToken)return;
+                if(!live())throw Error('生徒が切り替わりました。');
+                const payload={action:'saveWish',studentId:id,token:editorToken,results:JSON.stringify(wish.results||{})};
+                for(const [key,input] of fields)payload[key]=input.value;
+                const response=await StepStaffAuth.fetchRuntime(payload),result=await response.json();
+                if(!response.ok||!result.success)throw Error(result.error||'保存できませんでした。');
+                dialog.close();await load(true);
+              } catch(error){status.textContent=error.message;}finally{save.disabled=false;}
+            };
+          }catch(error){alert(error.message);}finally{edit.disabled=false;}
+        };
+        heading.append(edit);
+      }
       head.append(heading);
       if (action === 'getWish') {
         const controls=make('div',null,'academicControls');
