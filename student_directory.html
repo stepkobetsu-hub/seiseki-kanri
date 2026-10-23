@@ -128,6 +128,21 @@ header #logout{color:#175443;background:#fff;border-color:#def5e7}.card{backgrou
 #directoryGradeDialog h3{margin:0}
 .gradeHeadAction{margin-left:8px;border:1px solid #93c5fd;border-radius:30px;background:#fff;color:#2563eb;padding:5px 10px;font:inherit;font-weight:700;cursor:pointer}
 
+
+/* 志望校の編集を成績管理の配置・項目に統一 */
+dialog.directoryWishEditor{width:min(1000px,96vw);padding:20px}
+.directoryWishEditor h2{font-size:1rem;margin:0 0 12px}
+.wishEditorRows{display:grid;gap:8px}
+.wishEditorRow{padding:10px;border:1px solid #e2e8f0;border-radius:8px;background:#eef2ff;display:grid;grid-template-columns:1.2fr 1fr .85fr .85fr .55fr;gap:6px;align-items:end}
+.wishEditorRow.private{background:#fef9ee}
+.wishEditorField{display:block;min-width:0;font-size:.76rem}
+.wishEditorField>span{display:block;margin-bottom:4px}
+.wishEditorField input,.wishEditorField select{width:100%;min-width:0;box-sizing:border-box;padding:7px 10px;border:1px solid #cbd5e1;border-radius:8px;background:white;font:inherit}
+.wishEditorField input[placeholder]{margin-top:6px}
+.wishEditorEnroll{font-size:.76rem;display:flex;gap:4px;align-items:center;padding-bottom:8px;white-space:nowrap}
+.wishEditorEnroll input{width:16px;height:16px;accent-color:#25735a}
+@media(max-width:640px){.wishEditorRow{grid-template-columns:1fr 1fr}.wishEditorField:first-child{grid-column:1/-1}.wishEditorEnroll{padding:4px 0}}
+
 </style>
 </head>
 <body>
@@ -590,14 +605,37 @@ const DirectoryAcademic = (() => {
             const rows=await read(action,id,session,false);if(!live())return;
             const wish=rows[0]||{},dialog=make('dialog'),form=make('form');
             form.append(make('h2','志望校の追加・編集：'+(student.name||'No.'+id)));
-            const fields=[];
+            dialog.className='directoryWishEditor';
+            const fields=[],resultFields=[],schoolRows=make('div',null,'wishEditorRows');
+            const results=wish.results||{};
+            const inputField=(row,label,control)=>{
+              const wrap=make('label',null,'wishEditorField');wrap.append(make('span',label),control);row.append(wrap);return control;
+            };
+            const select=(values,value)=>{
+              const control=make('select');
+              for(const value of values){const option=make('option',value);option.value=value;control.append(option);}
+              if(value&&!values.includes(value)){const option=make('option',value);option.value=value;control.append(option);}
+              control.value=value||'';return control;
+            };
             for(const [key,label] of [['pub1','公立 第1志望'],['pub2','公立 第2志望'],['pub3','公立 第3志望'],['pri1','私立 第1志望'],['pri2','私立 第2志望'],['pri3','私立 第3志望']]) {
-              form.append(make('h3',label));
-              for(const [suffix,label] of [['name','高校名'],['dept','学科・コース']]) {
-                const wrap=make('label',label,'edit-field'),input=make('input');input.value=wish[key+suffix]||'';
-                fields.push([key+suffix,input]);wrap.append(input);form.append(wrap);
-              }
+              const row=make('div',null,'wishEditorRow'+(key.startsWith('pri')?' private':''));
+              const name=make('input');name.value=wish[key+'name']||'';
+              inputField(row,label+' 高校名',name);fields.push([key+'name',()=>name.value]);
+              const dept=String(wish[key+'dept']||'').trim(),kind=['','普通科','総合学科'].includes(dept)?dept:'その他';
+              const deptSelect=select(['','普通科','総合学科','その他'],kind),other=make('input');other.value=kind==='その他'?dept:'';
+              other.placeholder='学科・コースを入力';other.hidden=kind!=='その他';
+              const deptWrap=make('div');deptWrap.append(deptSelect,other);inputField(row,'学科・コース',deptWrap);
+              deptSelect.onchange=()=>{other.hidden=deptSelect.value!=='その他';};
+              fields.push([key+'dept',()=>deptSelect.value==='その他'?other.value:deptSelect.value]);
+              const exam=select(['','一般','推薦'],results[key+'type']);
+              inputField(row,'入試',exam);resultFields.push([key+'type',()=>exam.value]);
+              const result=select(['','合格','不合格'],results[key]);
+              inputField(row,'合否',result);resultFields.push([key,()=>result.value]);
+              const enroll=make('input');enroll.type='checkbox';enroll.checked=!!results[key+'enroll'];
+              const enrollWrap=make('label',null,'wishEditorEnroll');enrollWrap.append(enroll,make('span','進学'));row.append(enrollWrap);
+              resultFields.push([key+'enroll',()=>enroll.checked]);schoolRows.append(row);
             }
+            form.append(schoolRows);
             const status=make('p','','error'),actions=make('div',null,'row');
             const save=make('button','保存','btn'),close=make('button','閉じる','btn secondary');save.type='submit';close.type='button';close.onclick=()=>dialog.close();
             actions.append(save,close);form.append(status,actions);dialog.append(form);document.body.append(dialog);
@@ -607,8 +645,9 @@ const DirectoryAcademic = (() => {
               try {
                 const editorToken=await ensureEditorSession();if(!editorToken)return;
                 if(!live())throw Error('生徒が切り替わりました。');
-                const payload={action:'saveWish',studentId:id,token:editorToken,results:JSON.stringify(wish.results||{})};
-                for(const [key,input] of fields)payload[key]=input.value;
+                const editedResults={...results};for(const [key,getValue] of resultFields)editedResults[key]=getValue();
+                const payload={action:'saveWish',studentId:id,token:editorToken,results:JSON.stringify(editedResults)};
+                for(const [key,getValue] of fields)payload[key]=getValue();
                 const response=await StepStaffAuth.fetchRuntime(payload),result=await response.json();
                 if(!response.ok||!result.success)throw Error(result.error||'保存できませんでした。');
                 dialog.close();await load(true);
