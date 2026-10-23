@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 110350)
-Total output lines: 6241
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -1225,7 +1222,1037 @@ tr:hover td{background:#f8fafc}
     <div id="gradeHistoryStatus" class="gradeEditorStatus" role="status" aria-live="polite"></div>
     <div id="gradeHistoryLoading" style="padding:36px;text-align:center;color:#64748b">読み込み中...</div>
     <div id="gradeHistoryScoreSection" style="display:none;overflow:auto;flex:1">
-      <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-success btn-sm" type="button" onclick="addGradeHistoryRow('score')">＋ テスト成績…10350 tokens truncated…moveItem('adminStaffName');
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-success btn-sm" type="button" onclick="addGradeHistoryRow('score')">＋ テスト成績を追加</button></div>
+      <table class="gradeHistoryTable">
+        <thead><tr><th>年度</th><th>回次</th><th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>5計</th><th><span>5科</span><span>順位</span></th><th>音</th><th>美</th><th>体</th><th>技</th><th>9計</th><th><span>9科</span><span>順位</span></th><th><span>国</span><span>平均</span></th><th><span>社</span><span>平均</span></th><th><span>数</span><span>平均</span></th><th><span>理</span><span>平均</span></th><th><span>英</span><span>平均</span></th><th><span>5計</span><span>平均</span></th></tr></thead>
+        <tbody id="gradeHistoryScoreBody"></tbody>
+      </table>
+    </div>
+    <div id="gradeHistoryReportSection" style="display:none;overflow:auto;flex:1">
+      <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-success btn-sm" type="button" onclick="addGradeHistoryRow('report')">＋ 通知表評定を追加</button></div>
+      <table class="gradeHistoryTable">
+        <thead><tr><th>年度</th><th>学期</th><th>国</th><th>社</th><th>数</th><th>理</th><th>英</th><th>音</th><th>美</th><th>体</th><th>技</th><th>5計</th><th>9計</th></tr></thead>
+        <tbody id="gradeHistoryReportBody"></tbody>
+      </table>
+    </div>
+    <div class="modalFoot">
+      <button id="gradeHistorySaveBtn" class="btn btn-primary btn-sm" type="button" onclick="saveGradeHistory()">変更を保存</button>
+      <button class="btn btn-ghost btn-sm" type="button" onclick="closeGradeHistoryEditor()">取消</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="assets/js/supabase-config.js"></script>
+<script src="assets/js/staff-auth.js?v=20261009-single-read"></script>
+<script src="assets/js/meeting-memo-view.js?v=20261021-issue50"></script>
+<script src="assets/js/grade-order.js?v=20261021-newest-first"></script>
+<script>
+if (location.hash === '#directory') location.replace('student_directory.html');
+const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
+const RUNTIME_CONFIG = window.SEISEKI_CONFIG || {};
+const SUPABASE_URL = RUNTIME_CONFIG.supabaseUrl || localStorage.getItem('seisekiSupabaseUrl') || '';
+const SUPABASE_ANON_KEY = RUNTIME_CONFIG.supabaseAnonKey || localStorage.getItem('seisekiSupabaseAnonKey') || '';
+const DEFAULT_SUPABASE_AUTH_EMAIL = RUNTIME_CONFIG.supabaseAdminEmail || localStorage.getItem('seisekiSupabaseAdminEmail') || 'stepkobetsu@gmail.com';
+// 成績データの正本は本番Supabase。管理権限は共通スタッフセッションで検証する。
+const SEISEKI_ADMIN_RUNTIME_URL = 'https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
+const ADMIN_SESSION_TOKEN_KEY = 'adminSystemPortalSessionToken';
+const ADMIN_SESSION_EXPIRES_KEY = 'adminSystemPortalExpiresAt';
+const SUPABASE_ENABLED_ACTIONS = new Set(['getEntrySheetData','importMissingEntryGrades',
+  'getStudents', 'getStudentList',
+  'getAllScores', 'getStudentScores', 'getStudentGradeProfile', 'saveScore', 'deleteScore',
+  'getAllReports', 'getReports', 'saveReport', 'deleteReport',
+  'getAllWishes', 'getWish', 'saveWish', 'saveWishResult',
+  'getSchools', 'addSchool', 'updateSchool', 'deleteSchool',
+  'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
+  'getStaffMembers', 'addStaffMember', 'deleteStaffMember'
+]);
+const SUPABASE_WRITE_ACTIONS = new Set(['importMissingEntryGrades',
+  'saveScore', 'deleteScore', 'saveReport', 'deleteReport',
+  'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool',
+  'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember'
+]);
+let DATA_SOURCE = 'supabase-admin-edge';
+localStorage.setItem('seisekiDataSource', DATA_SOURCE);
+let schools = [];
+let students = [];
+let allScores = [];
+let allReports = [];
+let pendingSync = null;
+let staffMembers = [];
+let staffMemberRecords = [];
+let meetingMemos = [];
+let meetingMemoSourceRows = [];
+let meetingMemoSourceLoaded = false;
+let adminScores = [];
+let renderedAdminScores = [];
+let renderedAdminReports = [];
+let renderedWishes = [];
+let selectedMeetingCampus = '';
+let selectedMeetingGradeGroup = '';
+let selectedMeetingListCampus = '';
+let currentMeetingMemoId = '';
+let schoolScheduleHistory = {};
+let schoolAutoSaveTimers = {};
+let activeScheduleCell = null;
+const TABS = ['speed','compare','students','meetings','schools','scores','report','wish','entry','sync','settings'];
+// タブ履歴管理（グローバル宣言）
+let _navHist = [];
+let _navIdx = -1;
+let _navSkip = false;
+
+let speedChartInst = null;
+// キャッシュ（通信呼び出し削減）
+let _cache = { students: null, allScores: null, allReports: null, allWishes: null, studentDetail: {} };
+let cmpScoreChartInst = null;
+let cmpRpChartInst = null;
+let cmpDiffChartInst = null;
+let reportChartInst = null;
+let cmpScoreData = [];
+let cmpRpData = [];
+// showMain() は非同期初期化の途中で呼ばれるため、比較画面が使う状態は先に初期化する。
+let compareMeetingRequestId = 0;
+let compareMeetingStudentId = '';
+let compareMeetingRows = [];
+let compareMeetingLoaded = false;
+let compareMeetingHidden = false;
+let currentEntryInfoStudentId = '';
+let currentEntryGuardian2 = null;
+let currentEntryAiReview = null;
+let _studentPageOffset = 0;
+let studentPageOffset = 0; // backward-compatible alias for stale browser state
+let _studentHasMore = false;
+let _studentFilterTimer = null;
+let _stuSortGrade = true;
+let _stuSortSchool = '';
+let _stuSchoolExclude = new Set(); // チェックを外した学校名
+
+function getNendo(date) {
+  const d = date || new Date();
+  return d.getMonth() < 3 ? d.getFullYear() - 1 : d.getFullYear();
+}
+const NOW_YEAR = getNendo();
+
+function normalizeGrade(grade) {
+  const s = String(grade || '')
+    .trim()
+    .replace(/[１２３４５６]/g, ch => ({'１':'1','２':'2','３':'3','４':'4','５':'5','６':'6'}[ch]))
+    .replace(/\s+/g, '')
+    .replace(/^小学/, '小')
+    .replace(/^中学/, '中')
+    .replace(/^高校/, '高')
+    .replace(/年$/, '');
+  const m = s.match(/^([小中高]?)([1-6])$/);
+  if (!m) return s;
+  return (m[1] || '中') + m[2];
+}
+
+function gradeMatchesGroup(grade, group) {
+  if (!group) return true;
+  const g = normalizeGrade(grade);
+  const n = Number((g.match(/[1-6]/) || [''])[0]);
+  if (group === 'elementary') return g.startsWith('小');
+  if (group === 'junior') return g.startsWith('中');
+  if (group === 'high') return g.startsWith('高');
+  if (group === 'e13') return g.startsWith('小') && n >= 1 && n <= 3;
+  if (group === 'e46') return g.startsWith('小') && n >= 4 && n <= 6;
+  if (group === 'j1') return g === '中1';
+  if (group === 'j2') return g === '中2';
+  if (group === 'j3') return g === '中3';
+  if (group === 'h13') return g.startsWith('高') && n >= 1 && n <= 3;
+  return true;
+}
+
+const GRADE_FILTER_OPTIONS = [
+  ['', '全学年'],
+  ['elementary', '小学生'],
+  ['junior', '中学生'],
+  ['high', '高校生'],
+  ['e13', '小1〜小3'],
+  ['e46', '小4〜小6'],
+  ['j1', '中1'],
+  ['j2', '中2'],
+  ['j3', '中3'],
+  ['h13', '高1〜高3']
+];
+function initGradeSelects() {
+  ['spGrade','chartGrade','cmpGrade','stuGrade','scAGrade','rpAGrade','wishGrade','meetGradeGroup'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const prev = el.value;
+    el.innerHTML = GRADE_FILTER_OPTIONS.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+    if (GRADE_FILTER_OPTIONS.some(([value]) => value === prev)) el.value = prev;
+  });
+}
+
+// ===== API =====
+function hasSupabaseConfig() {
+  return /^https:\/\/.+\.supabase\.co$/.test(SUPABASE_URL) && !!SUPABASE_ANON_KEY;
+}
+
+function getSupabaseSession() {
+  try {
+    const raw = sessionStorage.getItem('seisekiSupabaseSession');
+    if (!raw) return null;
+    const session = JSON.parse(raw);
+    if (!session.access_token || !session.expires_at) return null;
+    if (Date.now() > Number(session.expires_at) * 1000 - 60000) return null;
+    return session;
+  } catch(e) {
+    return null;
+  }
+}
+
+function clearSensitiveCache() {
+  _cache = { students: null, allScores: null, allReports: null, allWishes: null, studentDetail: {} };
+  students = [];
+  allScores = [];
+  allReports = [];
+  meetingMemos = [];
+  adminScores = [];
+  renderedAdminScores = [];
+  renderedAdminReports = [];
+  renderedWishes = [];
+  sessionStorage.removeItem('seisekiStudentsCache');
+}
+
+function setStudentSourceStatus(message, isError) {
+  const el = document.getElementById('stuSourceStatus');
+  if (!el) return;
+  el.style.display = message ? 'block' : 'none';
+  el.style.color = isError ? '#dc2626' : '#64748b';
+  el.textContent = message || '';
+}
+
+function setDataSource(source) {
+  DATA_SOURCE = source;
+  localStorage.setItem('seisekiDataSource', source);
+  if (source !== 'supabase') clearSensitiveCache();
+}
+
+function supabaseHeaders(extra) {
+  const session = getSupabaseSession();
+  return Object.assign({
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: 'Bearer ' + (session?.access_token || SUPABASE_ANON_KEY),
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation'
+  }, extra || {});
+}
+
+async function supabaseSignIn(email, password) {
+  const url = SUPABASE_URL.replace(/\/$/, '') + '/auth/v1/token?grant_type=password';
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email, password })
+  });
+  const json = await r.json().catch(() => ({}));
+  if (!r.ok || !json.access_token) throw new Error('Supabase認証に失敗しました');
+  sessionStorage.setItem('seisekiSupabaseSession', JSON.stringify({
+    access_token: json.access_token,
+    refresh_token: json.refresh_token || '',
+    expires_at: Math.floor(Date.now() / 1000) + Number(json.expires_in || 3600),
+    user_id: json.user?.id || '',
+    email: json.user?.email || email
+  }));
+  return json;
+}
+
+async function supabaseSignOut() {
+  const session = getSupabaseSession();
+  if (session?.access_token && hasSupabaseConfig()) {
+    try {
+      await fetch(SUPABASE_URL.replace(/\/$/, '') + '/auth/v1/logout', {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: 'Bearer ' + session.access_token
+        }
+      });
+    } catch(e) { /* logout must still clear local state */ }
+  }
+  sessionStorage.removeItem('seisekiSupabaseSession');
+}
+
+function sbValue(v) {
+  return v === null || v === undefined ? '' : v;
+}
+
+function sbStudent(row) {
+  return {
+    id: sbValue(row.student_code || row.id),
+    studentCode: sbValue(row.student_code),
+    name: sbValue(row.name),
+    nameKana: sbValue(row.name_kana),
+    campus: sbValue(row.campus),
+    grade: sbValue(row.grade),
+    school: sbValue(row.school_name),
+    flag: row.active === false ? '退塾' : '1',
+    syncedAt: sbValue(row.source_updated_at || row.updated_at)
+  };
+}
+
+let enrollmentByStudentId = new Map();
+let studentSearchById = new Map();
+let enrollmentIndexReady = false;
+
+function normalizedEnrollmentFlag(student) {
+  const value = student?.enrollmentFlag ?? student?.flag ?? student?.active ?? '';
+  if (value === true) return '1';
+  if (value === false) return '0';
+  const flag = String(value).trim();
+  if (flag === '1') return '1';
+  if (flag === '0' || flag === '退塾' || flag === 'inactive' || flag === 'false') return '0';
+  return '';
+}
+
+function enrollmentSelection(activeId, withdrawnId) {
+  return {
+    showActive: !!document.getElementById(activeId)?.checked,
+    showWithdrawn: !!document.getElementById(withdrawnId)?.checked
+  };
+}
+
+function matchesEnrollmentFilter(student, showActive, showWithdrawn) {
+  const flag = normalizedEnrollmentFlag(student);
+  if (flag === '1') return showActive;
+  if (flag === '' || flag === '0') return showWithdrawn;
+  return false;
+}
+
+function matchesEnrollmentRecord(studentId, activeId, withdrawnId) {
+  const { showActive, showWithdrawn } = enrollmentSelection(activeId, withdrawnId);
+  const flag = enrollmentByStudentId.get(String(studentId));
+  return matchesEnrollmentFilter({ flag }, showActive, showWithdrawn);
+}
+
+function withdrawnBadgeForStudentId(studentId) {
+  const key = String(studentId);
+  if (!enrollmentByStudentId.has(key)) return '';
+  const flag = enrollmentByStudentId.get(key);
+  if (flag === '0') return '<span class="withdrawalScheduledBadge">退塾予定</span>';
+  if (flag === '') return '<span class="withdrawnBadge">退塾</span>';
+  return '';
+}
+
+function enrollmentFilterIsEmpty(activeId, withdrawnId) {
+  const { showActive, showWithdrawn } = enrollmentSelection(activeId, withdrawnId);
+  return !showActive && !showWithdrawn;
+}
+
+// 生徒一覧専用。☆マスタB列の 1 / 0 / 空欄を3状態のまま扱う。
+function studentListEnrollmentStatus(student) {
+  let value;
+  if (student && Object.prototype.hasOwnProperty.call(student, 'enrollmentFlag')) value = student.enrollmentFlag;
+  else if (student && Object.prototype.hasOwnProperty.call(student, 'flag')) value = student.flag;
+  else value = student?.active;
+  if (value === null || value === undefined) return 'withdrawn';
+  const flag = String(value).trim();
+  if (flag === '1') return 'active';
+  if (flag === '0') return 'withdrawalScheduled';
+  if (flag === '') return 'withdrawn';
+  return 'unknown';
+}
+
+function matchesStudentListEnrollment(student, showActive, showWithdrawn) {
+  const status = studentListEnrollmentStatus(student);
+  if (status === 'active' || status === 'withdrawalScheduled') return showActive;
+  if (status === 'withdrawn') return showWithdrawn;
+  return false;
+}
+
+function studentListStatusBadge(student) {
+  const status = studentListEnrollmentStatus(student);
+  if (status === 'withdrawalScheduled') return '<span class="withdrawalScheduledBadge">退塾予定</span>';
+  if (status === 'withdrawn') return '<span class="withdrawnBadge">退塾</span>';
+  return '';
+}
+
+function studentListPrintName(student) {
+  const status = studentListEnrollmentStatus(student);
+  const suffix = status === 'withdrawalScheduled' ? '（※）' : status === 'withdrawn' ? '（退塾）' : '';
+  return `${student.name}${suffix}`;
+}
+
+// 全画面共通の生徒検索：漢字・ひらがな・カタカナ・ローマ字・生徒番号に対応
+function matchesUnifiedStudentSearch_(record, query) {
+  const q = normalizeCmpStudentSearch_(query);
+  if (!q) return true;
+  const studentId = String(record?.studentId ?? record?.id ?? record?.studentCode ?? record?.student_code ?? '').trim();
+  const master = studentSearchById.get(studentId)
+    || students.find(s => String(s.id ?? s.studentId ?? s.studentCode ?? '') === studentId)
+    || {};
+  const name = record?.name ?? master.name ?? '';
+  const kana = record?.nameKana ?? record?.kana ?? record?.furigana
+    ?? master.nameKana ?? master.kana ?? master.furigana ?? '';
+  return [studentId, name, kana, cmpKanaToRomaji_(kana)]
+    .map(normalizeCmpStudentSearch_)
+    .some(value => value.includes(q));
+}
+
+async function ensureEnrollmentIndex(force) {
+  if (enrollmentIndexReady && !force) return;
+  const result = await api({ action: 'getStudents', limit: 1000 });
+  if (!result.success) throw new Error(result.error || '在籍情報を取得できませんでした');
+  const rows = result.students || [];
+  enrollmentByStudentId = new Map();
+  studentSearchById = new Map();
+  rows.forEach(student => {
+    const id = String(student.id ?? student.studentId ?? student.student_code ?? '').trim();
+    const flag = normalizedEnrollmentFlag(student);
+    if (id) {
+      enrollmentByStudentId.set(id, flag);
+      studentSearchById.set(id, student);
+    }
+  });
+  // 面談画面の生徒選択にも同じ全件データを再利用し、二重取得と競合を防ぐ
+  if (!students.length) students = rows;
+  enrollmentIndexReady = true;
+}
+
+function sbScore(row) {
+  return {
+    id: row.id,
+    studentId: sbValue(row.student_code || row.student_id),
+    name: sbValue(row.student_name || row.name),
+    campus: sbValue(row.campus),
+    grade: sbValue(row.grade),
+    school: sbValue(row.school_name),
+    year: row.school_year,
+    term: row.test_number,
+    jpn: row.japanese, soc: row.social, math: row.math, sci: row.science, eng: row.english,
+    mus: row.music, art: row.art, pe: row.health_pe, tech: row.technology_home,
+    total5: row.total_5, total9: row.total_9, rank5: row.rank_5, rank9: row.rank_9,
+    avg_jpn: row.avg_japanese, avg_soc: row.avg_social, avg_math: row.avg_math,
+    avg_sci: row.avg_science, avg_eng: row.avg_english, avg_total5: row.avg_total_5,
+    createdAt: sbValue(row.created_at), updatedAt: sbValue(row.updated_at)
+  };
+}
+
+function sbReport(row) {
+  return {
+    id: row.id,
+    studentId: sbValue(row.student_code || row.student_id),
+    name: sbValue(row.student_name || row.name),
+    campus: sbValue(row.campus),
+    grade: sbValue(row.grade),
+    school: sbValue(row.school_name),
+    year: row.school_year,
+    semester: row.term,
+    rp_jpn: row.japanese, rp_soc: row.social, rp_math: row.math, rp_sci: row.science, rp_eng: row.english,
+    rp_mus: row.music, rp_art: row.art, rp_pe: row.health_pe, rp_tech: row.technology_home,
+    createdAt: sbValue(row.created_at), updatedAt: sbValue(row.updated_at)
+  };
+}
+
+function sbWish(row) {
+  const wishes = row.wishes || {};
+  return Object.assign({
+    id: row.id,
+    studentId: sbValue(row.student_code || row.student_id),
+    name: sbValue(row.student_name || row.name),
+    campus: sbValue(row.campus),
+    grade: sbValue(row.grade),
+    updatedAt: sbValue(row.updated_at),
+    results: row.results || {}
+  }, wishes);
+}
+
+function sbMemo(row) {
+  return {
+    id: row.id,
+    date: row.memo_date,
+    studentId: sbValue(row.student_code || row.student_id),
+    name: sbValue(row.student_name || row.name),
+    campus: sbValue(row.campus),
+    grade: sbValue(row.grade),
+    school: sbValue(row.school_name),
+    counterpart: sbValue(row.contact_person),
+    content: sbValue(row.content),
+    staff: sbValue(row.staff_name),
+    staffEmail: sbValue(row.staff_email),
+    createdAt: sbValue(row.created_at),
+    updatedAt: sbValue(row.updated_at)
+  };
+}
+
+function supabaseUrl(path, params) {
+  const url = new URL(SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/' + path);
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== '' && value !== null && value !== undefined) url.searchParams.set(key, value);
+  });
+  return url.toString();
+}
+
+async function supabaseGet(path, params) {
+  const url = supabaseUrl(path, params);
+  if (path === 'students') console.info('Supabase students request:', url);
+  const r = await fetch(url, { headers: supabaseHeaders() });
+  if (!r.ok) throw new Error('Supabase read failed: ' + r.status);
+  return await r.json();
+}
+
+async function supabaseWrite(path, params, options) {
+  const url = supabaseUrl(path, params);
+  const r = await fetch(url, {
+    method: options.method || 'POST',
+    headers: supabaseHeaders(options.headers),
+    body: options.body === undefined ? undefined : JSON.stringify(options.body)
+  });
+  const text = await r.text();
+  let body = null;
+  try { body = text ? JSON.parse(text) : null; } catch(e) { body = text; }
+  if (!r.ok) {
+    const message = typeof body === 'object' && body ? (body.message || body.msg || JSON.stringify(body)) : String(body || '');
+    throw new Error('Supabase write failed: ' + r.status + (message ? ' ' + message : ''));
+  }
+  return body;
+}
+
+async function legacyApi(data) {
+  const r = await fetch(GAS, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(data)
+  });
+  return await r.json();
+}
+
+async function supabaseApi(data) {
+  if (!hasSupabaseConfig()) return { success: false, fallback: true, error: 'Supabase設定がありません' };
+  if (!SUPABASE_ENABLED_ACTIONS.has(data.action)) {
+    return { success: false, fallback: true, error: 'Phase 2ではSupabase対象外です: ' + data.action };
+  }
+  if (!getSupabaseSession()) {
+    return { success: false, fallback: false, authRequired: true, error: 'Supabaseログインが必要です' };
+  }
+  switch (data.action) {
+    case 'getStudents': {
+      const limit = Math.min(Number(data.limit || 50), 50);
+      const offset = Math.max(Number(data.offset || 0), 0);
+      const params = {
+        select: 'id,student_code,name,name_kana,campus,grade,school_name,active',
+        order: 'active.desc,campus.asc,grade.asc,student_code.asc',
+        limit,
+        offset
+      };
+      if (data.activeOnly === true) params.active = 'eq.true';
+      else if (data.withdrawnOnly === true) params.active = 'eq.false';
+      if (data.campus) params.campus = 'eq.' + data.campus;
+      if (Array.isArray(data.grades) && data.grades.length) params.grade = supabaseGradesParam(data.grades);
+      else if (data.grade) params.grade = supabaseGradeParam(data.grade);
+      if (data.q) {
+        const q = String(data.q).replace(/[()*.,]/g, ' ').trim();
+        if (q) params.or = `(name.ilike.*${q}*,student_code.ilike.*${q}*)`;
+      }
+      const rows = await supabaseGet('students', {
+        ...params
+      });
+      return { success: true, students: rows.map(sbStudent), source: 'supabase', hasMore: rows.length === limit, limit, offset };
+    }
+    case 'syncStudents':
+      return await previewSupabaseStudentSync();
+    case 'applySyncResult':
+      return await applySupabaseStudentSync(data);
+    case 'getSyncLog':
+      return { success: true, logs: getSupabaseSyncLogs() };
+    default:
+      return { success: false, fallback: true, error: 'Supabase未対応アクション: ' + data.action };
+  }
+}
+
+function cleanSyncValue(value) {
+  return value === null || value === undefined ? '' : String(value).trim();
+}
+
+function activeFromStudentFlag(value) {
+  if (value === false) return false;
+  const flag = cleanSyncValue(value);
+  return !['退塾', 'inactive', 'false', '0'].includes(flag);
+}
+
+function syncStudentFromGas(s, index) {
+  const active = activeFromStudentFlag(s.flag ?? s.status ?? s.active);
+  return {
+    id: cleanSyncValue(s.id || s.studentId || s.student_code),
+    name: cleanSyncValue(s.name),
+    nameKana: cleanSyncValue(s.kana || s.nameKana || s.name_kana),
+    campus: cleanSyncValue(s.campus),
+    grade: cleanSyncValue(s.grade),
+    school: cleanSyncValue(s.school || s.school_name),
+    flag: active ? '1' : '退塾',
+    active,
+    sourceRow: index + 2
+  };
+}
+
+function syncStudentToSupabaseRow(s) {
+  return {
+    student_code: cleanSyncValue(s.id),
+    name: cleanSyncValue(s.name),
+    name_kana: cleanSyncValue(s.nameKana),
+    campus: cleanSyncValue(s.campus),
+    grade: cleanSyncValue(s.grade),
+    school_name: cleanSyncValue(s.school),
+    active: activeFromStudentFlag(s.flag),
+    source_row: Number(s.sourceRow || 0) || null,
+    source_updated_at: new Date().toISOString()
+  };
+}
+
+function supabaseStudentToSync(row) {
+  return {
+    id: cleanSyncValue(row.student_code),
+    name: cleanSyncValue(row.name),
+    nameKana: cleanSyncValue(row.name_kana),
+    campus: cleanSyncValue(row.campus),
+    grade: cleanSyncValue(row.grade),
+    school: cleanSyncValue(row.school_name),
+    flag: row.active === false ? '退塾' : '1',
+    active: row.active !== false
+  };
+}
+
+function studentSyncChanges(next, current) {
+  const fields = [
+    ['name', '氏名'],
+    ['nameKana', 'かな'],
+    ['campus', '校舎'],
+    ['grade', '学年'],
+    ['school', '学校'],
+    ['flag', '在籍']
+  ];
+  return fields
+    .filter(([key]) => cleanSyncValue(next[key]) !== cleanSyncValue(current[key]))
+    .map(([key, label]) => `${label}: ${cleanSyncValue(current[key]) || '-'}→${cleanSyncValue(next[key]) || '-'}`);
+}
+
+async function previewSupabaseStudentSync() {
+  const gasResult = await legacyApi({ action: 'getStudents' });
+  if (!gasResult.success) return { success: false, error: gasResult.error || 'GAS生徒マスタを取得できませんでした' };
+  const gasStudents = (gasResult.students || [])
+    .map(syncStudentFromGas)
+    .filter(s => s.id && s.name);
+  const supabaseRows = await supabaseGet('students', {
+    select: 'student_code,name,name_kana,campus,grade,school_name,active',
+    order: 'student_code.asc',
+    limit: 1000
+  });
+  const currentByCode = new Map(supabaseRows.map(row => [cleanSyncValue(row.student_code), supabaseStudentToSync(row)]));
+  const nextByCode = new Map(gasStudents.map(s => [s.id, s]));
+  const toAdd = [];
+  const toUpdate = [];
+  const toDeactivate = [];
+  gasStudents.forEach(next => {
+    const current = currentByCode.get(next.id);
+    if (!current) {
+      toAdd.push(next);
+      return;
+    }
+    const changes = studentSyncChanges(next, current);
+    if (changes.length) toUpdate.push({ ...next, changes });
+  });
+  currentByCode.forEach((current, id) => {
+    if (!nextByCode.has(id) && current.active) toDeactivate.push(current);
+  });
+  return {
+    success: true,
+    preview: { toAdd, toUpdate, passChanged: [], toDeactivate },
+    masterCount: gasStudents.length,
+    localCount: supabaseRows.length,
+    source: 'supabase'
+  };
+}
+
+async function applySupabaseStudentSync(data) {
+  const toUpsert = [...(data.toAdd || []), ...(data.toUpdate || [])].map(syncStudentToSupabaseRow);
+  let applied = 0;
+  if (toUpsert.length) {
+    await supabaseWrite('students', { on_conflict: 'student_code' }, {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+      body: toUpsert
+    });
+    applied += toUpsert.length;
+  }
+  const toDeactivate = data.toDeactivate || [];
+  if (toDeactivate.length) {
+    const codes = toDeactivate.map(s => cleanSyncValue(s.id)).filter(Boolean);
+    if (data.deleteDeactivated) {
+      for (const code of codes) {
+        await supabaseWrite('students', { student_code: 'eq.' + code }, { method: 'DELETE' });
+        applied++;
+      }
+    } else {
+      const rows = toDeactivate.map(s => ({
+        student_code: cleanSyncValue(s.id),
+        name: cleanSyncValue(s.name) || '退塾生',
+        name_kana: cleanSyncValue(s.nameKana),
+        campus: cleanSyncValue(s.campus),
+        grade: cleanSyncValue(s.grade),
+        school_name: cleanSyncValue(s.school),
+        active: false,
+        source_updated_at: new Date().toISOString()
+      }));
+      await supabaseWrite('students', { on_conflict: 'student_code' }, {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+        body: rows
+      });
+      applied += rows.length;
+    }
+  }
+  addSupabaseSyncLog(applied, toUpsert.length, toDeactivate.length, !!data.deleteDeactivated);
+  return { success: true, applied };
+}
+
+function getSupabaseSyncLogs() {
+  try { return JSON.parse(localStorage.getItem('seisekiSupabaseSyncLogs') || '[]'); }
+  catch(e) { return []; }
+}
+
+function addSupabaseSyncLog(applied, upserted, deactivated, deleted) {
+  const logs = getSupabaseSyncLogs();
+  logs.unshift({
+    time: new Date().toLocaleString('ja-JP'),
+    type: 'sync',
+    detail: `Supabase生徒マスタ同期: ${applied}件（追加/更新 ${upserted}件、${deleted ? '削除' : '退塾'} ${deactivated}件）`
+  });
+  localStorage.setItem('seisekiSupabaseSyncLogs', JSON.stringify(logs.slice(0, 50)));
+}
+
+function supabaseGradesParam(grades) {
+  const toFullWidthDigit = v => String(v).replace(/[1-6]/g, ch => ({'1':'１','2':'２','3':'３','4':'４','5':'５','6':'６'}[ch]));
+  const values = [...new Set((grades || []).flatMap(v => {
+    const normalized = normalizeGrade(v);
+    return [normalized, toFullWidthDigit(normalized)];
+  }))];
+  return 'in.(' + values.join(',') + ')';
+}
+
+function supabaseGradeParam(grade) {
+  const map = {
+    elementary: ['小1','小2','小3','小4','小5','小6'],
+    junior: ['中1','中2','中3'],
+    high: ['高1','高2','高3'],
+    e13: ['小1','小2','小3'],
+    e46: ['小4','小5','小6'],
+    j1: ['中1'],
+    j2: ['中2'],
+    j3: ['中3'],
+    h13: ['高1','高2','高3']
+  };
+  const toFullWidthDigit = v => String(v).replace(/[1-6]/g, ch => ({'1':'１','2':'２','3':'３','4':'４','5':'５','6':'６'}[ch]));
+  const baseValues = map[grade] || [normalizeGrade(grade)];
+  const values = [...new Set(baseValues.flatMap(v => [v, toFullWidthDigit(v)]))];
+  return 'in.(' + values.join(',') + ')';
+}
+
+function newAdminMutationId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return 'admin-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+}
+
+function getAdminSessionToken() {
+  return getAdminState(ADMIN_SESSION_TOKEN_KEY) || '';
+}
+
+function hasValidAdminSessionToken() {
+  const token = getAdminSessionToken();
+  if (!token) return false;
+  const expiresAt = getAdminState(ADMIN_SESSION_EXPIRES_KEY);
+  return !expiresAt || !Number.isFinite(Date.parse(expiresAt)) || Date.parse(expiresAt) > Date.now() + 30000;
+}
+
+async function adminSupabaseApi(data) {
+  const token = getAdminSessionToken();
+  if (!token) {
+    return { success: false, authRequired: true, code: 'AUTH_REQUIRED', error: '管理者セッションがありません。再ログインしてください。' };
+  }
+  const payload = { ...data, token, requestTrace: 'admin-' + crypto.randomUUID() };
+  if (SUPABASE_WRITE_ACTIONS.has(data.action) && !payload.mutationId) {
+    payload.mutationId = newAdminMutationId();
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), data.action==='importMissingEntryGrades'?45000:15000);
+  try {
+    const response = await fetch(SEISEKI_ADMIN_RUNTIME_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
+      signal: controller.signal
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.success !== true) {
+      const authRequired = response.status === 401 || response.status === 403 || result.code === 'AUTH_REQUIRED';
+      return {
+        success: false,
+        authRequired,
+        code: result.code || 'SUPABASE_ERROR',
+        error: authRequired ? 'ログインの有効期限が切れました。再ログインしてください。' : (result.error || `Supabaseから取得できませんでした。参照ID: ${result.trace || payload.requestTrace}`),
+        referenceId: result.trace || payload.requestTrace
+      };
+    }
+    return result;
+  } catch (e) {
+    return {
+      success: false,
+      error: e.name === 'AbortError' ? 'Supabaseへの接続がタイムアウトしました。' : e.message
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function api(data) {
+  try {
+    if (SUPABASE_ENABLED_ACTIONS.has(data.action)) {
+      return await adminSupabaseApi(data);
+    }
+    return await legacyApi(data);
+  } catch(e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// ===== LOGIN =====
+const ADMIN_DEVICE_KEY = 'adminDeviceMode';
+const ADMIN_IDLE_AT_KEY = 'adminLastActivityAt';
+const ADMIN_IDLE_LIMIT_MS = 30 * 60 * 1000;
+const ADMIN_ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
+let adminDeviceMode = '';
+let adminIdleTimer = null;
+let adminLoginInProgress = false;
+
+function getSavedAdminDevice() {
+  if(localStorage.getItem(ADMIN_SESSION_TOKEN_KEY))return 'personal';
+  if(sessionStorage.getItem(ADMIN_SESSION_TOKEN_KEY))return 'school';
+  return localStorage.getItem(ADMIN_DEVICE_KEY) === 'personal'
+    ? 'personal'
+    : (sessionStorage.getItem(ADMIN_DEVICE_KEY) === 'school' ? 'school' : '');
+}
+function selectAdminDevice(mode) {
+  if (!['personal', 'school'].includes(mode)) return;
+  adminDeviceMode = mode;
+  document.getElementById('devicePersonal')?.classList.toggle('selected', mode === 'personal');
+  document.getElementById('deviceSchool')?.classList.toggle('selected', mode === 'school');
+  document.getElementById('deviceWarning')?.classList.add('hidden');
+  if (mode === 'school') {
+    localStorage.removeItem(ADMIN_DEVICE_KEY);
+    localStorage.removeItem('adminCodeInput');
+    localStorage.removeItem('adminPwInput');
+    localStorage.removeItem('adminEmailInput');
+    localStorage.removeItem('adminLoggedIn');
+    localStorage.removeItem('adminStaffCode');
+    localStorage.removeItem('adminStaffName');
+    sessionStorage.setItem(ADMIN_DEVICE_KEY, 'school');
+    document.getElementById('adminCodeIn').value = '';
+    document.getElementById('adminPwIn').value = '';
+  } else {
+    sessionStorage.removeItem(ADMIN_DEVICE_KEY);
+    localStorage.setItem(ADMIN_DEVICE_KEY, 'personal');
+  }
+}
+function getAdminState(key) {
+  return adminDeviceMode === 'personal' ? localStorage.getItem(key) : sessionStorage.getItem(key);
+}
+function setAdminState(key, value) {
+  const store = adminDeviceMode === 'personal' ? localStorage : sessionStorage;
+  store.setItem(key, value);
+}
+function clearAdminIdleTimer() {
+  if (adminIdleTimer) clearTimeout(adminIdleTimer);
+  adminIdleTimer = null;
+  ADMIN_ACTIVITY_EVENTS.forEach(eventName => document.removeEventListener(eventName, recordAdminActivity));
+}
+function scheduleAdminIdleLogout() {
+  if (adminDeviceMode !== 'school' || getAdminState('adminLoggedIn') !== '1') return;
+  clearAdminIdleTimer();
+  ADMIN_ACTIVITY_EVENTS.forEach(eventName => document.addEventListener(eventName, recordAdminActivity, { passive:true }));
+  const lastActivity = Number(sessionStorage.getItem(ADMIN_IDLE_AT_KEY)) || Date.now();
+  const remaining = Math.max(0, ADMIN_IDLE_LIMIT_MS - (Date.now() - lastActivity));
+  adminIdleTimer = setTimeout(() => logout({ automatic:true }), remaining);
+}
+function recordAdminActivity() {
+  if (adminDeviceMode !== 'school' || getAdminState('adminLoggedIn') !== '1') return;
+  sessionStorage.setItem(ADMIN_IDLE_AT_KEY, String(Date.now()));
+  if (adminIdleTimer) clearTimeout(adminIdleTimer);
+  adminIdleTimer = setTimeout(() => logout({ automatic:true }), ADMIN_IDLE_LIMIT_MS);
+}
+
+function toggleSidebar(){
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sideOverlay');
+  const isOpen = sb.classList.contains('open');
+  if(isOpen){ closeSidebar(); } else {
+    sb.classList.add('open');
+    ov.classList.add('show');
+    document.getElementById('sideToggleBtn').textContent = '✕';
+  }
+}
+function closeSidebar(){
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sideOverlay');
+  sb.classList.remove('open');
+  ov.classList.remove('show');
+  document.getElementById('sideToggleBtn').textContent = '☰';
+}
+
+async function doAdminLogin() {
+  if (adminLoginInProgress) return;
+  const code = document.getElementById('adminCodeIn').value.trim();
+  const pw = document.getElementById('adminPwIn').value;
+  const errEl = document.getElementById('loginErr');
+  adminDeviceMode = adminDeviceMode || getSavedAdminDevice();
+  if (!adminDeviceMode) {
+    document.getElementById('deviceWarning').classList.remove('hidden');
+    return;
+  }
+  if (!code || !pw) {
+    errEl.textContent = '講師コードとパスワードを入力してください';
+    return;
+  }
+  adminLoginInProgress = true;
+  let staff;
+  try {
+    staff = await StepStaffAuth.login(code, pw);
+  } catch (error) {
+    errEl.textContent = error.message || 'ログインできませんでした';
+    adminLoginInProgress = false;
+    return;
+  }
+  if (!staff.success) {
+    errEl.textContent = staff.error || 'ログインできませんでした';
+    adminLoginInProgress = false;
+    return;
+  }
+  const gradeToken = staff.gradeSessionToken || staff.systemPortalSessionToken;
+  if (!gradeToken || !['1','2','3','4'].includes(String(staff.permissionLevel))) {
+    errEl.textContent = '成績管理にはスタッフ権限（権限1〜4）が必要です。';
+    adminLoginInProgress = false;
+    return;
+  }
+  setAdminState('adminLoggedIn', '1');
+  setAdminState('adminStaffCode', staff.code || code);
+  setAdminState('adminStaffName', staff.name || '');
+  setAdminState(ADMIN_SESSION_TOKEN_KEY, gradeToken);
+  setAdminState(ADMIN_SESSION_EXPIRES_KEY, staff.gradeExpiresAt || staff.systemPortalExpiresAt || '');
+  if (adminDeviceMode === 'personal') {
+    try {
+      await StepStaffAuth.persist(gradeToken);
+      setAdminState(ADMIN_SESSION_EXPIRES_KEY, '2100-01-01T00:00:00.000Z');
+    } catch (error) {
+      if(error.authRequired){await logout();errEl.textContent=error.message;adminLoginInProgress=false;return;}
+      // A network failure does not invalidate the authenticated session.
+      console.warn('端末のログイン保持を再確認してください。');
+    }
+    rememberAdminLogin(code, pw, '');
+  } else {
+    sessionStorage.setItem(ADMIN_IDLE_AT_KEY, String(Date.now()));
+  }
+
+  errEl.textContent = '';
+  adminLoginInProgress = false;
+  showMain();
+}
+function rememberAdminLogin(code, password, email) {
+  localStorage.setItem('adminCodeInput', code || '');
+  localStorage.removeItem('adminPwInput');
+  if (email) localStorage.setItem('adminEmailInput', email);
+}
+function restoreAdminLoginInputs() {
+  const codeEl = document.getElementById('adminCodeIn');
+  const pwEl = document.getElementById('adminPwIn');
+  const emailEl = document.getElementById('adminEmailIn');
+  if (codeEl) codeEl.value = adminDeviceMode === 'personal' ? (localStorage.getItem('adminCodeInput') || '') : '';
+  if (pwEl) pwEl.value = adminDeviceMode === 'personal' ? (localStorage.getItem('adminPwInput') || '') : '';
+  if (emailEl) emailEl.value = localStorage.getItem('adminEmailInput') || DEFAULT_SUPABASE_AUTH_EMAIL;
+}
+function updateAdminLabel() {
+  const label = document.getElementById('adminLabel');
+  if (!label) return;
+  const name = getAdminState('adminStaffName') || '';
+  const code = getAdminState('adminStaffCode') || '';
+  label.textContent = name ? `${name}（${code}）` : '管理者';
+  label.style.fontSize = '.78rem';
+}
+
+let adminReconcileInProgress = false;
+function reconcileAdminDataInBackground() {
+  const cutoverKey = 'seisekiSupabaseCutoverReconciledV2';
+  if (adminReconcileInProgress || localStorage.getItem(cutoverKey) === '1' || !hasValidAdminSessionToken()) return;
+  adminReconcileInProgress = true;
+  setTimeout(async () => {
+    try {
+      const reconciled = await adminSupabaseApi({ action: 'reconcileLegacy' });
+      if (!reconciled.success) {
+        console.warn('在籍区分の再照合を完了できませんでした', reconciled.error);
+        return;
+      }
+      localStorage.setItem(cutoverKey, '1');
+      enrollmentIndexReady = false;
+      clearSensitiveCache();
+      if (getAdminState('adminLoggedIn') === '1') {
+        reloadData();
+        toast('在籍区分を最新状態に更新しました');
+      }
+    } finally {
+      adminReconcileInProgress = false;
+    }
+  }, 0);
+}
+
+function showMain() {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('mainHeader').style.display = 'flex';
+  document.getElementById('mainLayout').style.display = 'flex';
+  updateAdminLabel();
+  initYearSelects();
+  initGradeSelects();
+  const initialTab = getInitialAdminTab();
+  _navHist.length = 0;
+  _navHist.push(initialTab);
+  _navIdx = 0;
+  _updateNavBtns();
+  const el = [...document.querySelectorAll('.sideItem')].find(e => e.getAttribute('onclick')?.includes("'" + initialTab + "'"));
+  if (el) {
+    _navSkip = true;
+    if (initialTab === 'compare' && /^\d{1,10}$/.test(new URLSearchParams(location.search).get('studentId') || '')) {
+      goToCompare(new URLSearchParams(location.search).get('studentId'));
+    } else aNav(initialTab, el);
+    _navSkip = false;
+  } else {
+    loadSpeed();
+  }
+  scheduleAdminIdleLogout();
+  reconcileAdminDataInBackground();
+}
+async function logout(options = {}) {
+  clearAdminIdleTimer();
+  const token = getAdminSessionToken();
+  if (token) {
+    try {
+      await Promise.race([
+        adminSupabaseApi({ action: 'logoutAdmin' }),
+        new Promise(resolve => setTimeout(resolve, 3000))
+      ]);
+    } catch(e) { /* local logout must always continue */ }
+  }
+  sessionStorage.removeItem('seisekiSupabaseSession');
+  clearSensitiveCache();
+  sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+  sessionStorage.removeItem(ADMIN_SESSION_EXPIRES_KEY);
+  localStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+  localStorage.removeItem(ADMIN_SESSION_EXPIRES_KEY);
+  sessionStorage.removeItem('adminLoggedIn');
+  sessionStorage.removeItem('adminStaffCode');
+  sessionStorage.removeItem('adminStaffName');
   sessionStorage.removeItem(ADMIN_DEVICE_KEY);
   sessionStorage.removeItem(ADMIN_IDLE_AT_KEY);
   localStorage.removeItem('adminLoggedIn');
