@@ -84,13 +84,17 @@ header #logout{color:#175443;background:#fff;border-color:#def5e7}.card{backgrou
 #familyAcademic{width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;border-radius:0;padding:0;background:#fff;color:#244a3d}
 #familyAcademic::backdrop{background:#fff}
 .familyAcademicOpen{overflow:hidden}
-.familyAcademicHead{position:sticky;top:0;z-index:3;display:flex;justify-content:space-between;align-items:center;gap:12px;background:#eaf8f0;border-bottom:1px solid #badfc9;padding:16px 24px}
-.familyAcademicHead h2{margin:0;font-size:1.2rem}
+.familyAcademicHead{position:sticky;top:0;z-index:3;display:flex;justify-content:space-between;align-items:center;gap:14px;background:#eaf8f0;border-bottom:1px solid #badfc9;padding:10px 24px}
+.familyAcademicHead h2{margin:0;font-size:1rem;flex:none}
+.familyStudentSummary{display:flex;align-items:center;flex-wrap:wrap;gap:4px 14px;flex:1;min-width:0}
+.familySummaryItem{font-size:.95rem;overflow-wrap:anywhere}.familySummaryItem.name{font-size:1.2rem;font-weight:800}.familySummaryItem.number,.familySummaryItem.kana{font-size:.8rem;color:#48715e}.familySummaryItem.grade,.familySummaryItem.school{font-weight:650}
+.familyAcademicHead>.btn{flex:none;padding:8px 14px}
+@media(max-width:700px){.familyAcademicHead{flex-wrap:wrap;gap:6px 10px}.familyAcademicHead h2{font-size:.85rem}.familyStudentSummary{order:3;flex-basis:100%;gap:3px 12px}.familyAcademicHead>.btn{margin-left:auto}.familySummaryItem.name{font-size:1.05rem}}
 .familyAcademicBody{max-width:1200px;margin:auto;padding:8px 24px 24px}
 .familyAcademicBody h3{color:#225947}
 .familyAcademicBody .familyBasicHead{display:flex;align-items:center;gap:12px;margin:0 0 8px;font-size:1rem}
 .familyStudentNumber{font-size:.85rem;font-weight:500;color:#48715e}
-.familyAcademicBody .directoryAcademic{margin-top:14px}
+.familyAcademicBody .directoryAcademic{margin:0}.familyAcademicBody .academicWishPanel{padding:12px 18px}.familyAcademicBody .academicCombined{margin-bottom:0}
 .familyAcademicBody .field{cursor:default}
 .familyAcademicBody .academicCompareTable{font-size:.8rem}
 .btn.small.familyViewButton{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:12px 17px;min-height:66px;max-width:400px;background:linear-gradient(120deg,#2563a0,#387fc2);border:2px solid #1f5c96;border-radius:14px;color:#fff;font-size:1.02rem;font-weight:800;line-height:1.5;white-space:normal;text-align:left;box-shadow:0 5px 14px #2563a02e}
@@ -735,10 +739,12 @@ function openFamilyAcademic(student){
   const head=document.createElement('div');head.className='familyAcademicHead';
   const title=document.createElement('h2');title.id='familyAcademicTitle';title.textContent='成績・志望校確認';
   const close=document.createElement('button');close.type='button';close.className='btn secondary';close.textContent='閉じる';close.onclick=()=>dialog.close();
-  head.append(title,close);dialog.append(head);
+  const summary=document.createElement('div');summary.className='familyStudentSummary';
+  for(const [label,value,cls] of [['生徒番号','No.'+student.id,'number'],['生徒氏名',student.name,'name'],['フリガナ',student.kana,'kana'],['学年',student.grade,'grade'],['学校名',student.school,'school']]){
+    const item=document.createElement('span');item.className='familySummaryItem '+cls;item.setAttribute('aria-label',label);item.textContent=value||'未入力';summary.append(item);
+  }
+  head.append(title,summary,close);dialog.append(head);
   const body=document.createElement('div');body.className='familyAcademicBody';
-  section(body,'基本情報',[['生徒氏名',student.name],['フリガナ',student.kana],['学年',student.grade],['学校名',student.school]],{big:true});
-  const basicHead=body.querySelector('h3');basicHead.className='familyBasicHead';const number=document.createElement('span');number.className='familyStudentNumber';number.textContent='No.'+student.id;basicHead.append(number);
   dialog.append(body);document.body.append(dialog);
   dialog.addEventListener('close',()=>{dialog.remove();document.body.classList.remove('familyAcademicOpen');},{once:true});
   document.body.classList.add('familyAcademicOpen');dialog.showModal();
