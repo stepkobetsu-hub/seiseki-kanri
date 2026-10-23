@@ -80,6 +80,19 @@ header #logout{color:#175443;background:#fff;border-color:#def5e7}.card{backgrou
 /* 成績管理へのリンクは生徒名簿と同じ濃緑に統一 */
 .btn.detailGrades,.btn.directoryGradeLink{background:#25735a;color:#fff;border-color:#175443}
 .btn.detailGrades:hover,.btn.directoryGradeLink:hover{background:#175443;color:#fff}
+
+#familyAcademic{width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;border-radius:0;padding:0;background:#fff;color:#244a3d}
+#familyAcademic::backdrop{background:#fff}
+.familyAcademicOpen{overflow:hidden}
+.familyAcademicHead{position:sticky;top:0;z-index:3;display:flex;justify-content:space-between;align-items:center;gap:12px;background:#eaf8f0;border-bottom:1px solid #badfc9;padding:16px 24px}
+.familyAcademicHead h2{margin:0;font-size:1.2rem}
+.familyAcademicBody{max-width:1200px;margin:auto;padding:12px 24px 30px}
+.familyAcademicBody h3{color:#225947}
+.familyAcademicBody .field{cursor:default}
+.familyAcademicBody .academicCompareTable{font-size:.8rem}
+.familyViewButton{white-space:normal;text-align:center}
+@media(max-width:600px){.familyAcademicHead{padding:12px}.familyAcademicBody{padding:10px 12px 24px}.familyViewButton{width:100%}}
+
 </style>
 </head>
 <body>
@@ -409,6 +422,7 @@ const DirectoryAcademic = (() => {
       ? values.reduce((sum,value) => sum + Number(value),0) : '';
   };
   function clear() {
+    document.getElementById('familyAcademic')?.close();
     for (const entry of reads.values()) entry.controller.abort();
     reads.clear();
   }
@@ -484,13 +498,13 @@ const DirectoryAcademic = (() => {
     if (!list.childElementCount) box.hidden=true;
     else area.append(list);
   }
-  function mount(card,student) {
+  function mount(card,student,{shared=false}={}) {
     memosHidden=false;
     const id=String(student.id),session=token();
     if (!session || !/^\d{1,10}$/.test(id)) return;
     select(id,session);
     const wrap=make('section',null,'directoryAcademic');
-    wrap.dataset.studentId=id;wrap.setAttribute('aria-label','志望校・テスト成績・通知表・面談メモ');
+    wrap.dataset.studentId=id;wrap.setAttribute('aria-label',shared?'志望校・テスト成績・通知表':'志望校・テスト成績・通知表・面談メモ');
     card.append(wrap);wrap.reloadGrades=[];
     const live=()=>wrap.isConnected && selectedId === id && token() === session;
     function panel(title,action,render,parent=wrap,hidden=false) {
@@ -505,7 +519,7 @@ const DirectoryAcademic = (() => {
         const controls=make('div',null,'academicControls');
         const grades=make('a','📊 成績管理システムへ','btn small');
         grades.href='admin.html?studentId='+encodeURIComponent(id)+'&v=20261010-admin-login-fixed#compare';
-        grades.target='_blank';grades.rel='noopener';controls.append(grades,update);head.append(controls);
+        grades.target='_blank';grades.rel='noopener';if(!shared)controls.append(grades);controls.append(update);head.append(controls);
       } else head.append(update);
       const area=make('div',null,'academicBody');area.setAttribute('aria-live','polite');
       box.append(head,area);parent.append(box);
@@ -529,12 +543,12 @@ const DirectoryAcademic = (() => {
     const records=make('section',null,'academicPanel academicCombined');
     const head=make('div',null,'academicHead'),title=make('div',null,'academicDataTitle');
     const admission=make('span','入塾日・通塾期間を読み込み中…','academicAdmission');
-    admission.dataset.admissionStudentId=id;title.append(make('h3','📋 データ一覧'),admission);head.append(title);
+    admission.dataset.admissionStudentId=id;title.append(make('h3','📋 データ一覧'));if(!shared)title.append(admission);head.append(title);
     const controls=make('div',null,'academicControls');
     const grades=make('a','📊 成績管理システムへ','btn small');
     grades.href='admin.html?studentId='+encodeURIComponent(id)+'&v=20261010-admin-login-fixed#compare';grades.target='_blank';grades.rel='noopener';
-    controls.append(grades);head.append(controls);records.append(head);
-    const area=make('div',null,'academicBody');area.setAttribute('aria-live','polite');records.append(area);wrap.append(records);loadDirectoryAdmission(id,admission,student);
+    if(!shared)controls.append(grades);head.append(controls);records.append(head);
+    const area=make('div',null,'academicBody');area.setAttribute('aria-live','polite');records.append(area);wrap.append(records);if(!shared)loadDirectoryAdmission(id,admission,student);
     const states=[{rows:[],status:'loading'},{rows:[],status:'loading'}];
     const grade=Number(String(student.grade||'').normalize('NFKC').match(/^中([123])/)?.[1]||0);
     const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tokyo',year:'numeric',month:'numeric'}).formatToParts(new Date());
@@ -593,6 +607,7 @@ const DirectoryAcademic = (() => {
       }
       update.onclick=()=>load(true);wrap.reloadGrades.push(()=>load(true));load();
     }
+    if(shared)return; // Shared view never mounts or requests private memos.
     const memoBox=panel('🗒️ 面談・メモ','getMeetingMemos',(area,rows)=>{
       const empty=!rows.length;area.closest('.academicPanel').classList.toggle('academicMemoEmpty',empty);
       memoToggle.disabled=empty;area.hidden=!empty&&memosHidden;
@@ -699,7 +714,26 @@ const DirectoryEntry = (() => {
   return {clear,mount};
 })();
 
-function renderDetail(s){const card=el('detail');card.replaceChildren();const title=document.createElement('h2');title.textContent=s.name||'氏名未入力';const admissionTop=document.createElement('span');admissionTop.className='admissionTop';admissionTop.textContent='入塾日・通塾期間を読み込み中…';title.append(admissionTop);const enrollment=statusBadge(s.flag);const detailTop=document.createElement('div');detailTop.className='detailTop';const detailMeta=document.createElement('div');detailMeta.className='detailMeta';const identity=document.createElement('div');identity.className='detailIdentity';identity.append(document.createTextNode(`No.${s.id}`));if(enrollment)identity.append(enrollment);const topGrades=document.createElement('a');topGrades.className='btn small detailGrades';topGrades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261010-admin-login-fixed#compare`;topGrades.target='_blank';topGrades.rel='noopener';topGrades.textContent='📊 成績管理システムへ';const topMaster=document.createElement('a');topMaster.className='btn secondary small masterShortcut';topMaster.href=MASTER_SHEET;topMaster.target='_blank';topMaster.rel='noopener';topMaster.textContent='★生徒マスタへ';const detailLinks=document.createElement('div');detailLinks.className='detailLinks';detailLinks.append(topMaster);detailMeta.append(identity,detailLinks);detailTop.append(title,detailMeta);card.append(detailTop);section(card,'基本情報',[['生徒氏名',s.name],['フリガナ',s.kana],['学年',s.grade],['学校名',s.school]],{big:true});loadDirectoryAdmission(String(s.id),admissionTop,s);DirectoryAcademic.mount(card,s);section(card,'連絡先',[['保護者携帯',s.guardianPhone,{phone:true}],['保護者自宅電話',s.homePhone,{phone:true}],['第2保護者携帯',s.secondPhone,{phone:true}]],{big:true});const lessonHead=document.createElement('div');lessonHead.className='lessonHead';const h=document.createElement('h3');h.textContent='通塾時間割';const timetable=document.createElement('a');timetable.className='btn secondary small';timetable.href=TIMETABLE_APP+'?studentId='+encodeURIComponent(s.id);timetable.target='_blank';timetable.rel='noopener';timetable.textContent='時間割マスタアプリへ';lessonHead.append(h,timetable);card.append(lessonHead);if(s.lessons?.length){for(const v of s.lessons){const p=document.createElement('div');p.className='lesson';p.textContent=`${v.weekday} ${v.time} ${v.subject}`;card.append(p)}}else{const p=document.createElement('p');p.className='muted';p.textContent='登録されている授業枠はありません。';card.append(p)}if(s.course||s.options||s.note)section(card,'コース・備考',[['コース・オプション',[s.course,s.options].filter(Boolean).join('＋')],['時間割の備考',s.note]],{small:true});renderDebitSection(card,s);section(card,'その他の情報（タップで拡大）',[['保護者氏名',s.guardian],['第2保護者氏名',s.secondGuardian],['郵便番号',s.postcode],['住所',s.address],['保護者メール',s.guardianEmail],['第2保護者メール',s.secondEmail],['パスワード（L列）',s.loginPassword,{secret:true}]],{small:true});const actions=document.createElement('div');actions.className='actions';const edit=document.createElement('button');edit.className='btn';edit.type='button';edit.textContent='✏️ 生徒マスタを編集';edit.onclick=openEditor;const sheet=document.createElement('a');sheet.className='btn secondary';sheet.href=TIMETABLE_APP+'?studentId='+encodeURIComponent(s.id);sheet.target='_blank';sheet.rel='noopener';sheet.textContent='時間割マスタアプリへ';const grades=document.createElement('a');grades.className='btn directoryGradeLink';grades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261010-admin-login-fixed#compare`;grades.target='_blank';grades.rel='noopener';grades.textContent='📊 成績管理システムへ';DirectoryEntry.mount(card,s);actions.append(edit,sheet,grades);card.append(actions)}
+
+// Build the shared screen from an explicit allowlist, never from the detail card.
+function openFamilyAcademic(student){
+  document.getElementById('familyAcademic')?.remove();
+  const dialog=document.createElement('dialog');dialog.id='familyAcademic';
+  dialog.setAttribute('aria-labelledby','familyAcademicTitle');
+  const head=document.createElement('div');head.className='familyAcademicHead';
+  const title=document.createElement('h2');title.id='familyAcademicTitle';title.textContent='成績・志望校確認';
+  const close=document.createElement('button');close.type='button';close.className='btn secondary';close.textContent='閉じる';close.onclick=()=>dialog.close();
+  head.append(title,close);dialog.append(head);
+  const body=document.createElement('div');body.className='familyAcademicBody';
+  const identity=document.createElement('p');identity.textContent='No.'+student.id;body.append(identity);
+  section(body,'基本情報',[['生徒氏名',student.name],['フリガナ',student.kana],['学年',student.grade],['学校名',student.school]],{big:true});
+  dialog.append(body);document.body.append(dialog);
+  dialog.addEventListener('close',()=>{dialog.remove();document.body.classList.remove('familyAcademicOpen');},{once:true});
+  document.body.classList.add('familyAcademicOpen');dialog.showModal();
+  DirectoryAcademic.mount(body,{id:student.id,grade:student.grade},{shared:true});
+}
+
+function renderDetail(s){const card=el('detail');card.replaceChildren();const title=document.createElement('h2');title.textContent=s.name||'氏名未入力';const admissionTop=document.createElement('span');admissionTop.className='admissionTop';admissionTop.textContent='入塾日・通塾期間を読み込み中…';title.append(admissionTop);const enrollment=statusBadge(s.flag);const detailTop=document.createElement('div');detailTop.className='detailTop';const detailMeta=document.createElement('div');detailMeta.className='detailMeta';const identity=document.createElement('div');identity.className='detailIdentity';identity.append(document.createTextNode(`No.${s.id}`));if(enrollment)identity.append(enrollment);const topGrades=document.createElement('a');topGrades.className='btn small detailGrades';topGrades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261010-admin-login-fixed#compare`;topGrades.target='_blank';topGrades.rel='noopener';topGrades.textContent='📊 成績管理システムへ';const topMaster=document.createElement('a');topMaster.className='btn secondary small masterShortcut';topMaster.href=MASTER_SHEET;topMaster.target='_blank';topMaster.rel='noopener';topMaster.textContent='★生徒マスタへ';const detailLinks=document.createElement('div');detailLinks.className='detailLinks';const familyView=document.createElement('button');familyView.type='button';familyView.className='btn small familyViewButton';familyView.textContent='生徒・保護者と成績・志望校確認';familyView.onclick=()=>openFamilyAcademic(s);detailLinks.append(topMaster,familyView);detailMeta.append(identity,detailLinks);detailTop.append(title,detailMeta);card.append(detailTop);section(card,'基本情報',[['生徒氏名',s.name],['フリガナ',s.kana],['学年',s.grade],['学校名',s.school]],{big:true});loadDirectoryAdmission(String(s.id),admissionTop,s);DirectoryAcademic.mount(card,s);section(card,'連絡先',[['保護者携帯',s.guardianPhone,{phone:true}],['保護者自宅電話',s.homePhone,{phone:true}],['第2保護者携帯',s.secondPhone,{phone:true}]],{big:true});const lessonHead=document.createElement('div');lessonHead.className='lessonHead';const h=document.createElement('h3');h.textContent='通塾時間割';const timetable=document.createElement('a');timetable.className='btn secondary small';timetable.href=TIMETABLE_APP+'?studentId='+encodeURIComponent(s.id);timetable.target='_blank';timetable.rel='noopener';timetable.textContent='時間割マスタアプリへ';lessonHead.append(h,timetable);card.append(lessonHead);if(s.lessons?.length){for(const v of s.lessons){const p=document.createElement('div');p.className='lesson';p.textContent=`${v.weekday} ${v.time} ${v.subject}`;card.append(p)}}else{const p=document.createElement('p');p.className='muted';p.textContent='登録されている授業枠はありません。';card.append(p)}if(s.course||s.options||s.note)section(card,'コース・備考',[['コース・オプション',[s.course,s.options].filter(Boolean).join('＋')],['時間割の備考',s.note]],{small:true});renderDebitSection(card,s);section(card,'その他の情報（タップで拡大）',[['保護者氏名',s.guardian],['第2保護者氏名',s.secondGuardian],['郵便番号',s.postcode],['住所',s.address],['保護者メール',s.guardianEmail],['第2保護者メール',s.secondEmail],['パスワード（L列）',s.loginPassword,{secret:true}]],{small:true});const actions=document.createElement('div');actions.className='actions';const edit=document.createElement('button');edit.className='btn';edit.type='button';edit.textContent='✏️ 生徒マスタを編集';edit.onclick=openEditor;const sheet=document.createElement('a');sheet.className='btn secondary';sheet.href=TIMETABLE_APP+'?studentId='+encodeURIComponent(s.id);sheet.target='_blank';sheet.rel='noopener';sheet.textContent='時間割マスタアプリへ';const grades=document.createElement('a');grades.className='btn directoryGradeLink';grades.href=`admin.html?studentId=${encodeURIComponent(s.id)}&v=20261010-admin-login-fixed#compare`;grades.target='_blank';grades.rel='noopener';grades.textContent='📊 成績管理システムへ';DirectoryEntry.mount(card,s);actions.append(edit,sheet,grades);card.append(actions)}
 const MEETING_API='https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
 
 let directorySyncBusy=false,directorySyncedAt=0;
