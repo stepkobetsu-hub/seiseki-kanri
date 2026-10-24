@@ -774,9 +774,12 @@ const DirectoryAcademic = (() => {
 
 let directoryGradeSession='';
 const directoryGradeEscape=value=>String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const DIRECTORY_GRADE_WRITE_ACTIONS=new Set(['saveScore','saveReport','deleteScore','deleteReport']);
 async function directoryGradeApi(payload){
   if(!token()||String(selectedId)!==String(payload.studentId))throw Error('生徒が切り替わりました。閉じて開き直してください。');
-  const response=await StepStaffAuth.fetchRuntime({...payload,token:directoryGradeSession});
+  const requestPayload={...payload,token:directoryGradeSession};
+  if(DIRECTORY_GRADE_WRITE_ACTIONS.has(payload.action)&&!requestPayload.mutationId)requestPayload.mutationId=crypto.randomUUID();
+  const response=await StepStaffAuth.fetchRuntime(requestPayload);
   const result=await response.json();if(!response.ok||!result.success)throw Error(result.error||'成績情報の通信に失敗しました。');
   return result;
 }
