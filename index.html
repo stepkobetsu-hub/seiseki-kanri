@@ -583,13 +583,29 @@ async function initStaffAppLogin(){
   document.getElementById('rememberLogin').checked = true;
   const savedToken = saved?.gradeSessionToken || saved?.systemPortalSessionToken;
   if (savedToken && ['1','2','3','4'].includes(String(saved.permissionLevel || '').trim())) {
-    try {
-      const verified = await StepStaffAuth.verify(savedToken);
-      showStaffHome(saved.name || '', verified.permissionLevel);
-      return;
-    } catch (error) {
+    // Restore navigation immediately; protected data APIs still authorize on the server.
+    showStaffHome(saved.name || '', saved.permissionLevel);
+    StepStaffAuth.verify(savedToken).then(verified => {
+      const current = getSavedStaffAuth();
+      if ((current?.gradeSessionToken || current?.systemPortalSessionToken) !== savedToken) return;
+      current.permissionLevel = verified.permissionLevel;
+      localStorage.setItem(STAFF_AUTH_KEY, JSON.stringify(current));
+      showStaffHome(current.name || '', verified.permissionLevel);
+    }).catch(error => {
+      const current = getSavedStaffAuth();
+      if ((current?.gradeSessionToken || current?.systemPortalSessionToken) !== savedToken) return;
+      if (!error.authRequired) {
+        console.warn('ログイン状態の再確認を完了できませんでした', error);
+        return;
+      }
       localStorage.removeItem(STAFF_AUTH_KEY);
-    }
+      document.getElementById('homePage').classList.add('hidden');
+      document.getElementById('adminQrPage').classList.add('hidden');
+      document.getElementById('loginPage').classList.remove('hidden');
+      setLoginMsg('ログインの有効期限が切れました。もう一度ログインしてください。');
+      scheduleAutoLogin();
+    });
+    return;
   }
 
   // Password managers may fill fields without firing input/change events.
