@@ -50,10 +50,9 @@ input[type=file]::file-selector-button{border:1px solid #b8cbe0;border-radius:8p
     </div>
     <div class="edit-actions" style="margin-top:12px">
       <button id="editBtn" class="btn" onclick="toggleEdit()" disabled>編集</button>
-      <button id="editSkipBtn" class="btn" onclick="skipEdit()" disabled>編集スキップ</button>
+      <button id="editSkipBtn" class="btn" onclick="cancelEntry()" disabled>キャンセル</button>
+      <button id="saveBtn" class="btn" onclick="saveAll()" disabled>編集をせずアップロード</button>
     </div>
-    <div class="row" style="margin-top:12px">
-      <button id="saveBtn" class="btn" onclick="saveAll()" disabled>成績管理にアップロード</button>
     </div>
     <div id="msg" class="msg" style="margin-top:10px"></div>
     <div class="row" style="margin-top:12px"><button id="nextBtn" class="btn hidden" onclick="nextEntry()">次の人のエントリーシートを読み取る</button></div>
@@ -99,10 +98,9 @@ function updateNavigation(){
   else if(!sideFiles.front){active=['frontInput'];hint='① 表面の「ファイルを選択」を押してください。';}
   else if(!ready){active=['backInput','backSkipBtn'];hint='② 裏面を選択してください。裏面がなければスキップできます。';}
   else if(!readFinished || !hasResult){active=['readBtn'];hint='③ 「読み取り」を押してください。';}
-  else if(editMode){active=['editBtn'];hint='④ 内容を編集し、「編集完了」を押してください。';}
-  else if(!reviewed){active=['editBtn','editSkipBtn'];hint='④ 「編集」または「編集スキップ」を押してください。';}
-  else if(!canSave){active=['editBtn'];hint='生徒番号を入力するため「編集」を押してください。';}
-  else{active=['saveBtn'];hint='⑤ 「成績管理にアップロード」を押してください。';}
+  else if(editMode){active=['editBtn','editSkipBtn'];hint='④ 内容を編集し、「編集完了」を押すか、「キャンセル」で取り込みを中止してください。';}
+  else if(!canSave){active=['editBtn','editSkipBtn'];hint='生徒番号がありません。「編集」で補うか、「キャンセル」を押してください。';}
+  else{active=['editBtn','editSkipBtn','saveBtn'];hint='④ 「編集」「キャンセル」「編集をせずアップロード」から選択してください。';}
   ['frontInput','backInput','backSkipBtn','readBtn','editBtn','editSkipBtn','saveBtn','nextBtn'].forEach(id=>{
     $(id).classList.toggle('next-step',active.includes(id));
   });
@@ -111,8 +109,8 @@ function updateNavigation(){
   $('backSkipBtn').disabled=busy || !sideFiles.front || !!sideFiles.back;
   $('readBtn').disabled=busy || !ready;
   $('editBtn').disabled=busy || !hasResult;
-  $('editSkipBtn').disabled=busy || !hasResult || editMode;
-  $('saveBtn').disabled=busy || !reviewed || editMode || !canSave || entrySaved;
+  $('editSkipBtn').disabled=busy || !readFinished;
+  $('saveBtn').disabled=busy || !readFinished || editMode || !canSave || entrySaved;
   $('nextBtn').disabled=busy;
   $('nextBtn').classList.toggle('hidden',!readFinished && !entrySaved);
   $('stepHint').textContent=hint;
@@ -122,9 +120,9 @@ function skipBack(){
   sideFiles.back=null;$('backInput').value='';backSkipped=true;
   makeGroupFromSides();
 }
-function skipEdit(){
-  if(busy || editMode || !results.some(r=>r && !r.error))return;
-  reviewed=true;updateNavigation();
+function cancelEntry(){
+  if(busy || !readFinished)return;
+  nextEntry();
 }
 
 
@@ -176,7 +174,7 @@ async function startRead(){
     renderQueue();renderResults();
   }
   readFinished=true;setBusy(false);
-  say(results.some(r=>r && !r.error)?'読み取りが終わりました。「編集」または「編集スキップ」へ進んでください。':'読み取りに失敗しました。もう一度「読み取り」を押してください。',results.some(r=>r && !r.error)?'ok':'err');
+  say(results.some(r=>r && !r.error)?'読み取りが終わりました。「編集」「キャンセル」「編集をせずアップロード」を選択できます。':'読み取りに失敗しました。もう一度「読み取り」を押してください。',results.some(r=>r && !r.error)?'ok':'err');
 
 }
 
@@ -285,7 +283,7 @@ function toggleEdit(){
 }
 
 async function saveAll(){
-  if(busy || !reviewed || editMode || entrySaved)return;
+  if(busy || !readFinished || editMode || entrySaved)return;
   if(editMode){
     try{results=JSON.parse($('jsonBox').value);results.forEach(r=>r&&!r.error&&normalizeResult(r));editMode=false;$('editBtn').textContent='編集';$('jsonBox').readOnly=true;renderResults();}
     catch(e){say('AI JSONの形式が正しくありません: '+e.message,'err');return}
