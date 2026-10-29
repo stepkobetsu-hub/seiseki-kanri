@@ -1096,7 +1096,7 @@ const DirectoryEntry = (() => {
 function decorateFamilyViewButton(button){
   const icon=document.createElement('span');icon.className='familyViewIllustration';icon.setAttribute('aria-hidden','true');
   icon.innerHTML='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 56" fill="none"><rect x="27" y="4" width="34" height="30" rx="5" fill="#fff"/><path d="M33 26h21M36 22v-6m7 6V11m7 11V8" stroke="#3379b0" stroke-width="3" stroke-linecap="round"/><circle cx="15" cy="19" r="8" fill="#ffdbb0"/><path d="M7 16c0-11 17-11 17 0l-8-4-9 4Z" fill="#544738"/><path d="M2 49V38c0-12 26-12 26 0v11" fill="#f5ae46"/><circle cx="37" cy="33" r="6" fill="#ffdbb0"/><path d="M31 31c0-9 13-9 13 1l-6-4-7 3Z" fill="#544738"/><path d="M26 53v-8c0-10 23-10 23 0v8" fill="#8dcce8"/><path d="m49 44 4 4 8-10" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  const label=document.createElement('span');label.textContent='生徒・保護者と成績・志望校確認';button.append(icon,label);
+  const label=document.createElement('span');label.textContent='成績・志望校のみの表示';button.append(icon,label);
 }
 
 function openFamilyAcademic(student){
