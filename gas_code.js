@@ -556,7 +556,7 @@ function directoryDetailFromRows_(id, row, formulas, scheduleData, weekdays, hou
   lessons.sort((a, b) => a.order - b.order || Number(a.time.slice(0, 2).replace(/\D/g, '')) - Number(b.time.slice(0, 2).replace(/\D/g, '')) || a.slot - b.slot);
   lessons.forEach(lesson => { delete lesson.order; delete lesson.slot; });
   const editable = {};
-  ['E','F','H','K','L','M','N','P','Q','R','S','T','U','V','W','X','Y','Z','AA','AB','AC','AE','AW'].forEach(letter => {
+  ['E','F','H','K','L','M','N','P','Q','R','S','T','U','V','W','X','Y','Z','AA','AB','AC','AE','AW','BA'].forEach(letter => {
     const index = directoryColumn_(letter) - 1;
     editable[letter] = { value: row[index], formula: !!formulas[index] };
   });
@@ -565,7 +565,7 @@ function directoryDetailFromRows_(id, row, formulas, scheduleData, weekdays, hou
     loginPassword: row[11], debitSubmitted: row[12], debitEnabled: row[13],
     guardian: row[16], postcode: row[19], address: [row[20], row[21], row[22]].filter(Boolean).join(' '),
     guardianEmail: row[23], guardianPhone: row[24], homePhone: row[25],
-    secondGuardian: row[26], secondEmail: row[29], secondPhone: row[30], gradePassword: row[48],
+    secondGuardian: row[26], secondEmail: row[52], secondPhone: row[30], gradePassword: row[48],
     lessons: lessons, course: scheduleData[34] || '', options: [scheduleData[35], scheduleData[36]].filter(Boolean).join('＋'), note: scheduleData[37] || ''
   } };
 }
@@ -579,7 +579,7 @@ function saveStudentDirectory(data) {
   const id = String(data.studentId || '').trim();
   if (!/^\d{1,10}$/.test(id)) throw new Error('生徒番号が正しくありません');
   const changes = data.changes || {};
-  const allowed = ['E','F','H','K','L','M','N','P','Q','R','S','T','U','V','W','X','Y','Z','AA','AB','AC','AE','AW'];
+  const allowed = ['E','F','H','K','L','M','N','P','Q','R','S','T','U','V','W','X','Y','Z','AA','AB','AC','AE','AW','BA'];
   const keys = Object.keys(changes);
   if (!keys.length || keys.length > allowed.length || keys.some(k => !allowed.includes(k))) throw new Error('更新する項目が正しくありません');
   const lock = LockService.getScriptLock();
@@ -1290,7 +1290,7 @@ const ENTRY_MASTER_MAP = {
   guardian2Name: 27,      // AA
   guardian2Kana: 28,      // AB
   guardian2Relation: 29,  // AC
-  guardian2Email: 30,     // AD
+  guardian2Email: 53,     // BA
   guardian2Mobile: 31     // AE
 };
 
