@@ -470,11 +470,11 @@ function getStudentDirectoryDetail(data) {
   const schedule = book.getSheetByName('時間割マスタ');
   if (!master || !schedule) throw new Error('生徒マスタまたは時間割マスタを取得できません');
   const masterLast = master.getLastRow();
-  const masterRows = masterLast >= 2 ? master.getRange(2, 1, masterLast - 1, 49).getDisplayValues() : [];
+  const masterRows = masterLast >= 2 ? master.getRange(2, 1, masterLast - 1, 53).getDisplayValues() : [];
   const masterIndex = masterRows.findIndex(row => String(row[0]).trim() === id);
   if (masterIndex < 0) throw new Error('生徒が見つかりません');
   const row = masterRows[masterIndex];
-  const formulas = master.getRange(masterIndex + 2, 1, 1, 49).getFormulas()[0];
+  const formulas = master.getRange(masterIndex + 2, 1, 1, 53).getFormulas()[0];
   const scheduleRows = schedule.getRange(1, 1, Math.max(2, schedule.getLastRow()), 38).getDisplayValues();
   const scheduleData = scheduleRows.slice(2).find(row => String(row[0]).trim() === id) || [];
   return directoryDetailFromRows_(id, row, formulas, scheduleData, scheduleRows[0].slice(4, 28), scheduleRows[1].slice(4, 28));
@@ -489,8 +489,8 @@ function getStudentDirectorySnapshot(data) {
   if (!master || !schedule) throw new Error('生徒マスタまたは時間割マスタを取得できません');
   const count = Math.max(0, master.getLastRow() - 1);
   if (count > 1000) throw new Error('生徒マスタが上限を超えています');
-  const masterRows = count ? master.getRange(2, 1, count, 49).getDisplayValues() : [];
-  const formulas = count ? master.getRange(2, 1, count, 49).getFormulas() : [];
+  const masterRows = count ? master.getRange(2, 1, count, 53).getDisplayValues() : [];
+  const formulas = count ? master.getRange(2, 1, count, 53).getFormulas() : [];
   const scheduleRows = schedule.getRange(1, 1, Math.max(2, schedule.getLastRow()), 38).getDisplayValues();
   const scheduleById = new Map();
   for (const row of scheduleRows.slice(2)) {
