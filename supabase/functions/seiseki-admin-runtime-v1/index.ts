@@ -1,7 +1,10 @@
+import {uploadMeetingFile,resolveMeetingFiles,openMeetingFile} from './meeting-files.mjs';
 import {entryGradeRows,missingEntryRows} from './entry-grade-import.ts';
 import {cleanEntryEdit,mergeEntryEdit} from './entry-info-edit.ts';
 import { CORS_HEADERS, preflightResponse } from './storage.ts';
 import {checkPermissionBridge} from './permission-bridge.ts';
+
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 type JsonObject = Record<string, unknown>;
 
@@ -10,12 +13,12 @@ const ADMIN_ACTIONS = new Set([
   'saveScore', 'deleteScore', 'getAllReports', 'getReports', 'saveReport',
   'deleteReport', 'getAllWishes', 'getWish', 'saveWish', 'saveWishResult',
   'getSchools', 'addSchool', 'updateSchool', 'deleteSchool',
-  'getMeetingBootstrap', 'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
+  'getMeetingBootstrap', 'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo', 'saveMeetingAttachment', 'getMeetingAttachment',
   'getStaffMembers', 'addStaffMember', 'deleteStaffMember',
   'reconcileLegacy', 'persistAdminSession', 'logoutAdmin',
   'getEntrySheetData', 'saveEntrySheetInfo', 'importMissingEntryGrades', 'syncStudentDirectory', 'getStudentDirectoryDetail', 'saveStudentDirectory', 'enableStudentDirectoryAutoSync',
 ]);
-const WRITE_ACTIONS = new Set(['saveEntrySheetInfo', 'importMissingEntryGrades', 'saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember', 'saveStudentDirectory']);
+const WRITE_ACTIONS = new Set(['saveMeetingAttachment','saveEntrySheetInfo', 'importMissingEntryGrades', 'saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember', 'saveStudentDirectory']);
 const ADMIN_PERMISSION_LEVELS = new Set(['2', '3', '4']);
 const STAFF_PERMISSION_LEVELS = new Set(['1', '2', '3', '4']);
 // Grade-only sessions never authorize the directory or other management apps.
@@ -25,7 +28,7 @@ const GRADE_ACTIONS = new Set([
   'saveScore', 'deleteScore', 'getAllReports', 'getReports', 'saveReport',
   'deleteReport', 'getAllWishes', 'getWish', 'saveWish', 'saveWishResult',
   'getSchools', 'addSchool', 'updateSchool', 'deleteSchool',
-  'getMeetingBootstrap', 'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
+  'getMeetingBootstrap', 'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo', 'saveMeetingAttachment', 'getMeetingAttachment',
   'getStaffMembers', 'addStaffMember', 'deleteStaffMember',
   'reconcileLegacy', 'persistAdminSession', 'logoutAdmin', 'verifyStaffSession',
 ]);
@@ -540,7 +543,7 @@ function meetingMemo(row: JsonObject): JsonObject {
     id: row.id, date: row.memo_date, studentId: row.student_code,
     name: row.student_name ?? '', campus: row.campus ?? '', grade: row.grade ?? '',
     school: row.school_name ?? '', counterpart: row.contact_person ?? '',
-    content: row.content ?? '', staff: row.staff_name ?? '',
+    content: row.content ?? '', staff: row.staff_name ?? '', attachments: row.attachments ?? [],
     createdAt: row.created_at ?? '', updatedAt: row.updated_at ?? '',
   };
 }
@@ -552,6 +555,15 @@ function meetingStaff(row: JsonObject): JsonObject {
     notifyOte: row.notify_ote === true,
     notifyJinryo: row.notify_jinryo === true,
   };
+}
+
+async function meetingStorage(mode:string,path:string,bytes?:Uint8Array,mime?:string):Promise<unknown>{
+ const base=env('SUPABASE_URL').replace(/\/$/,'')+'/storage/v1';
+ const route=mode==='sign'?'/object/sign/':'/object/';
+ const response=await fetch(base+route+'step-meeting-files/'+path,{method:'POST',headers:{...pgHeaders(), 'Content-Type':mode==='sign'?'application/json':String(mime),...(mode==='upload'?{'x-upsert':'true'}:{})},body:mode==='sign'?JSON.stringify({expiresIn:300}):(bytes?new Uint8Array(bytes).buffer:undefined)});
+ if(!response.ok)throw new ResponseError(502,'ATTACHMENT_STORAGE','添付ファイルの保存・取得に失敗しました。もう一度お試しください。');
+ if(mode==='sign'){const data=await response.json();return base+data.signedURL;}
+ return null;
 }
 
 async function readMeetingMemos(payload: JsonObject): Promise<JsonObject> {
@@ -589,16 +601,18 @@ async function saveMeetingMemo(payload: JsonObject): Promise<JsonObject> {
   }
   const [studentRows, existingRows] = await Promise.all([
     pg(query('students', { select: 'student_code,name,campus,grade,school_name', student_code: `eq.${studentId}`, limit: 1 })) as Promise<JsonObject[]>,
-    pg(query('meeting_memos', { select: 'created_at', id: `eq.${id}`, limit: 1 })) as Promise<JsonObject[]>,
+    pg(query('meeting_memos', { select: '*', id: `eq.${id}`, limit: 1 })) as Promise<JsonObject[]>,
   ]);
   if (!studentRows.length) throw new ResponseError(404, 'STUDENT_NOT_FOUND', 'Student not found');
   const studentRow = studentRows[0];
+  if(existingRows[0]?.student_code!==undefined && existingRows[0].student_code!==studentId && (existingRows[0].attachments as unknown[])?.length) throw new ResponseError(400,'ATTACHMENT_STUDENT','添付のあるメモの生徒は変更できません。');
+  const attachments=await resolveMeetingFiles(payload.attachmentIds,existingRows[0],id,studentId,{pg});
   const now = new Date().toISOString();
   const row = {
     id, memo_date: memoDate, student_code: studentId,
     student_name: String(studentRow.name ?? ''), campus: String(studentRow.campus ?? ''),
     grade: String(studentRow.grade ?? ''), school_name: String(studentRow.school_name ?? ''),
-    contact_person: String(payload.counterpart ?? ''), content, staff_name: staffName,
+    contact_person: String(payload.counterpart ?? ''), content, staff_name: staffName, attachments,
     created_at: existingRows[0]?.created_at ?? now, updated_at: now,
   };
   const saved = await pg(query('meeting_memos', { on_conflict: 'id', select: '*' }), {
@@ -992,6 +1006,8 @@ async function dispatch(payload: JsonObject): Promise<JsonObject> {
       return {success:true,students:studentsResult.students,staff:staffResult.staff,staffMembers:staffResult.staffMembers,memos:memosResult.memos,source:'supabase'};
     }
     case 'getMeetingMemos': return readMeetingMemos(payload);
+    case 'saveMeetingAttachment': return uploadMeetingFile(payload,{pg,storage:meetingStorage});
+    case 'getMeetingAttachment': return openMeetingFile(payload,{pg,storage:meetingStorage});
     case 'getStaffMembers': return readMeetingStaff();
     case 'saveMeetingMemo': return saveMeetingMemo(payload);
     case 'deleteMeetingMemo': return deleteMeetingMemo(payload);
@@ -1015,7 +1031,7 @@ async function dispatch(payload: JsonObject): Promise<JsonObject> {
 async function enforceCentralPermission(session:JsonObject,payload:JsonObject):Promise<void>{
  const campuses:string[]=[];
  if(payload.studentId){const rows=await pg(query('students',{select:'campus',student_code:`eq.${String(payload.studentId)}`,limit:1})) as JsonObject[];if(rows[0])campuses.push(String(rows[0].campus||''));}
- if(payload.id&&['saveMeetingMemo','deleteMeetingMemo'].includes(String(payload.action))){const rows=await pg(query('meeting_memos',{select:'campus',id:`eq.${String(payload.id)}`,limit:1})) as JsonObject[];if(rows[0])campuses.push(String(rows[0].campus||''));}
+ if(payload.id&&['saveMeetingMemo','deleteMeetingMemo','saveMeetingAttachment','getMeetingAttachment'].includes(String(payload.action))){const rows=await pg(query('meeting_memos',{select:'campus',id:`eq.${String(payload.id)}`,limit:1})) as JsonObject[];if(rows[0])campuses.push(String(rows[0].campus||''));}
  let verdict:Record<string,unknown>|null;
  try{verdict=await checkPermissionBridge(session,payload,async path=>await pg(path),campuses);}catch{throw new ResponseError(503,'PERMISSION_UNAVAILABLE','共通権限を確認できません。時間をおいて再度お試しください。');}
  if(!verdict)return;
@@ -1031,7 +1047,7 @@ Deno.serve(async request => {
   const preflight = preflightResponse(request);
   if (preflight) return preflight;
   if (request.method !== 'POST') return json({ success: false, code: 'METHOD_NOT_ALLOWED' }, 405);
-  let trace = crypto.randomUUID();
+  let trace: string = crypto.randomUUID();
   let action = '';
   try {
     const payload = await request.json() as JsonObject;
@@ -1057,6 +1073,7 @@ Deno.serve(async request => {
     if(/^[a-zA-Z0-9-]{8,64}$/.test(trace))console.info(JSON.stringify({event:'request_completed',trace,action}));
     return json(result);
   } catch (error) {
+    if (error instanceof Error && 'meetingFileStatus' in error) return json({success:false,error:error.message},Number(error.meetingFileStatus));
     if (error instanceof ResponseError) {
       console.warn(JSON.stringify({ event:'request_rejected', trace, action, code:error.code, status:error.status, message:error.message }));
       return json({ success: false, code: error.code, error: error.message, trace }, error.status);

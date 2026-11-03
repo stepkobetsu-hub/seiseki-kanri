@@ -1,6 +1,6 @@
 // Server-only authorization bridge. Session identity must be verified before calling.
 export function permissionTarget(action:string,requested:unknown){
- const meeting=new Set(['getMeetingBootstrap','getMeetingMemos','saveMeetingMemo','deleteMeetingMemo','getStaffMembers','addStaffMember','deleteStaffMember']);
+ const meeting=new Set(['saveMeetingAttachment','getMeetingAttachment','getMeetingBootstrap','getMeetingMemos','saveMeetingMemo','deleteMeetingMemo','getStaffMembers','addStaffMember','deleteStaffMember']);
  const directory=new Set(['getStudentDirectoryDetail','saveStudentDirectory','syncStudentDirectory','enableStudentDirectoryAutoSync']);
  const session=new Set(['verifyStaffSession','persistAdminSession']);
  const shared=new Set(['getEntrySheetData','saveEntrySheetInfo','getStudents','getStudentList']);
