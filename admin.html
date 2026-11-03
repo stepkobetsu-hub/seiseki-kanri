@@ -324,6 +324,7 @@ tr:hover td{background:#f8fafc}
 .r2{background:rgba(239,68,68,.12);color:#dc2626}
 .r1{background:rgba(239,68,68,.2);color:#dc2626}
 </style>
+<link rel="stylesheet" href="assets/css/meeting-files.css?v=20261103-1">
 </head>
 <body>
 
@@ -822,6 +823,7 @@ tr:hover td{background:#f8fafc}
           <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
             <div id="meetSelectedStudent" aria-live="polite" style="margin-bottom:12px;padding:10px 12px;background:var(--primary-lt);border-radius:8px;color:var(--primary);font-size:1.1rem;font-weight:700">生徒を選択してください</div>
             <div class="fld"><label>内容</label><textarea id="meetContent" placeholder="面談・電話・相談内容など" style="min-height:170px"></textarea></div>
+            <div class="fld"><label>添付書類</label><div id="adminMemoAttachments"></div></div>
             <button id="meetSaveBtn" class="btn btn-primary btn-sm" onclick="saveMeetingMemo(false)">保存する</button>
             <button id="meetMailSaveBtn" class="btn btn-success btn-sm" onclick="saveMeetingMemo(true)">メール送信して保存</button>
             <button class="btn btn-ghost btn-sm" onclick="clearMeetingForm()">入力欄をクリア</button>
@@ -1245,8 +1247,9 @@ tr:hover td{background:#f8fafc}
 <div id="toast"></div>
 
 <script src="assets/js/supabase-config.js"></script>
+<script src="assets/js/meeting-files.js?v=20261103-1"></script>
 <script src="assets/js/staff-auth.js?v=20261009-single-read"></script>
-<script src="assets/js/meeting-memo-view.js?v=20261021-issue50"></script>
+<script src="assets/js/meeting-memo-view.js?v=20261103-files1"></script>
 <script src="assets/js/grade-order.js?v=20261021-newest-first"></script>
 <script>
 if (location.hash === '#directory') location.replace('student_directory.html');
@@ -1265,13 +1268,13 @@ const SUPABASE_ENABLED_ACTIONS = new Set(['getEntrySheetData','importMissingEntr
   'getAllReports', 'getReports', 'saveReport', 'deleteReport',
   'getAllWishes', 'getWish', 'saveWish', 'saveWishResult',
   'getSchools', 'addSchool', 'updateSchool', 'deleteSchool',
-  'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo',
+  'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo', 'saveMeetingAttachment', 'getMeetingAttachment',
   'getStaffMembers', 'addStaffMember', 'deleteStaffMember'
 ]);
 const SUPABASE_WRITE_ACTIONS = new Set(['importMissingEntryGrades',
   'saveScore', 'deleteScore', 'saveReport', 'deleteReport',
   'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool',
-  'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember'
+  'saveMeetingAttachment', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember'
 ]);
 let DATA_SOURCE = 'supabase-admin-edge';
 localStorage.setItem('seisekiDataSource', DATA_SOURCE);
@@ -1293,6 +1296,8 @@ let selectedMeetingCampus = '';
 let selectedMeetingGradeGroup = '';
 let selectedMeetingListCampus = '';
 let currentMeetingMemoId = '';
+let adminAttachmentMemoId='';
+const adminMemoFiles=StepMeetingFiles.editor(document.getElementById('adminMemoAttachments'));
 let schoolScheduleHistory = {};
 let schoolAutoSaveTimers = {};
 let activeScheduleCell = null;
@@ -5827,7 +5832,7 @@ async function deleteStaffMember(name) {
 }
 
 function clearMeetingForm() {
-  currentMeetingMemoId = '';
+  currentMeetingMemoId = '';adminAttachmentMemoId='';adminMemoFiles.load();
   ['meetStudent','meetContent','meetOther','meetStaffOther'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   updateMeetingSelectedStudent();
   const dateEl = document.getElementById('meetDate');
@@ -5848,7 +5853,8 @@ async function saveMeetingMemo(sendEmail) {
   const staff = buildMeetingStaff();
   const payload = {
     action: 'saveMeetingMemo',
-    id: currentMeetingMemoId,
+    id: currentMeetingMemoId||adminAttachmentMemoId||crypto.randomUUID(),
+    attachmentIds:adminMemoFiles.ids(),
     date: document.getElementById('meetDate')?.value || '',
     studentId: document.getElementById('meetStudent')?.value || '',
     counterpart,
@@ -5857,11 +5863,15 @@ async function saveMeetingMemo(sendEmail) {
     sendEmail: !!sendEmail
   };
   if (!staff) { toast('担当者を選択または入力してください'); return; }
+  if(!payload.studentId||!payload.date||!payload.content){toast('生徒・日付・内容を入力してください');return;}
+  adminAttachmentMemoId=payload.id;
   const saveBtn = document.getElementById('meetSaveBtn');
   const mailBtn = document.getElementById('meetMailSaveBtn');
   if (saveBtn) saveBtn.disabled = true;
   if (mailBtn) mailBtn.disabled = true;
+  saveBtn.parentElement.parentElement.inert=true;
   try {
+    await adminMemoFiles.upload(payload.id,payload.studentId,api);
     const r = await api(payload);
     if (!r.success) { toast(r.error || '保存に失敗しました'); return; }
     if (sendEmail) {
@@ -5870,7 +5880,7 @@ async function saveMeetingMemo(sendEmail) {
     } else {
       toast(currentMeetingMemoId ? '面談メモを更新しました' : '面談メモを保存しました');
     }
-    currentMeetingMemoId = '';
+    currentMeetingMemoId = '';adminAttachmentMemoId='';adminMemoFiles.load();
     const btn = document.getElementById('meetSaveBtn');
     if (btn) btn.textContent = '保存する';
     document.getElementById('meetContent').value = '';
@@ -5882,7 +5892,7 @@ async function saveMeetingMemo(sendEmail) {
   } catch (e) {
     toast(e.message || '保存に失敗しました');
   } finally {
-    if (saveBtn) saveBtn.disabled = false;
+    if (saveBtn) {saveBtn.parentElement.parentElement.inert=false;saveBtn.disabled = false;}
     if (mailBtn) mailBtn.disabled = false;
   }
 }
@@ -6046,19 +6056,20 @@ function renderMeetingTable(list, emptyMessage) {
       <td><button onclick="goToCompare('${htmlEsc(m.studentId)}')" style="border:0;background:transparent;color:#1a56a0;font-weight:700;text-decoration:underline;cursor:pointer;padding:0">${htmlEsc(m.name)}</button>${withdrawnBadgeForStudentId(m.studentId)}<div style="color:#94a3b8;font-size:.72rem">No.${htmlEsc(m.studentId)} / ${htmlEsc(m.grade || '')}</div></td>
       <td>${htmlEsc(m.counterpart || '')}</td>
       <td>${htmlEsc(m.staff || '')}</td>
-      <td style="white-space:pre-wrap;min-width:320px">${htmlEsc(m.content || '')}</td>
+      <td style="white-space:pre-wrap;min-width:320px">${htmlEsc(m.content || '')}<div data-meeting-files="${sortedList.indexOf(m)}"></div></td>
       <td style="white-space:nowrap">
         <button class="btn btn-outline btn-sm" onclick="editMeetingMemo('${htmlEsc(m.id)}')">編集</button>
         <button class="btn btn-danger btn-sm" onclick="deleteMeetingMemo('${htmlEsc(m.id)}')">削除</button>
       </td>
     </tr>
   `).join('');
+  body.querySelectorAll('[data-meeting-files]').forEach(el=>StepMeetingFiles.render(el,sortedList[Number(el.dataset.meetingFiles)],api));
 }
 
 function editMeetingMemo(id) {
   const m = meetingMemos.find(x => String(x.id) === String(id));
   if (!m) { toast('面談メモが見つかりません'); return; }
-  currentMeetingMemoId = m.id;
+  currentMeetingMemoId = m.id;adminAttachmentMemoId=m.id;adminMemoFiles.load(m.attachments||[],m.id,m.studentId);
   const dateEl = document.getElementById('meetDate');
   if (dateEl) dateEl.value = formatEntryValue(m.date).replace(/\//g, '-').slice(0, 10);
   updateMeetingDateDisplay();

@@ -45,6 +45,7 @@
         make('div', `${displayDate(memo.date)}　相手: ${memo.counterpart || '－'}　担当: ${memo.staff || '－'}`, 'academicMemoMeta'),
         make('div', memo.content || '', 'academicMemoContent')
       );
+      root.StepMeetingFiles?.render(item,memo);
       container.append(item);
     }
     return sorted;

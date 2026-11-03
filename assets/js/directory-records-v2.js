@@ -67,7 +67,7 @@ window.StepDirectoryRecords = (() => {
       const box=panel('🗒️ 面談記録','getMeetingMemos',(a,d)=>{
         const rows=(d.memos||[]).filter(r=>String(r.studentId)===id).sort((x,y)=>String(y.date).localeCompare(String(x.date)));
         a.append(node('p',rows.length?rows.length+'件の面談記録（新しい順）':'この生徒の面談記録はまだありません。','muted'));
-        for(const r of rows){const article=node('article');article.className='meetingMemo';article.append(node('div',String(r.date||'').slice(0,10)+'　相手: '+(r.counterpart||'-')+'　担当: '+(r.staff||'-'),'meetingMeta'),node('div',r.content||'','meetingContent'));a.append(article);}
+        for(const r of rows){const article=node('article');article.className='meetingMemo';article.append(node('div',String(r.date||'').slice(0,10)+'　相手: '+(r.counterpart||'-')+'　担当: '+(r.staff||'-'),'meetingMeta'),node('div',r.content||'','meetingContent'));StepMeetingFiles.render(article,r);a.append(article);}
       });
       const link=node('a','＋ 面談メモを登録','btn secondary small');link.href='meeting_memo.html?studentId='+encodeURIComponent(id);link.target='_blank';link.rel='noopener';box.querySelector('.recordPanelHead').append(link);
     }

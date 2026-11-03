@@ -1,0 +1,5 @@
+.meetingFiles{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;white-space:normal}
+.meetingFile{display:inline-flex;align-items:center;gap:6px;max-width:100%;border:1px solid #b9d1e9;border-radius:9px;background:#edf6ff;color:#155aa5;padding:9px 12px;font:inherit;font-size:.86rem;font-weight:700;text-align:left;overflow-wrap:anywhere;cursor:pointer;min-height:42px}
+.meetingFile:hover{background:#dceeff}.meetingFile:disabled{opacity:.6}
+.meetingFileEdit{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #dde7f1;font-size:.86rem}.meetingFileEdit span{min-width:0;overflow-wrap:anywhere}.meetingFileEdit button{flex-shrink:0;font-size:.78rem;padding:6px 10px;min-height:34px}
+.meetingFileHelp{font-size:.8rem;color:#52667c;line-height:1.7;margin:6px 0}

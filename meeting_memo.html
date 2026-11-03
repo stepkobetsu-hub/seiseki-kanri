@@ -383,6 +383,7 @@ body.auth-locked > #toast{display:none!important}
   .headActions .logoutButton{height:40px;min-height:40px;font-size:.65rem;padding:0 4px}
 }
 </style>
+<link rel="stylesheet" href="assets/css/meeting-files.css?v=20261103-1">
 </head>
 <body class="auth-locked">
 
@@ -496,6 +497,7 @@ body.auth-locked > #toast{display:none!important}
         <label for="content">内容</label>
         <textarea id="content" placeholder="面談・電話・相談内容など"></textarea>
       </div>
+      <div class="field full"><label>添付書類</label><div id="memoAttachments"></div></div>
     </div>
 
     <div class="actions">
@@ -553,13 +555,14 @@ body.auth-locked > #toast{display:none!important}
 
 <div id="toast" class="toast"></div>
 
+<script src="assets/js/meeting-files.js?v=20261103-1"></script>
 <script src="assets/js/staff-auth.js?v=20261009-single-read"></script>
 <script>
 const GAS = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
 const STUDENT_SEARCH_GAS = 'https://script.google.com/macros/s/AKfycbxIH2VtgwRi50xduXgrkYrjD0yrzNfQ5vCWt1XgOzil6LZSgXNj6MJo9jPYvOkjNHdu/exec';
 const SEISEKI_ADMIN_RUNTIME_URL = 'https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
 const SUPABASE_MEETING_ACTIONS = new Set([
-  'getMeetingBootstrap',
+  'getMeetingBootstrap', 'saveMeetingAttachment', 'getMeetingAttachment',
   'getStudents', 'getStudentList', 'getMeetingMemos', 'saveMeetingMemo',
   'deleteMeetingMemo', 'getStaffMembers', 'addStaffMember', 'deleteStaffMember',
   'persistAdminSession', 'logoutAdmin'
@@ -575,6 +578,8 @@ let allMemos = [];
 let memosLoadState='loading';
 let memoLoadRequest=0;
 let meetingSaveAttempt_=null;
+let meetingAttachmentMemoId='';
+const memoFiles=StepMeetingFiles.editor($('memoAttachments'),()=>saveMeetingDraft_());
 let currentCampus = '';
 let currentGradeGroup = '';
 let filterCampus = '';
@@ -1276,7 +1281,7 @@ function meetingDraftKey_(){
 }
 function saveMeetingDraft_(){
   const key=meetingDraftKey_();if(!key||!$('content').value.trim())return;
-  const draft={time:Date.now(),studentId:$('student').value,date:$('date').value,counterpart:$('counterpart').value,other:$('other').value,staff:$('staff').value,content:$('content').value,editingId,attempt:meetingSaveAttempt_};
+  const draft={time:Date.now(),studentId:$('student').value,date:$('date').value,counterpart:$('counterpart').value,other:$('other').value,staff:$('staff').value,content:$('content').value,editingId,attachmentMemoId:meetingAttachmentMemoId,attachments:memoFiles.snapshot(),attempt:meetingSaveAttempt_};
   try{meetingDraftStorage_().setItem(key,JSON.stringify(draft));}catch(e){}
 }
 function restoreMeetingDraft_(){
@@ -1290,6 +1295,7 @@ function restoreMeetingDraft_(){
     for(const id of ['date','counterpart','other','content'])$(id).value=draft[id]||'';
     $('staff').value=draft.staff==='他'?(draft.staffOther||''):(draft.staff||'');
     editingId=draft.editingId||'';meetingSaveAttempt_=draft.attempt||null;
+    meetingAttachmentMemoId=draft.attachmentMemoId||'';memoFiles.load(draft.attachments?.files||[],draft.attachments?.boundId||'',draft.attachments?.boundStudent||'');
     toggleOther();renderStudents();
     showToast('保存確認前の入力内容を復元しました');
   }catch(e){}
@@ -1309,7 +1315,8 @@ async function saveMemo(sendEmail){
     counterpart: buildCounterpart(),
     staff,
     content: $('content').value.trim(),
-    sendEmail: !!sendEmail
+    sendEmail: !!sendEmail,
+    attachmentIds:memoFiles.ids()
   };
   // バリデーション
   const errEl = $('formError');
@@ -1335,12 +1342,15 @@ async function saveMemo(sendEmail){
   }
   errEl.classList.remove('show');
   const fingerprint=JSON.stringify({...payload,sendEmail:!!sendEmail});
-  if(!meetingSaveAttempt_||meetingSaveAttempt_.fingerprint!==fingerprint)meetingSaveAttempt_={fingerprint,id:editingId||meetingMutationId_(),mutationId:meetingMutationId_()};
+  if(!meetingSaveAttempt_||meetingSaveAttempt_.fingerprint!==fingerprint)meetingSaveAttempt_={fingerprint,id:editingId||meetingAttachmentMemoId||meetingMutationId_(),mutationId:meetingMutationId_()};
   payload.id=meetingSaveAttempt_.id;payload.mutationId=meetingSaveAttempt_.mutationId;
+  meetingAttachmentMemoId=payload.id;
   saveMeetingDraft_();
+  $('saveBtn').closest('section').inert=true;
   $('saveBtn').disabled = true;
   if ($('mailSaveBtn')) $('mailSaveBtn').disabled = true;
   try {
+    await memoFiles.upload(payload.id,payload.studentId,api);
     const r = meetingSaveAttempt_.response || await api(payload);
     if (!r.success||!r.memo||String(r.memo.id)!==String(payload.id)) throw new Error(r.error || '保存結果を確認できませんでした');
     const saved=r.memo;
@@ -1354,7 +1364,7 @@ async function saveMemo(sendEmail){
     renderMemos();
     const confirmed=await api({action:'getMeetingMemos',studentId:payload.studentId});
     const record=confirmed.memos?.find(m=>String(m.id)===String(payload.id));
-    if(!confirmed.success||!record||record.content!==payload.content)throw Error('保存応答は受信しましたが、読み返しを確認できませんでした。入力内容を残しています。同じ内容で再確認できます。');
+    if(!confirmed.success||!record||record.content!==payload.content||JSON.stringify((record.attachments||[]).map(a=>a.id))!==JSON.stringify(payload.attachmentIds))throw Error('保存応答は受信しましたが、読み返しを確認できませんでした。入力内容を残しています。同じ内容で再確認できます。');
     allMemos=[...confirmed.memos,...allMemos.filter(m=>String(m.studentId)!==String(payload.studentId))];memosLoadState='ready';renderMemos();
     removeMeetingDraft_();meetingSaveAttempt_=null;
     if (sendEmail) {
@@ -1368,6 +1378,7 @@ async function saveMemo(sendEmail){
     errEl.textContent=e.message||'保存を確認できませんでした。入力内容を残しています。';errEl.classList.add('show');
     showToast(e.message || '保存に失敗しました');
   } finally {
+    $('saveBtn').closest('section').inert=false;
     $('saveBtn').disabled = false;
     if ($('mailSaveBtn')) $('mailSaveBtn').disabled = false;
   }
@@ -1375,7 +1386,7 @@ async function saveMemo(sendEmail){
 
 function clearForm(keepStudent){
   removeMeetingDraft_();meetingSaveAttempt_=null;
-  editingId = '';
+  editingId = '';meetingAttachmentMemoId='';memoFiles.load();
   $('formTitle').textContent = '面談・電話内容を登録';
   $('saveBtn').textContent = '保存する';
   if (!keepStudent) {
@@ -1459,7 +1470,7 @@ function renderMemos(){
     return;
   }
   $('memoList').innerHTML = memos.map(m => `
-    <article class="memo">
+    <article class="memo" data-memo-index="${memos.indexOf(m)}">
       <div class="memoTop">
         <div>
           <div class="studentName">${esc(m.name)} <span class="meta">No.${esc(m.studentId)} / ${esc(m.grade || '')}</span></div>
@@ -1473,6 +1484,7 @@ function renderMemos(){
       <div class="content">${esc(m.content || '')}</div>
     </article>
   `).join('');
+  $('memoList').querySelectorAll('[data-memo-index]').forEach(el=>StepMeetingFiles.render(el,memos[Number(el.dataset.memoIndex)],api));
 }
 
 function formatDate(v){
@@ -1487,7 +1499,7 @@ function formatDate(v){
 function editMemo(id){
   const m = memos.find(x => String(x.id) === String(id));
   if (!m) return;
-  editingId = m.id;
+  editingId = m.id;meetingAttachmentMemoId=m.id;meetingSaveAttempt_=null;memoFiles.load(m.attachments||[],m.id,m.studentId);
   $('formTitle').textContent = '面談メモを編集';
   $('saveBtn').textContent = '変更を保存';
   currentGradeGroup = '';
