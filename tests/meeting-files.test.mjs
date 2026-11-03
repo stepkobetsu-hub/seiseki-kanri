@@ -77,3 +77,21 @@ test('browser editor retries failed uploads and renders literal filenames below 
  host.children[2].children[0].children[1].onclick();assert.equal(editor.ids().length,0);
  input.files=[new File(['%PDF-new'],'new.pdf')];input.onchange();await editor.upload('other','999',async p=>({success:true,attachment:{id:p.attachmentId}}));
 });
+
+test('image viewer fits rotated bounds, zooms, pans and closes without a new tab',async()=>{
+ class Element{
+  constructor(tag){this.tag=tag;this.children=[];this.style={};this.events={};this.clientWidth=800;this.clientHeight=600;this.scrollWidth=800;this.scrollHeight=600;this.scrollLeft=0;this.scrollTop=0;}
+  append(...a){this.children.push(...a);}setAttribute(k,v){this[k]=v;}addEventListener(k,fn){(this.events[k]??=[]).push(fn);}showModal(){this.open=true;}close(){this.open=false;for(const fn of this.events.close||[])fn();}remove(){this.removed=true;}setPointerCapture(){}
+ }
+ const body=new Element('body'),win={addEventListener(){},removeEventListener(){}},context={window:win,document:{body,createElement:t=>new Element(t)}};
+ vm.runInNewContext(fs.readFileSync(new URL('../assets/js/meeting-files.js',import.meta.url),'utf8'),context);
+ const host=new Element('div');win.StepMeetingFiles.render(host,{id:mid,attachments:[{id:aid,name:'学校の結果.jpg',mimeType:'image/jpeg'}]},async()=>({success:true,url:'https://wisedgcgwaebtkprdhth.supabase.co/storage/v1/object/sign/private?token=test'}));
+ await host.children[0].children[0].onclick();const dialog=body.children[0],toolbar=dialog.children[1],stage=dialog.children[2],status=dialog.children[3].children[0],paper=stage.children[0].children[0],img=paper.children[0];
+ assert(dialog.open);assert(toolbar.children[0].disabled);img.naturalWidth=1200;img.naturalHeight=1600;img.onload();assert.match(status.textContent,/36%.*0°/);
+ toolbar.children[1].onclick();assert.match(status.textContent,/47%.*90°/);assert.match(img.style.transform,/rotate\(90deg\)/);assert.equal(Number.parseFloat(paper.style.height),568);
+ toolbar.children[5].onclick();assert.equal(paper.style.width,'1600px');assert.match(status.textContent,/100%/);
+ toolbar.children[2].onclick();assert.match(status.textContent,/80%/);
+ stage.events.pointerdown[0]({pointerId:1,clientX:100,clientY:100,preventDefault(){}});stage.events.pointermove[0]({pointerId:1,clientX:70,clientY:80});assert.equal(stage.scrollLeft,30);assert.equal(stage.scrollTop,20);
+ toolbar.children[0].onclick();assert.match(img.style.transform,/rotate\(0deg\)/);toolbar.children[4].onclick();assert.match(status.textContent,/36%/);
+ dialog.children[0].children[1].onclick();assert(dialog.removed);assert.equal(dialog.open,false);
+});

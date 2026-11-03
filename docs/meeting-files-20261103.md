@@ -22,3 +22,9 @@
 `npx deno check --no-lock supabase/functions/seiseki-admin-runtime-v1/index.ts`、3画面のインラインJavaScript構文検査も成功。
 
 既存の古い `staff-permissions.test.mjs` は既存TS importの除去不足と旧scriptバージョン固定、`meeting-memo-view.test.mjs` / `admin-device-session.test.mjs` は既存画面との不一致で失敗するため、本変更は上記の追加統合テストで検証。既存テスト自体は変更していない。
+
+## 画像ビューア（2026-11-03追加）
+
+添付画像は同じ画面のダイアログで表示。左右90度回転、拡大・縮小、100%、画面に合わせる、ドラッグ移動、ホイール・２本指の拡大縮小に対応。表示だけを変更し、保存済みファイルは変更しない。PDFはダイアログ内のブラウザーPDFツールバーで操作する。表示非対応形式は「元のファイルを開く」へ案内。権限確認後の短期署名URLを引き続き使用し、ポップアップや別タブへのセッション移譲は行わない。
+
+画像の初期フィット、回転時の寸法、拡大縮小、ドラッグ、閉じる操作を追加テストで確認。`tests/meeting-files.test.mjs` は5件成功。
