@@ -10,7 +10,7 @@ function harness(fetch) {
   const element=()=>({style:{},className:'',textContent:'',addEventListener(){},classList:{add(){},remove(){}}});
   const context=vm.createContext({fetch,AbortController,URLSearchParams,Date,console,
     location:{search:''},window:{addEventListener(){}},
-    document:{addEventListener(){},getElementById(id){if(!elements.has(id))elements.set(id,element());return elements.get(id);}},
+    document:{querySelector(){return null;},addEventListener(){},getElementById(id){if(!elements.has(id))elements.set(id,element());return elements.get(id);}},
     localStorage:{getItem(){return null;},setItem(){}},sessionStorage:{getItem(){return null;}},
     setTimeout(fn,ms){if(ms===0)zeroTimers.push(fn);return 1;},clearTimeout(){}});
   vm.runInContext(source,context);
@@ -58,4 +58,19 @@ test('network retry sends the identical patch through the legacy endpoint',async
   const legacy=new URLSearchParams(calls[1].options.body);
   assert.equal(legacy.get('action'),'savePatch');
   assert.deepEqual(JSON.parse(legacy.get('payload')),direct.payload);
+});
+
+
+test('refresh never discards unsaved edits or interrupts an active save',async()=>{
+  const h=harness(async()=>{throw Error('unexpected fetch');});
+  h.run("schools=[]; db={a:{files:[]}}; persistedState=captureState(); db.a.noan=true; let loads=0; loadFromGAS=async()=>{loads++};");
+  await h.run('refreshDb(true)');
+  assert.equal(h.run('loads'),0);
+  assert.equal(h.run('db.a.noan'),true);
+  h.run('persistedState=captureState();saveInFlight=true;');
+  await h.run('refreshDb(true)');
+  assert.equal(h.run('loads'),0);
+  h.run('saveInFlight=false;');
+  await h.run('refreshDb(true)');
+  assert.equal(h.run('loads'),1);
 });

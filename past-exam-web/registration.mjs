@@ -7,6 +7,8 @@ export function requireData(response){
 export function cellKey(ctx){
   const parts=['schoolId','year','grade','exam','subject'].map(k=>String(ctx[k]||''));
   if(parts.some(v=>!v||v.includes('||')))throw Error('登録情報を確認してください');
+  if(/^\d+$/.test(parts[3]))parts[3]=`第${Number(parts[3])}回`;
+  if(!/^第[1-9]\d*回$/.test(parts[3]))throw Error('テスト回を確認してください');
   return parts.join('||');
 }
 export function contains(data,pending){return (data.db[cellKey(pending.ctx)]?.files||[]).some(f=>f.fileId===pending.file.fileId);}

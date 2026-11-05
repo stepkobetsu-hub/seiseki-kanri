@@ -172,6 +172,12 @@ td.g3 .cell.filled { background:var(--g3-acc); border-color:var(--g3-acc); }
 .toast { position:fixed; bottom:24px; right:24px; background:var(--navy); color:white; padding:10px 18px; border-radius:10px; font-size:13px; box-shadow:0 4px 20px rgba(0,0,0,.2); opacity:0; transform:translateY(10px); transition:all .22s; z-index:200; pointer-events:none; }
 .toast.show { opacity:1; transform:translateY(0); }
 input[type=file] { display:none; }
+.file-search{background:#fff;padding:18px;border-radius:12px;margin-bottom:20px;box-shadow:0 2px 12px rgba(27,58,107,.09)}
+.file-search h2{font-size:17px;margin:0 0 8px}.file-search p{font-size:12px;color:var(--sub);line-height:1.7}
+.file-search input{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;font-size:14px}
+.registered-files{max-height:300px;overflow:auto;margin-top:10px}.registered-file{padding:10px 0;border-bottom:1px solid #e5e7eb;font-size:12px;overflow-wrap:anywhere}
+.registered-file a{display:block;color:#1d4ed8;margin-top:5px}.registered-file button{font:inherit;background:#eef4ff;border:1px solid #cbd5e1;border-radius:6px;padding:5px 8px;color:var(--navy);cursor:pointer}
+#refreshBtn:disabled{opacity:.5;cursor:wait}
 </style>
 </head>
 <body>
@@ -201,6 +207,7 @@ input[type=file] { display:none; }
       <button id="redoBtn" onclick="redo()" title="やり直す (Ctrl+Y)" style="display:none;background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.5);color:white;padding:6px 12px;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;opacity:0.3;">↪</button>
       <a id="folderBtn" href="https://drive.google.com/drive/folders/1201W051sgBNe3t7sVEcfKA3stXjXhdeR" target="_blank" style="display:none;background:#f59e0b;color:white;text-decoration:none;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;">📁 保存フォルダ</a>
       <span id="adminBadge" class="admin-badge" style="display:none">管理者モード</span>
+      <button id="refreshBtn" class="back-btn" onclick="refreshDb()" disabled>↻ 最新情報を取得</button>
       <span id="syncStatus" class="sync-badge sync-idle">● 接続中...</span>
     </div>
   </header>
@@ -209,6 +216,12 @@ input[type=file] { display:none; }
       <h2>学校一覧</h2>
       <button class="add-school-btn" id="addSchoolBtn" onclick="openAddSchool()" style="display:none">＋ 学校を追加</button>
     </div>
+    <section class="file-search" aria-labelledby="fileSearchTitle">
+      <h2 id="fileSearchTitle">登録済みファイル <span id="fileCount"></span></h2>
+      <p>学校・年度・科目・ファイル名で検索できます。別のスマホで登録した後は「最新情報を取得」を押してください。</p>
+      <input id="fileSearch" type="search" aria-label="登録済みファイルを検索" placeholder="例：高蔵寺 2024 数学" oninput="renderRegisteredFiles()">
+      <div id="registeredFiles" class="registered-files" aria-live="polite"></div>
+    </section>
     <div class="schools-grid" id="schoolsGrid"></div>
   </div>
   <div id="pageDetail" class="page">
@@ -269,6 +282,7 @@ const DEFAULT_SCHOOLS = [
 
 let schools=[], db={}, curSchool=null, curYear=null, curCell=null, editSid=null, curPass='', isAdmin=false, isViewOnly=false, liveReady=false;
 let persistedState = null, saveInFlight = false, saveRequested = false;
+let refreshing = false, lastSyncAt = 0;
 let undoStack = [], redoStack = [];
 function pushUndo() {
   try {
@@ -472,6 +486,9 @@ async function loadFromGAS(pass) {
       }
 
       saveLocalSnapshot();
+      lastSyncAt = Date.now();
+      document.getElementById('refreshBtn').disabled = false;
+      renderRegisteredFiles();
       setSyncStatus('ok','✓ 同期済み');
       setTimeout(() => setSyncStatus('idle','● オンライン'), 3000);
 
@@ -493,6 +510,7 @@ async function loadFromGAS(pass) {
     }
   }
 
+  document.getElementById('refreshBtn').disabled = false;
   liveReady = false;
   isAdmin = false;
   isViewOnly = true;
@@ -500,6 +518,48 @@ async function loadFromGAS(pass) {
   showToast('⚠ 最新データの取得に失敗しました。表示中のデータは閲覧のみです。');
   const loginError = document.getElementById('loginError');
   if (loginError) loginError.textContent = '接続エラー：' + ((lastErr && lastErr.message) || lastErr || '');
+}
+
+async function refreshDb(automatic=false) {
+  if(refreshing)return;
+  const dirty=persistedState && makeSavePatch(persistedState,captureState()).length>0;
+  if(saveInFlight || saveTimer || dirty || document.querySelector('.modal-overlay.open')) {
+    if(!automatic)showToast('入力・保存が終わってから最新情報を取得してください。');
+    return;
+  }
+  refreshing=true;
+  document.getElementById('refreshBtn').disabled=true;
+  setSyncStatus('saving','◌ 最新データ確認中');
+  try{await loadFromGAS(curPass || DEFAULT_PASS);}
+  finally{refreshing=false;document.getElementById('refreshBtn').disabled=false;}
+}
+window.addEventListener('focus',()=>{
+  if(liveReady && Date.now()-lastSyncAt>15000)refreshDb(true);
+});
+
+function renderRegisteredFiles() {
+  const wrap=document.getElementById('registeredFiles');
+  const terms=document.getElementById('fileSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const rows=[];
+  Object.entries(db).forEach(([key,item])=>{
+    const [sid,year,grade,exam,subject]=key.split('||');
+    const school=schools.find(s=>String(s.id)===sid);
+    (item.files||[]).forEach(file=>rows.push({school,year,grade,exam,subject,file}));
+  });
+  document.getElementById('fileCount').textContent=`（${rows.length}件）`;
+  const matches=rows.filter(r=>terms.every(t=>[r.school?.name,r.year,r.grade,r.exam,r.subject,r.file.name].join(' ').toLowerCase().includes(t)));
+  matches.sort((a,b)=>(Date.parse(b.file.date)||0)-(Date.parse(a.file.date)||0));
+  wrap.replaceChildren();
+  matches.forEach(r=>{
+    const row=document.createElement('div');row.className='registered-file';
+    const label=[r.school?.name||'学校不明',r.year+'年度',r.grade,r.exam,r.subject].join(' ／ ');
+    const button=document.createElement('button');button.type='button';button.textContent=label+' →';
+    button.disabled=!r.school;button.addEventListener('click',()=>goDetail(r.school,r.year));row.append(button);
+    const a=document.createElement('a');a.textContent=r.file.name||'PDFを開く';
+    try{const u=new URL(r.file.url);if(u.protocol==='https:' && ['drive.google.com','docs.google.com'].includes(u.hostname)){a.href=u.href;a.target='_blank';a.rel='noopener noreferrer';}}catch{}
+    row.append(a);wrap.append(row);
+  });
+  if(!matches.length)wrap.textContent=liveReady?'該当する登録済みファイルはありません。':'最新データを確認中です。';
 }
 
 // ページ読み込み時。通常は自動ログイン、必要になれば入口画面に戻せます。
@@ -715,6 +775,7 @@ function countFilled(school, year) {
 }
 
 function renderTop() {
+  renderRegisteredFiles();
   const grid = document.getElementById('schoolsGrid');
   grid.innerHTML = '';
   if (!schools.length) {

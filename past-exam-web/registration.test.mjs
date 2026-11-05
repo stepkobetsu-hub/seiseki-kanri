@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import {ExamApi,makePatch,requireData,cellKey} from './registration.mjs';
 const pending={ctx:{schoolId:'s1',year:'2024',grade:'中1',exam:'1',subject:'国語',kind:'テストのみ'},file:{fileId:'pdf1',name:'scan.pdf',url:'https://drive.google.com/file/d/pdf1/view'}};
 const key=cellKey(pending.ctx),config={fastUrl:'https://fast.example',gasUrl:'https://gas.example',pass:'test'};
+test('Web test number matches DB and Android keys',()=>{
+  assert.equal(key,'s1||2024||中1||第1回||国語');
+  assert.equal(cellKey({...pending.ctx,exam:'第1回'}),key);
+  assert.throws(()=>cellKey({...pending.ctx,exam:'0'}));
+});
 const initial=()=>({schools:[{id:'s1'}],db:{[key]:{files:[{fileId:'previous'}],noan:true,stu:true},other:{files:[{fileId:'other'}]}}});
 const response=data=>({ok:true,json:async()=>data});
 test('patch preserves old files, flags, archive year and unrelated cells without mutating the snapshot',()=>{const d=initial(),before=JSON.stringify(d);const patch=makePatch(d,pending);assert.equal(patch.length,1);assert.equal(patch[0].key,key);assert.equal(patch[0].after.files.length,2);assert.equal(patch[0].after.noan,true);assert.equal(patch[0].after.stu,true);assert.equal(JSON.stringify(d),before);});

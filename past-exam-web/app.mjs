@@ -1,5 +1,5 @@
 import {normalizeSchools,restoreSchools} from './school-catalog.mjs?v=1.0.2';
-import {ExamApi,cellKey} from './registration.mjs?v=1.0.1-fetch2';
+import {ExamApi,cellKey} from './registration.mjs?v=1.0.5';
 const $=id=>document.getElementById(id),api=new ExamApi(window.PAST_EXAM_UPLOAD_CONFIG);
 const schoolKey='stepPastExamWebSchoolsV1';
 const pendingKey='stepPastExamWebPastExamPendingV1';
@@ -45,6 +45,7 @@ async function register(){
   status('PDFは保存済みです。過去問DBへ登録し、反映を確認しています…');
   const saved=pending;await api.register(saved);
   localStorage.removeItem(pendingKey);pending=null;paintPending();showFile(saved.file);
+  document.querySelector('.db-button[href]').href='../past_exam_db.html?'+new URLSearchParams({fresh:'1',sid:saved.ctx.schoolId,year:saved.ctx.year});
   $('pdf').value='';$('fileStatus').textContent='登録したPDFは上のリンクから確認できます。';
   status('過去問DBへの登録を確認しました。');$('complete').hidden=false;$('complete').scrollIntoView({behavior:'smooth',block:'start'});
   if(typeof $('done').showModal==='function')$('done').showModal();
