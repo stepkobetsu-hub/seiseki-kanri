@@ -1112,12 +1112,13 @@ tr:hover td{background:#f8fafc}
       <div class="card">
         <div class="cardHead">🔄 生徒マスタ同期</div>
         <p style="font-size:.82rem;color:var(--sub);margin-bottom:14px">
-          元スプレッドシート（☆マスタ）から差分を確認して適用します。<br>
-          Supabase方式では、GAS生徒マスタの変更をここからSupabaseへ反映できます。
+          元スプレッドシート（☆マスタ）の変更は約5分ごとにSupabaseへ自動反映されます。<br>
+          B列は <strong>1=在籍 / 0=退塾予定 / 空欄=退塾確定</strong> です。退塾確定後も成績・通知表・面談メモなどの履歴は削除されません。
         </p>
+        <div id="studentSyncStatus" style="margin-bottom:14px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#f8fafc;font-size:.8rem;color:var(--sub)">同期状態を確認中...</div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn btn-primary btn-sm" onclick="runSync()">🔍 差分を確認する</button>
-          <button class="btn btn-ghost btn-sm" onclick="loadSyncLog()">📋 同期ログを見る</button>
+          <button class="btn btn-primary btn-sm" onclick="runSync()">🔄 今すぐ同期する</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadStudentSyncStatus()">↻ 状態を再確認</button>
         </div>
       </div>
       <div id="syncResult" style="display:none"></div>
@@ -1263,7 +1264,7 @@ const SEISEKI_ADMIN_RUNTIME_URL = 'https://wisedgcgwaebtkprdhth.supabase.co/func
 const ADMIN_SESSION_TOKEN_KEY = 'adminSystemPortalSessionToken';
 const ADMIN_SESSION_EXPIRES_KEY = 'adminSystemPortalExpiresAt';
 const SUPABASE_ENABLED_ACTIONS = new Set(['getEntrySheetData','importMissingEntryGrades',
-  'getStudents', 'getStudentList',
+  'getStudents', 'getStudentList', 'syncStudentDirectory', 'getStudentSyncStatus',
   'getAllScores', 'getStudentScores', 'getStudentGradeProfile', 'saveScore', 'deleteScore',
   'getAllReports', 'getReports', 'saveReport', 'deleteReport',
   'getAllWishes', 'getWish', 'saveWish', 'saveWishResult',
@@ -1272,6 +1273,7 @@ const SUPABASE_ENABLED_ACTIONS = new Set(['getEntrySheetData','importMissingEntr
   'getStaffMembers', 'addStaffMember', 'deleteStaffMember'
 ]);
 const SUPABASE_WRITE_ACTIONS = new Set(['importMissingEntryGrades',
+  'syncStudentDirectory',
   'saveScore', 'deleteScore', 'saveReport', 'deleteReport',
   'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool',
   'saveMeetingAttachment', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember'
@@ -1489,6 +1491,7 @@ function sbValue(v) {
 }
 
 function sbStudent(row) {
+  const enrollmentStatus = row.enrollment_status || (row.active === false ? 'withdrawn' : 'active');
   return {
     id: sbValue(row.student_code || row.id),
     studentCode: sbValue(row.student_code),
@@ -1497,7 +1500,9 @@ function sbStudent(row) {
     campus: sbValue(row.campus),
     grade: sbValue(row.grade),
     school: sbValue(row.school_name),
-    flag: row.active === false ? '退塾' : '1',
+    flag: enrollmentStatus === 'active' ? '1' : enrollmentStatus === 'withdrawal_scheduled' ? '0' : '',
+    enrollmentFlag: enrollmentStatus === 'active' ? '1' : enrollmentStatus === 'withdrawal_scheduled' ? '0' : '',
+    enrollmentStatus,
     syncedAt: sbValue(row.source_updated_at || row.updated_at)
   };
 }
@@ -1741,7 +1746,7 @@ async function supabaseApi(data) {
       const limit = Math.min(Number(data.limit || 50), 50);
       const offset = Math.max(Number(data.offset || 0), 0);
       const params = {
-        select: 'id,student_code,name,name_kana,campus,grade,school_name,active',
+        select: 'id,student_code,name,name_kana,campus,grade,school_name,active,enrollment_status',
         order: 'active.desc,campus.asc,grade.asc,student_code.asc',
         limit,
         offset
@@ -1776,13 +1781,21 @@ function cleanSyncValue(value) {
 }
 
 function activeFromStudentFlag(value) {
-  if (value === false) return false;
+  return enrollmentStatusFromStudentFlag(value) === 'active';
+}
+
+function enrollmentStatusFromStudentFlag(value) {
+  if (value === true) return 'active';
+  if (value === false || value === null || value === undefined) return 'withdrawn';
   const flag = cleanSyncValue(value);
-  return !['退塾', 'inactive', 'false', '0'].includes(flag);
+  if (flag === '1') return 'active';
+  if (flag === '0') return 'withdrawal_scheduled';
+  if (flag === '' || ['退塾', 'inactive', 'false'].includes(flag)) return 'withdrawn';
+  return 'unknown';
 }
 
 function syncStudentFromGas(s, index) {
-  const active = activeFromStudentFlag(s.flag ?? s.status ?? s.active);
+  const enrollmentStatus = enrollmentStatusFromStudentFlag(s.flag ?? s.status ?? s.active);
   return {
     id: cleanSyncValue(s.id || s.studentId || s.student_code),
     name: cleanSyncValue(s.name),
@@ -1790,8 +1803,9 @@ function syncStudentFromGas(s, index) {
     campus: cleanSyncValue(s.campus),
     grade: cleanSyncValue(s.grade),
     school: cleanSyncValue(s.school || s.school_name),
-    flag: active ? '1' : '退塾',
-    active,
+    flag: enrollmentStatus === 'active' ? '1' : enrollmentStatus === 'withdrawal_scheduled' ? '0' : '',
+    active: enrollmentStatus === 'active',
+    enrollmentStatus,
     sourceRow: index + 2
   };
 }
@@ -1805,12 +1819,14 @@ function syncStudentToSupabaseRow(s) {
     grade: cleanSyncValue(s.grade),
     school_name: cleanSyncValue(s.school),
     active: activeFromStudentFlag(s.flag),
+    enrollment_status: enrollmentStatusFromStudentFlag(s.flag),
     source_row: Number(s.sourceRow || 0) || null,
     source_updated_at: new Date().toISOString()
   };
 }
 
 function supabaseStudentToSync(row) {
+  const enrollmentStatus = row.enrollment_status || (row.active === false ? 'withdrawn' : 'active');
   return {
     id: cleanSyncValue(row.student_code),
     name: cleanSyncValue(row.name),
@@ -1818,8 +1834,9 @@ function supabaseStudentToSync(row) {
     campus: cleanSyncValue(row.campus),
     grade: cleanSyncValue(row.grade),
     school: cleanSyncValue(row.school_name),
-    flag: row.active === false ? '退塾' : '1',
-    active: row.active !== false
+    flag: enrollmentStatus === 'active' ? '1' : enrollmentStatus === 'withdrawal_scheduled' ? '0' : '',
+    active: enrollmentStatus === 'active',
+    enrollmentStatus
   };
 }
 
@@ -1844,7 +1861,7 @@ async function previewSupabaseStudentSync() {
     .map(syncStudentFromGas)
     .filter(s => s.id && s.name);
   const supabaseRows = await supabaseGet('students', {
-    select: 'student_code,name,name_kana,campus,grade,school_name,active',
+    select: 'student_code,name,name_kana,campus,grade,school_name,active,enrollment_status',
     order: 'student_code.asc',
     limit: 1000
   });
@@ -1887,14 +1904,7 @@ async function applySupabaseStudentSync(data) {
   }
   const toDeactivate = data.toDeactivate || [];
   if (toDeactivate.length) {
-    const codes = toDeactivate.map(s => cleanSyncValue(s.id)).filter(Boolean);
-    if (data.deleteDeactivated) {
-      for (const code of codes) {
-        await supabaseWrite('students', { student_code: 'eq.' + code }, { method: 'DELETE' });
-        applied++;
-      }
-    } else {
-      const rows = toDeactivate.map(s => ({
+    const rows = toDeactivate.map(s => ({
         student_code: cleanSyncValue(s.id),
         name: cleanSyncValue(s.name) || '退塾生',
         name_kana: cleanSyncValue(s.nameKana),
@@ -1902,17 +1912,17 @@ async function applySupabaseStudentSync(data) {
         grade: cleanSyncValue(s.grade),
         school_name: cleanSyncValue(s.school),
         active: false,
+        enrollment_status: 'withdrawn',
         source_updated_at: new Date().toISOString()
-      }));
-      await supabaseWrite('students', { on_conflict: 'student_code' }, {
-        method: 'POST',
-        headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
-        body: rows
-      });
-      applied += rows.length;
-    }
+    }));
+    await supabaseWrite('students', { on_conflict: 'student_code' }, {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
+      body: rows
+    });
+    applied += rows.length;
   }
-  addSupabaseSyncLog(applied, toUpsert.length, toDeactivate.length, !!data.deleteDeactivated);
+  addSupabaseSyncLog(applied, toUpsert.length, toDeactivate.length, false);
   return { success: true, applied };
 }
 
@@ -2345,7 +2355,7 @@ function reloadData() {
   else if (visibleTab === 'scores') initAdminScoresTab();
   else if (visibleTab === 'report') initAdminReportTab();
   else if (visibleTab === 'wish') { _allWishes = []; loadAllWishes(); }
-  else if (visibleTab === 'sync') loadSyncLog();
+  else if (visibleTab === 'sync') loadStudentSyncStatus();
   else loadSpeed();
 }
 
@@ -2414,6 +2424,7 @@ function aNav(name, el) {
   }
   if (name === 'wish') loadAllWishes();
   if (name === 'entry') initEntryTab();
+  if (name === 'sync') loadStudentSyncStatus();
   if (name === 'settings') loadStaffMembers();
   // 履歴に追加
   if (!_navSkip) {
@@ -5102,39 +5113,18 @@ function buildCmpRpChart() {
   });
 }
 async function runSync() {
-  toast('⏳ 差分を確認中...');
-  const r = await api({ action: 'syncStudents' });
-  if (!r.success) { toast('❌ ' + r.error); return; }
-  pendingSync = r.preview;
-  const { toAdd, toUpdate, passChanged, toDeactivate } = r.preview;
-  const total = toAdd.length + toUpdate.length + toDeactivate.length;
-  if (total === 0 && passChanged.length === 0) { toast('✅ 差分なし：最新の状態です'); return; }
-  let html = `<div class="chips">
-    <span class="chip chip-green">追加 ${toAdd.length}名</span>
-    <span class="chip chip-blue">更新 ${toUpdate.length}名</span>
-    <span class="chip chip-blue" style="background:rgba(245,158,11,.15);color:#f59e0b;border-color:rgba(245,158,11,.3)">PW変更 ${passChanged.length}名</span>
-    <span class="chip chip-red">削除候補 ${toDeactivate.length}名</span>
-  </div>`;
-  const sect = (icon, title, body) => body ? `<div style="margin-bottom:10px"><div style="font-size:.78rem;color:var(--sub);margin-bottom:4px">${icon} ${title}</div>${body}</div>` : '';
-  if (toAdd.length) html += sect('➕', `新規追加 ${toAdd.length}名`, toAdd.map(s => `<div class="syncItem"><strong>${s.name}</strong>（${s.id}）${s.campus} / ${s.grade}</div>`).join(''));
-  if (toUpdate.length) html += sect('✏️', `情報更新 ${toUpdate.length}名`, toUpdate.map(s => `<div class="syncItem"><strong>${s.name}</strong>（${s.id}）<div class="syncChanges">${(s.changes||[]).join(' / ')}</div></div>`).join(''));
-  const hasFlagChange = toUpdate.some(s => (s.changes || []).some(c => /^(在籍フラグ|在籍):/.test(c)));
-  if (hasFlagChange || toDeactivate.length) html += `
-    <div style="margin:8px 0 10px;padding:9px 11px;border:1px solid #f6c453;border-radius:7px;background:#fff7db;color:#7c5a00;font-size:.76rem;line-height:1.7">
-      在籍フラグ「1→0」は「在籍→<strong style="color:#dc2626">退塾</strong>」となりますが、名簿に名前は残ります。<br>
-      「1→（数字なし）」や「0→（数字なし）」の場合に、名簿から名前が<strong style="color:#dc2626">削除されます</strong>。
-    </div>`;
-  if (passChanged.length) html += sect('🔑', `PW変更 ${passChanged.length}名`, passChanged.map(s => `<div class="syncItem"><strong>${s.name}</strong>（${s.id}）<div class="syncChanges">${s.oldPass} → ${s.newPass}</div></div>`).join(''));
-  if (toDeactivate.length) html += sect('⚠️', `削除候補 ${toDeactivate.length}名`, toDeactivate.map(s => `<div class="syncItem"><strong>${s.name}</strong>（${s.id}）</div>`).join(''));
-  document.getElementById('syncModalBody').innerHTML = html;
-
-  // 退塾候補を含め、同期は常に1回の操作で適用する
-  const foot = document.getElementById('syncModalFoot');
-  foot.innerHTML = `
-    <button class="btn btn-ghost btn-sm" onclick="closeSyncModal()">キャンセル</button>
-    <button class="btn btn-primary btn-sm" onclick="applySync()">同期する</button>`;
-
-  document.getElementById('syncModal').classList.add('show');
+  toast('⏳ 生徒マスタを同期中...');
+  const r = await api({ action: 'syncStudentDirectory', force: true });
+  if (!r.success) {
+    toast('❌ ' + (r.error || '同期に失敗しました'));
+    await loadStudentSyncStatus();
+    return;
+  }
+  const changed = Number(r.applied || 0);
+  toast(changed ? `✅ 同期完了（変更 ${changed}件）` : '✅ 差分なし：最新の状態です');
+  enrollmentIndexReady = false;
+  _cache.students = null;
+  await Promise.all([loadStudentSyncStatus(), loadStudents()]);
 }
 function openStudentSyncPreview() { return runSync(); }
 function closeSyncModal() { document.getElementById('syncModal').classList.remove('show'); }
@@ -5552,29 +5542,36 @@ async function saveWishEditModal() {
   }
 }
 async function applySync() {
-  if (!pendingSync) return;
   closeSyncModal();
-  toast('⏳ 同期中...');
-  const r = await api({
-    action: 'applySyncResult',
-    toAdd: pendingSync.toAdd || [],
-    toUpdate: pendingSync.toUpdate || [],
-    toDeactivate: pendingSync.toDeactivate || []
-  });
-  if (r.success) {
-    toast(`✅ 同期完了（${r.applied}件）`);
-    pendingSync = null;
-    loadStudents();
-  } else toast('❌ ' + r.error);
+  return runSync();
 }
-async function loadSyncLog() {
-  const r = await api({ action: 'getSyncLog' });
-  const logs = r.logs || [];
-  document.getElementById('syncLogWrap').style.display = 'block';
-  document.getElementById('syncLogList').innerHTML = logs.map(l =>
-    `<div class="logRow"><span style="color:var(--sub)">${l.time}</span><span class="logType ${l.type}">${l.type}</span><span>${l.detail}</span></div>`
-  ).join('') || '<div class="noData">ログなし</div>';
+
+function formatStudentSyncTime(value) {
+  if (!value) return '未実行';
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString('ja-JP') : '未実行';
 }
+
+async function loadStudentSyncStatus() {
+  const box = document.getElementById('studentSyncStatus');
+  if (!box) return;
+  box.textContent = '同期状態を確認中...';
+  const r = await api({ action: 'getStudentSyncStatus' });
+  if (!r.success || !r.status) {
+    box.innerHTML = `<span style="color:#b91c1c">同期状態を取得できません：${htmlEsc(r.error || '状態データがありません')}</span>`;
+    return;
+  }
+  const status = r.status;
+  const failed = status.last_status === 'error';
+  const warning = status.last_status === 'warning';
+  const interval = Number(status.interval_minutes || 5);
+  box.innerHTML = `
+    <div style="font-weight:700;color:${failed ? '#b91c1c' : warning ? '#92400e' : '#166534'}">${failed ? '⚠️ 自動同期でエラーが発生しています' : warning ? '⚠️ 確認が必要な行を除いて同期しました' : '✅ 自動同期は正常です'}</div>
+    <div>最終成功：${htmlEsc(formatStudentSyncTime(status.last_success_at))} / ${interval}分ごと / 読込 ${Number(status.row_count || 0)}件 / 前回変更 ${Number(status.last_change_count || 0)}件</div>
+    ${failed || warning ? `<div style="margin-top:4px;color:${failed ? '#b91c1c' : '#92400e'}">${htmlEsc(status.last_error_message || '同期に失敗しました')}</div>` : ''}`;
+}
+
+async function loadSyncLog() { return loadStudentSyncStatus(); }
 
 // ===== 面談・メモ =====
 function todayStr() {

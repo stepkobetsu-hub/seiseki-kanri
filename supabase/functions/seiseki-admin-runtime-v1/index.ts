@@ -3,6 +3,7 @@ import {entryGradeRows,missingEntryRows} from './entry-grade-import.ts';
 import {cleanEntryEdit,mergeEntryEdit} from './entry-info-edit.ts';
 import { CORS_HEADERS, preflightResponse } from './storage.ts';
 import {checkPermissionBridge} from './permission-bridge.ts';
+import { studentIndexRowFromDirectoryDetail, summarizeStudentIndexSync } from './student-enrollment-sync.mjs';
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
@@ -16,9 +17,9 @@ const ADMIN_ACTIONS = new Set([
   'getMeetingBootstrap', 'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo', 'saveMeetingAttachment', 'getMeetingAttachment',
   'getStaffMembers', 'addStaffMember', 'deleteStaffMember',
   'reconcileLegacy', 'persistAdminSession', 'logoutAdmin',
-  'getEntrySheetData', 'saveEntrySheetInfo', 'importMissingEntryGrades', 'syncStudentDirectory', 'getStudentDirectoryDetail', 'saveStudentDirectory', 'enableStudentDirectoryAutoSync',
+  'getEntrySheetData', 'saveEntrySheetInfo', 'importMissingEntryGrades', 'syncStudentDirectory', 'getStudentSyncStatus', 'getStudentDirectoryDetail', 'saveStudentDirectory', 'enableStudentDirectoryAutoSync',
 ]);
-const WRITE_ACTIONS = new Set(['saveMeetingAttachment','saveEntrySheetInfo', 'importMissingEntryGrades', 'saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember', 'saveStudentDirectory']);
+const WRITE_ACTIONS = new Set(['saveMeetingAttachment','saveEntrySheetInfo', 'importMissingEntryGrades', 'saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember', 'saveStudentDirectory', 'syncStudentDirectory']);
 const ADMIN_PERMISSION_LEVELS = new Set(['2', '3', '4']);
 const STAFF_PERMISSION_LEVELS = new Set(['1', '2', '3', '4']);
 // Grade-only sessions never authorize the directory or other management apps.
@@ -31,6 +32,7 @@ const GRADE_ACTIONS = new Set([
   'getMeetingBootstrap', 'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo', 'saveMeetingAttachment', 'getMeetingAttachment',
   'getStaffMembers', 'addStaffMember', 'deleteStaffMember',
   'reconcileLegacy', 'persistAdminSession', 'logoutAdmin', 'verifyStaffSession',
+  'syncStudentDirectory', 'getStudentSyncStatus',
 ]);
 const ADMIN_SESSION_REVERIFY_MS = 6 * 60 * 60 * 1000;
 const GRADE_GAS_URL = 'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
@@ -89,6 +91,9 @@ function requireActionPermission(session: JsonObject, token: unknown, action: st
     throw new ResponseError(403, 'APP_FORBIDDEN', 'このアプリには権限2以上が必要です。');
   }
   const level = String(session.permission_level ?? session.permissionLevel ?? '');
+  if (action === 'syncStudentDirectory' && !ADMIN_PERMISSION_LEVELS.has(level)) {
+    throw new ResponseError(403, 'ADMIN_FORBIDDEN', '生徒マスタの同期には権限2以上が必要です。');
+  }
   if (['saveStudentDirectory','saveEntrySheetInfo'].includes(action) && level !== '4') {
     throw new ResponseError(403, 'DIRECTORY_EDITOR_REQUIRED', '生徒マスタの保存には権限4でログインしてください。');
   }
@@ -895,10 +900,11 @@ async function putDirectoryDetails(details: JsonObject[], fetchedAt: string): Pr
   // Only public master fields are updated; UUIDs, admissions and all grade rows remain intact.
   const indexRows=rows.map(row=>{
     const s=row.detail.student as JsonObject,flag=String(s.flag??'').trim();
+    if(!['1','0',''].includes(flag))return null;
     return {student_code:row.student_code,name:String(s.name??'').trim(),name_kana:String(s.kana??'').trim()||null,
       campus:String(s.campus??'').trim()||null,grade:String(s.grade??'').trim()||null,school_name:String(s.school??'').trim()||null,
       active:flag==='1',enrollment_status:flag==='1'?'active':flag==='0'?'withdrawal_scheduled':'withdrawn',source_updated_at:fetchedAt};
-  }).filter(row=>row.name);
+  }).filter((row): row is NonNullable<typeof row> => !!row?.name);
   for(let i=0;i<indexRows.length;i+=50)await pg(query('students',{on_conflict:'student_code'}),{
     method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(indexRows.slice(i,i+50)),
   });
@@ -911,16 +917,62 @@ async function putDirectoryDetails(details: JsonObject[], fetchedAt: string): Pr
   return rows.length;
 }
 
+function directoryIndexRows(details: JsonObject[], fetchedAt: string): JsonObject[] {
+  if (!Array.isArray(details) || !details.length || details.length > 1000) throw new Error('Invalid directory snapshot');
+  const seen = new Set<string>();
+  return details.map(item => {
+    let row: JsonObject;
+    try { row = studentIndexRowFromDirectoryDetail(item, fetchedAt) as JsonObject; }
+    catch { return null; }
+    const id = String(row.student_code ?? '');
+    if (!/^\d{1,10}$/.test(id) || seen.has(id) || item.success !== true || !item.editable || !String(row.name ?? '')) {
+      throw new Error('Invalid directory detail');
+    }
+    seen.add(id);
+    return row;
+  }).filter((row): row is JsonObject => row !== null);
+}
+
+async function previewDirectoryDetails(details: JsonObject[], fetchedAt: string): Promise<JsonObject> {
+  const nextRows = directoryIndexRows(details, fetchedAt);
+  const currentRows = await pg(query('students', {
+    select:'student_code,name,name_kana,campus,grade,school_name,active,enrollment_status', limit:5000,
+  })) as JsonObject[];
+  return { ...summarizeStudentIndexSync(nextRows, currentRows), skippedInvalid:details.length - nextRows.length } as JsonObject;
+}
+
+async function writeDirectorySyncSuccess(count: number, changed: number, skippedInvalid: number): Promise<void> {
+  const now = new Date().toISOString();
+  const warning = skippedInvalid > 0 ? `B列が 1 / 0 / 空欄 以外の行を ${skippedInvalid}件スキップしました。` : null;
+  await pg(query('student_directory_sync_state', { singleton:'eq.true' }), {
+    method:'PATCH', headers:{ Prefer:'return=minimal' },
+    body:JSON.stringify({
+      last_attempt_at:now, last_success_at:now, last_status:warning ? 'warning' : 'success', row_count:count,
+      last_change_count:changed, last_error_at:null, last_error_message:warning, interval_minutes:5,
+    }),
+  });
+}
+
 async function syncDirectory(payload: JsonObject): Promise<JsonObject> {
-  const state = await pg(query('student_directory_sync_state', { select:'last_success_at,row_count', singleton:'eq.true', limit:1 })) as JsonObject[];
+  const state = await pg(query('student_directory_sync_state', { select:'last_success_at,row_count,last_change_count', singleton:'eq.true', limit:1 })) as JsonObject[];
   if (payload.force !== true && state.length && Date.now() - Date.parse(String(state[0].last_success_at ?? '')) < 45000) {
-    return { success:true, count:state[0].row_count, fetchedAt:state[0].last_success_at, source:'mirror', skipped:true };
+    return { success:true, count:state[0].row_count, applied:state[0].last_change_count, fetchedAt:state[0].last_success_at, source:'mirror', skipped:true };
   }
-  const result = await gas('getStudentDirectorySnapshot', { systemPortalSessionToken: String(payload.token ?? '') });
-  const count = await putDirectoryDetails(result.details as JsonObject[], String(result.fetchedAt ?? new Date().toISOString()));
-  await pg(query('student_directory_sync_state', { singleton:'eq.true' }), { method:'PATCH', headers:{ Prefer:'return=minimal' },
-    body:JSON.stringify({ last_success_at:new Date().toISOString(), row_count:count }) });
-  return { success:true, count, fetchedAt:result.fetchedAt, source:'master-sheet' };
+  const result = await gas('getStudentDirectorySnapshot', { syncSecret:await directorySyncKey() });
+  const fetchedAt = String(result.fetchedAt ?? new Date().toISOString());
+  const summary = await previewDirectoryDetails(result.details as JsonObject[], fetchedAt);
+  const count = await putDirectoryDetails(result.details as JsonObject[], fetchedAt);
+  await writeDirectorySyncSuccess(count, Number(summary.changed ?? 0), Number(summary.skippedInvalid ?? 0));
+  console.info(JSON.stringify({ event:'student_directory_sync_succeeded', count, changed:Number(summary.changed ?? 0), skippedInvalid:Number(summary.skippedInvalid ?? 0) }));
+  return { success:true, count, applied:summary.changed, summary, fetchedAt:result.fetchedAt, source:'master-sheet' };
+}
+
+async function getStudentSyncStatus(): Promise<JsonObject> {
+  const rows = await pg(query('student_directory_sync_state', {
+    select:'last_attempt_at,last_success_at,last_error_at,last_error_message,last_status,interval_minutes,last_change_count,row_count',
+    singleton:'eq.true', limit:1,
+  })) as JsonObject[];
+  return { success:true, status:rows[0] ?? null };
 }
 
 async function readDirectoryDetail(payload: JsonObject): Promise<JsonObject> {
@@ -968,12 +1020,28 @@ async function ingestDirectorySnapshot(payload: JsonObject): Promise<JsonObject>
   const received = String(payload.syncSecret ?? '');
   if (!sameSecret(received, await directorySyncKey())) throw new ResponseError(401, 'SYNC_FORBIDDEN', 'Invalid sync credentials');
   const snapshot = parseObject(payload.snapshot);
-  const count = await putDirectoryDetails(snapshot.details as JsonObject[], String(snapshot.fetchedAt ?? new Date().toISOString()));
+  const fetchedAt = String(snapshot.fetchedAt ?? new Date().toISOString());
+  const summary = await previewDirectoryDetails(snapshot.details as JsonObject[], fetchedAt);
+  const count = await putDirectoryDetails(snapshot.details as JsonObject[], fetchedAt);
+  await writeDirectorySyncSuccess(count, Number(summary.changed ?? 0), Number(summary.skippedInvalid ?? 0));
+  console.info(JSON.stringify({ event:'student_directory_sync_succeeded', count, changed:Number(summary.changed ?? 0), skippedInvalid:Number(summary.skippedInvalid ?? 0) }));
+  return { success:true, count, applied:summary.changed, fetchedAt:snapshot.fetchedAt };
+}
+
+async function reportDirectorySyncFailure(payload: JsonObject): Promise<JsonObject> {
+  const received = String(payload.syncSecret ?? '');
+  if (!sameSecret(received, await directorySyncKey())) throw new ResponseError(401, 'SYNC_FORBIDDEN', 'Invalid sync credentials');
+  const code = String(payload.errorCode ?? 'SYNC_FAILED');
+  const message = code === 'MASTER_READ_FAILED'
+    ? 'Google Sheets の生徒マスタを読み取れませんでした。GASの実行ログと権限を確認してください。'
+    : 'Supabaseへの生徒マスタ同期に失敗しました。しばらくしてから再試行してください。';
+  const now = new Date().toISOString();
   await pg(query('student_directory_sync_state', { singleton:'eq.true' }), {
     method:'PATCH', headers:{ Prefer:'return=minimal' },
-    body:JSON.stringify({ last_success_at:new Date().toISOString(), row_count:count }),
+    body:JSON.stringify({ last_attempt_at:now, last_error_at:now, last_status:'error', last_error_message:message }),
   });
-  return { success:true, count, fetchedAt:snapshot.fetchedAt };
+  console.warn(JSON.stringify({ event:'student_directory_sync_failed', code }));
+  return { success:true };
 }
 
 async function dispatch(payload: JsonObject): Promise<JsonObject> {
@@ -983,6 +1051,7 @@ async function dispatch(payload: JsonObject): Promise<JsonObject> {
     case 'importMissingEntryGrades': return importMissingEntryGrades(payload);
     case 'getStudents': case 'getStudentList': return getStudents(payload);
     case 'syncStudentDirectory': return syncDirectory(payload);
+    case 'getStudentSyncStatus': return getStudentSyncStatus();
     case 'enableStudentDirectoryAutoSync': return enableDirectoryAutoSync(payload);
     case 'getStudentDirectoryDetail': return readDirectoryDetail(payload);
     case 'saveStudentDirectory': return saveDirectoryDetail(payload);
@@ -1057,6 +1126,7 @@ Deno.serve(async request => {
     if(/^[a-zA-Z0-9-]{8,64}$/.test(trace))console.info(JSON.stringify({event:'request_received',trace,action}));
     if (action === 'staffLogin') return json(await loginStaff(payload));
     if (action === 'ingestStudentDirectory') return json(await ingestDirectorySnapshot(payload));
+    if (action === 'reportStudentDirectorySyncFailure') return json(await reportDirectorySyncFailure(payload));
     if (!ADMIN_ACTIONS.has(action) && action !== 'verifyStaffSession') throw new ResponseError(400, 'UNSUPPORTED_ACTION', 'Unsupported action');
     const session = await verifyAdmin(payload.token);
     if(/^[a-zA-Z0-9-]{8,64}$/.test(trace))console.info(JSON.stringify({event:'session_checked',trace,action}));
