@@ -521,8 +521,9 @@ function installStudentDirectoryAutoSync(data) {
 function syncStudentDirectoryToMirror_() {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(1000)) return;
+  let syncKey = '';
   try {
-    const syncKey = PropertiesService.getScriptProperties().getProperty('STUDENT_DIRECTORY_SYNC_KEY');
+    syncKey = PropertiesService.getScriptProperties().getProperty('STUDENT_DIRECTORY_SYNC_KEY');
     if (!syncKey) throw new Error('生徒情報の同期設定がありません');
     const snapshot = getStudentDirectorySnapshot({ syncSecret: syncKey });
     const endpoint = 'https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1';
@@ -535,6 +536,23 @@ function syncStudentDirectoryToMirror_() {
     if (response.getResponseCode() !== 200 || result.success !== true) {
       throw new Error('生徒情報の同期先が応答しませんでした（HTTP ' + response.getResponseCode() + '）');
     }
+  } catch (error) {
+    console.error(JSON.stringify({ event: 'student_directory_sync_failed', errorType: error && error.name || 'Error' }));
+    if (syncKey) {
+      try {
+        UrlFetchApp.fetch('https://wisedgcgwaebtkprdhth.supabase.co/functions/v1/seiseki-admin-runtime-v1', {
+          method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+          payload: JSON.stringify({
+            action: 'reportStudentDirectorySyncFailure',
+            syncSecret: syncKey,
+            errorCode: /HTTP/.test(String(error && error.message || '')) ? 'SYNC_DESTINATION_UNAVAILABLE' : 'MASTER_READ_FAILED'
+          })
+        });
+      } catch (reportError) {
+        console.error(JSON.stringify({ event: 'student_directory_sync_failure_report_failed', errorType: reportError && reportError.name || 'Error' }));
+      }
+    }
+    throw error;
   } finally { lock.releaseLock(); }
 }
 
