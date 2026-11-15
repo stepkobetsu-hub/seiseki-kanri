@@ -17,10 +17,18 @@ function exams(){
   const count=Number(schools.find(s=>String(s.id)===$('school').value)?.examCount)||0;
   $('exam').replaceChildren(new Option('選択',''),...Array.from({length:count},(_,i)=>new Option(`第${i+1}回`,String(i+1))));name();
 }
-function context(){return {schoolId:$('school').value,schoolName:schools.find(s=>String(s.id)===$('school').value)?.name||'',teacher:$('teacher').value.trim(),grade:$('grade').value,subject:$('subject').value,year:$('year').value,exam:$('exam').value,kind:$('kind').value};}
+function updateOtherKind(){
+  const other=$('kind').value==='その他';
+  $('otherKindWrap').hidden=!other;
+  $('otherKind').disabled=!other;
+  $('otherKind').required=other;
+  name();
+}
+function context(){return {schoolId:$('school').value,schoolName:schools.find(s=>String(s.id)===$('school').value)?.name||'',teacher:$('teacher').value.trim(),grade:$('grade').value,subject:$('subject').value,year:$('year').value,exam:$('exam').value,kind:$('kind').value==='その他' ? ('その他：'+$('otherKind').value.trim()) : $('kind').value};}
 function name(){
   const c=context(),parts=[c.teacher,c.schoolName,c.grade,c.subject,c.year,c.exam?`第${c.exam}回`:'',c.kind];
-  const value=parts.every(Boolean)?parts.map(s=>s.replace(/[\\/:*?"<>|\s]/g,'')).join('_')+'.pdf':'';
+  const detail=$('kind').value==='その他' ? $('otherKind').value.trim() : '';
+  const value=parts.every(Boolean)&&($('kind').value!=='その他'||!!detail)?parts.map(s=>s.replace(/[\\/:*?"<>|\s]/g,'')).join('_')+'.pdf':'';
   $('fileName').textContent=value||'項目を選ぶと表示されます';return value;
 }
 function showSchools(loaded){
@@ -70,7 +78,7 @@ $('form').addEventListener('submit',async event=>{
 });
 $('retry').addEventListener('click',async()=>{if(busy||!pending)return;lock(true);$('complete').hidden=true;try{await register();}catch(e){status('PDFは保存済みです。\n'+e.message,true);}finally{lock(false);}});
 $('reload').addEventListener('click',loadSchools);$('school').addEventListener('change',exams);
-$('form').addEventListener('change',name);$('teacher').addEventListener('input',name);
+$('form').addEventListener('change',name);$('kind').addEventListener('change',updateOtherKind);$('otherKind').addEventListener('input',name);$('teacher').addEventListener('input',name);
 $('pdf').addEventListener('change',()=>{$('fileStatus').textContent=$('pdf').files[0]?.name||'PDFを選択してください。';$('complete').hidden=true;});
 $('closeDone').addEventListener('click',()=>$('done').close());
 const year=new Date().getFullYear()-(new Date().getMonth()<3?1:0);
@@ -82,3 +90,4 @@ let schoolStorage;try{schoolStorage=localStorage;}catch{schoolStorage={getItem:(
 showSchools(restoreSchools(schoolStorage,schoolKey));
 $('schoolStatus').textContent=`保存済みの学校一覧（${schools.length}校）。学校が変わったときだけ更新してください。`;
 paintPending();
+updateOtherKind();
