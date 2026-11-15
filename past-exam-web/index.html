@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="過去問スキャン"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" sizes="180x180" href="icon-180.png"><link rel="icon" href="icon-192.png">
 <link rel="stylesheet" href="app.css?v=1.0.4">
-<script src="../past-exam-upload-config.js?v=20261001"></script><script type="module" src="app.mjs?v=1.0.5"></script>
+<script src="../past-exam-upload-config.js?v=20261001"></script><script type="module" src="app.mjs?v=1.0.6"></script>
 </head>
 <body><main>
 <header><img src="icon-192.png" alt="" width="54" height="54"><div><p class="eyebrow">個別指導STEP · iPhone・Android Web版</p><h1>過去問スキャナー</h1></div></header>
@@ -20,7 +20,8 @@
 <label>科目<select id="subject" required><option value="">選択</option><option>英語</option><option>数学</option><option>国語</option><option>理科</option><option>社会</option></select></label>
 <label>年度<select id="year" required></select></label>
 <label>回<select id="exam" required><option value="">学校を選択</option></select></label>
-<label>種類<select id="kind" required><option value="">選択</option><option>テストのみ</option><option>テスト＆先生解答</option><option>テスト＆生徒解答</option><option>先生解答のみ</option><option>生徒解答のみ</option></select></label>
+<label>種類<select id="kind" required><option value="">選択</option><option>テストのみ</option><option>テスト＆先生解答</option><option>テスト＆生徒解答</option><option>先生解答のみ</option><option>生徒解答のみ</option><option value="その他">その他</option></select></label>
+<label id="otherKindWrap" hidden>その他の内容（必須）<input id="otherKind" type="text" maxlength="60" placeholder="例：模範解答・解説プリント" autocomplete="off" disabled></label>
 </div>
 <h2>2　書類をPDFにする</h2><details class="scan-guide" open><summary>iPhoneでのスキャン方法</summary><ol><li>iPhoneの「ファイル」アプリを開きます。</li><li>「ブラウズ」で保存先フォルダを開き、右上の「…」→「書類をスキャン」。</li><li>紙を撮影し、必要なら切抜き・色を調整します。複数ページは続けて撮影します。</li><li>「保存」して、この画面へ戻ります。</li></ol><p class="note">四隅を動かしてトリミングできます。すでにPDFがある場合は、そのまま選べます。</p></details>
 <details class="scan-guide"><summary>Androidでのスキャン方法</summary><ol><li>Google Driveアプリを開き、「＋」→「スキャン」、またはカメラのボタンを押します。</li><li>紙を撮影し、切抜き・トリミングを調整します。複数ページは続けて撮影します。</li><li>PDFで保存し、この画面へ戻って「PDFを選ぶ」から選択します。</li></ol></details>
@@ -30,7 +31,7 @@
 </fieldset></form><p id="status" role="status" aria-live="polite"></p>
 <section id="pending" class="pending" hidden><h3>PDFは保存済みです</h3><p id="pendingDescription"></p><p>再アップロードは不要です。</p><button id="retry" type="button">DB登録だけ再試行</button></section>
 <p id="savedFile"></p></section>
-<footer><div class="footer-actions"><a class="db-button" href="../past_exam_db.html" target="_blank" rel="noopener">過去問DBへ</a><button id="reload" class="db-button" type="button">学校一覧更新</button></div><p id="schoolStatus" class="school-note" role="status">保存した学校一覧を表示します。</p><p class="version">Webアプリ 1.0.4</p></footer>
+<footer><div class="footer-actions"><a class="db-button" href="../past_exam_db.html" target="_blank" rel="noopener">過去問DBへ</a><button id="reload" class="db-button" type="button">学校一覧更新</button></div><p id="schoolStatus" class="school-note" role="status">保存した学校一覧を表示します。</p><p class="version">Webアプリ 1.0.6</p></footer>
 <dialog id="done"><strong>✓ 登録完了</strong><p>過去問DBへの反映を確認しました。</p><button id="closeDone" type="button">OK</button></dialog>
 <noscript>このアプリの利用にはJavaScriptを有効にしてください。</noscript>
 </main></body></html>
