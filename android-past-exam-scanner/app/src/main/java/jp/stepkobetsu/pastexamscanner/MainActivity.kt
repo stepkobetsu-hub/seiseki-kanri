@@ -111,7 +111,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showScanHelp() {
+        val posterBase64 = assets.open("scan_help_poster.jpg").use { stream ->
+            Base64.encodeToString(stream.readBytes(), Base64.NO_WRAP)
+        }
         val helpHtml = assets.open("scan_help.html").bufferedReader(Charsets.UTF_8).use { it.readText() }
+            .replace("__POSTER_DATA__", posterBase64)
         val dialogHeight = (resources.displayMetrics.heightPixels * 0.70f).toInt()
         val help = WebView(this).apply {
             settings.javaScriptEnabled = false
