@@ -81,8 +81,12 @@ $('reload').addEventListener('click',loadSchools);$('school').addEventListener('
 $('form').addEventListener('change',name);$('kind').addEventListener('change',updateOtherKind);$('otherKind').addEventListener('input',name);$('teacher').addEventListener('input',name);
 $('pdf').addEventListener('change',()=>{$('fileStatus').textContent=$('pdf').files[0]?.name||'PDFを選択してください。';$('complete').hidden=true;});
 $('closeDone').addEventListener('click',()=>$('done').close());
-const year=new Date().getFullYear()-(new Date().getMonth()<3?1:0);
-$('year').replaceChildren(new Option('選択',''),...Array.from({length:year-1999},(_,i)=>new Option(`${year-i}年度`,String(year-i))));$('year').value=String(year);
+const currentAcademicYear=()=>{const now=new Date();return now.getFullYear()-(now.getMonth()<3?1:0);};
+const academicYearLabel=(value,current)=>value===current?'今年度':value===current-1?'昨年度':value===current-2?'おととし':'';
+function updateYearHint(){const year=Number($('year').value),label=academicYearLabel(year,currentAcademicYear());$('yearHint').textContent=label?`（${label}）`:'';}
+const year=currentAcademicYear();
+$('year').replaceChildren(new Option('選択',''),...Array.from({length:year-1999},(_,i)=>{const y=year-i,label=academicYearLabel(y,year);return new Option(`${y}${label?`（${label}）`:''}`,String(y));}));$('year').value=String(year);updateYearHint();
+$('year').addEventListener('change',updateYearHint);
 $('teacher').value=getStorage('stepPastExamWebPastExamTeacher')||'';
 if(navigator.standalone||matchMedia('(display-mode: standalone)').matches)$('install').hidden=true;
 // Startup never depends on the network; only an explicit refresh loads the server.
