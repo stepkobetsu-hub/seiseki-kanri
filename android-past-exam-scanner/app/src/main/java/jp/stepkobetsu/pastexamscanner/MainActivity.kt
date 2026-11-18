@@ -99,6 +99,7 @@ class MainActivity : AppCompatActivity() {
         pending = preferences.getString("pending", null)?.let { JSONObject(it) }
 
         setupStaticSpinners()
+        binding.teacher.setText(preferences.getString("last_teacher", "").orEmpty())
         setupListeners()
         restoreSchools()
     }
@@ -133,7 +134,10 @@ class MainActivity : AppCompatActivity() {
         listOf(binding.school, binding.grade, binding.subject, binding.year, binding.exam, binding.kind)
             .forEach { it.onItemSelectedListener = updateListener }
 
-        binding.teacher.doAfterTextChanged { updateFileNamePreview() }
+        binding.teacher.doAfterTextChanged { editable ->
+            preferences.edit().putString("last_teacher", editable?.toString()?.trim().orEmpty()).apply()
+            updateFileNamePreview()
+        }
         binding.openPastExamDb.setOnClickListener {
             try {
                 startActivity(Intent(Intent.ACTION_VIEW,
