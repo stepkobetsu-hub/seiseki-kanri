@@ -3,6 +3,9 @@ package jp.stepkobetsu.pastexamscanner
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.widget.TextView
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import android.app.Activity
@@ -110,7 +113,7 @@ class MainActivity : AppCompatActivity() {
         setSpinner(binding.subject, listOf("英語", "数学", "国語", "理科", "社会"))
 
         val current = currentNendo()
-        setSpinner(binding.year, (current downTo 2000).map(Int::toString))
+        setYearSpinner(current)
 
         setSpinner(
             binding.kind,
@@ -303,7 +306,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun captureContext(): ExamContext = ExamContext(
         school = selectedSchool() ?: error("学校を選択してください"),
-        year = binding.year.selectedItem.toString(),
+        year = selectedYear(),
         grade = binding.grade.selectedItem.toString(),
         subject = binding.subject.selectedItem.toString(),
         exam = binding.exam.selectedItem.toString(),
@@ -350,7 +353,7 @@ class MainActivity : AppCompatActivity() {
         if (binding.exam.adapter == null || binding.exam.count == 0) return
         val c = ExamContext(
             school,
-            binding.year.selectedItem?.toString() ?: "",
+            selectedYear(),
             binding.grade.selectedItem?.toString() ?: "",
             binding.subject.selectedItem?.toString() ?: "",
             binding.exam.selectedItem?.toString() ?: "",
@@ -452,6 +455,39 @@ class MainActivity : AppCompatActivity() {
         val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, values)
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinner.adapter = adapter
+    }
+
+    private fun selectedYear(): String = binding.year.selectedItem?.toString()?.take(4).orEmpty()
+
+    private fun setYearSpinner(current: Int) {
+        val options = (current downTo 2000).map { year ->
+            val relative = when (year) {
+                current -> "今年度"
+                current - 1 -> "昨年度"
+                current - 2 -> "おととし"
+                else -> null
+            }
+            if (relative == null) year.toString() else "${year}（${relative}）"
+        }
+        val adapter = object : ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, options) {
+            private fun format(view: View): View {
+                val labelView = view as? TextView ?: return view
+                val text = labelView.text.toString()
+                val marker = text.indexOf('（')
+                if (marker >= 0) {
+                    val styled = SpannableString(text)
+                    styled.setSpan(ForegroundColorSpan(0xFFC62828.toInt()), marker, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                    labelView.text = styled
+                }
+                return view
+            }
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View =
+                format(super.getView(position, convertView, parent))
+            override fun getDropDownView(position: Int, convertView: View?, parent: android.view.ViewGroup): View =
+                format(super.getDropDownView(position, convertView, parent))
+        }
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        binding.year.adapter = adapter
     }
 
     private fun currentNendo(): Int {
