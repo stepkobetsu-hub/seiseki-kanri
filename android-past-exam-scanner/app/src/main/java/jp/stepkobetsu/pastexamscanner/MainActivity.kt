@@ -601,7 +601,7 @@ private class ZoomableScanGuideView(context: android.content.Context) :
     )
 
     init {
-        scaleType = ScaleType.MATRIX
+        scaleType = android.widget.ImageView.ScaleType.MATRIX
         setBackgroundColor(android.graphics.Color.WHITE)
     }
 
