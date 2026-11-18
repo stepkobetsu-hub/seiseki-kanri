@@ -111,12 +111,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showScanHelp() {
+        val helpHtml = assets.open("scan_help.html").bufferedReader(Charsets.UTF_8).use { it.readText() }
+        val dialogHeight = (resources.displayMetrics.heightPixels * 0.70f).toInt()
         val help = WebView(this).apply {
             settings.javaScriptEnabled = false
             settings.allowFileAccess = false
             settings.allowContentAccess = false
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, dialogHeight
+            )
             setBackgroundColor(android.graphics.Color.WHITE)
-            loadUrl("file:///android_asset/scan_help.html")
+            loadDataWithBaseURL(null, helpHtml, "text/html", "UTF-8", null)
         }
         AlertDialog.Builder(this)
             .setTitle("スキャンの使い方")
