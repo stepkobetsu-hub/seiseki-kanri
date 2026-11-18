@@ -121,6 +121,10 @@ class MainActivity : AppCompatActivity() {
             settings.javaScriptEnabled = false
             settings.allowFileAccess = false
             settings.allowContentAccess = false
+            settings.setSupportZoom(true)
+            settings.builtInZoomControls = true
+            settings.displayZoomControls = false
+            settings.useWideViewPort = true
             layoutParams = android.widget.LinearLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT, dialogHeight
             )
