@@ -3,6 +3,7 @@ package jp.stepkobetsu.pastexamscanner
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.widget.TextView
+import android.webkit.WebView
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
@@ -109,6 +110,21 @@ class MainActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
     }
 
+    private fun showScanHelp() {
+        val help = WebView(this).apply {
+            settings.javaScriptEnabled = false
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            setBackgroundColor(android.graphics.Color.WHITE)
+            loadUrl("file:///android_asset/scan_help.html")
+        }
+        AlertDialog.Builder(this)
+            .setTitle("スキャンの使い方")
+            .setView(help)
+            .setPositiveButton("閉じる", null)
+            .show()
+    }
+
     private fun setupStaticSpinners() {
         setSpinner(binding.grade, listOf("中1", "中2", "中3"))
         setSpinner(binding.subject, listOf("英語", "数学", "国語", "理科", "社会"))
@@ -146,6 +162,7 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "リンクを開くブラウザが見つかりません。", Toast.LENGTH_LONG).show()
             }
         }
+        binding.scanHelpButton.setOnClickListener { showScanHelp() }
         binding.retrySchools.setOnClickListener { loadSchools() }
 
         binding.scanButton.setOnClickListener {
