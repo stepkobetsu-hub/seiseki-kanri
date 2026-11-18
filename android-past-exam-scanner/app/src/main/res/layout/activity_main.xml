@@ -125,7 +125,7 @@
                 android:minWidth="100dp"
                 android:maxWidth="126dp"
                 android:minHeight="48dp"
-                android:text="スキャンの\n使い方"
+                android:text="使い方"
                 android:textAllCaps="false"
                 android:textSize="12sp"
                 android:textColor="#145DA0"
