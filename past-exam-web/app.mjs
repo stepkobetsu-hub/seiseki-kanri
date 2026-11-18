@@ -78,7 +78,7 @@ $('form').addEventListener('submit',async event=>{
 });
 $('retry').addEventListener('click',async()=>{if(busy||!pending)return;lock(true);$('complete').hidden=true;try{await register();}catch(e){status('PDFは保存済みです。\n'+e.message,true);}finally{lock(false);}});
 $('reload').addEventListener('click',loadSchools);$('school').addEventListener('change',exams);
-$('form').addEventListener('change',name);$('kind').addEventListener('change',updateOtherKind);$('otherKind').addEventListener('input',name);$('teacher').addEventListener('input',name);
+$('form').addEventListener('change',name);$('kind').addEventListener('change',updateOtherKind);$('otherKind').addEventListener('input',name);$('teacher').addEventListener('input',()=>{try{localStorage.setItem('stepPastExamWebPastExamTeacher',$('teacher').value.trim());}catch{}name();});
 $('pdf').addEventListener('change',()=>{$('fileStatus').textContent=$('pdf').files[0]?.name||'PDFを選択してください。';$('complete').hidden=true;});
 $('closeDone').addEventListener('click',()=>$('done').close());
 const currentAcademicYear=()=>{const now=new Date();return now.getFullYear()-(now.getMonth()<3?1:0);};
