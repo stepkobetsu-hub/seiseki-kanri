@@ -5,8 +5,8 @@
 <title>STEP過去問スキャナー｜Web版</title><meta name="theme-color" content="#145da0">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="過去問スキャン"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" sizes="180x180" href="icon-180.png"><link rel="icon" href="icon-192.png">
-<link rel="stylesheet" href="app.css?v=1.0.4">
-<script src="../past-exam-upload-config.js?v=20261001"></script><script type="module" src="app.mjs?v=1.0.6"></script>
+<link rel="stylesheet" href="app.css?v=1.0.7">
+<script src="../past-exam-upload-config.js?v=20261001"></script><script type="module" src="app.mjs?v=1.0.7"></script>
 </head>
 <body><main>
 <header><img src="icon-192.png" alt="" width="54" height="54"><div><p class="eyebrow">個別指導STEP · iPhone・Android Web版</p><h1>過去問スキャナー</h1></div></header>
@@ -18,7 +18,7 @@
 <label>学校<select id="school" required><option value="">読み込み中…</option></select></label>
 <label>学年<select id="grade" required><option value="">選択</option><option>中1</option><option>中2</option><option>中3</option></select></label>
 <label>科目<select id="subject" required><option value="">選択</option><option>英語</option><option>数学</option><option>国語</option><option>理科</option><option>社会</option></select></label>
-<label>年度<select id="year" required></select></label>
+<label>年度<select id="year" required></select><span id="yearHint" class="year-hint" aria-live="polite"></span></label>
 <label>回<select id="exam" required><option value="">学校を選択</option></select></label>
 <label>種類<select id="kind" required><option value="">選択</option><option>テストのみ</option><option>テスト＆先生解答</option><option>テスト＆生徒解答</option><option>先生解答のみ</option><option>生徒解答のみ</option><option value="その他">その他</option></select></label>
 <label id="otherKindWrap" hidden>その他の内容（必須）<input id="otherKind" type="text" maxlength="60" placeholder="例：模範解答・解説プリント" autocomplete="off" disabled></label>
