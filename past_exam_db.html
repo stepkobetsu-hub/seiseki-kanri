@@ -76,6 +76,8 @@ header { background:var(--navy); color:white; padding:14px 24px; display:flex; a
 .year-tabs   { display:flex; gap:6px; flex-wrap:wrap; }
 .year-tab { padding:5px 13px; border-radius:16px; font-size:12px; font-weight:500; cursor:pointer; border:1.5px solid #d0d4e0; background:white; color:var(--sub); font-family:inherit; transition:all .13s; }
 .year-tab.active { background:var(--navy); color:white; border-color:var(--navy); }
+.year-tab .year-relative { color:#c62828; font-weight:700; margin-left:2px; }
+.year-tab.active .year-relative { color:#ffb2b2; }
 .year-tab:hover:not(.active) { border-color:var(--navy); color:var(--navy); }
 .detail-right   { margin-left:auto; display:flex; align-items:center; gap:12px; }
 .detail-summary { font-size:13px; font-weight:700; color:var(--navy); }
@@ -870,7 +872,12 @@ function renderYearTabs() {
   YEARS.forEach(y => {
     const btn = document.createElement('button');
     btn.className = 'year-tab' + (String(y) === String(curYear) ? ' active' : '');
-    btn.textContent = y + '年度';
+    const yearLabel = Number(y) === THIS_YEAR ? '今年度' : Number(y) === THIS_YEAR - 1 ? '昨年度' : 'おととし';
+    btn.appendChild(document.createTextNode(y));
+    const relative = document.createElement('span');
+    relative.className = 'year-relative';
+    relative.textContent = '（' + yearLabel + '）';
+    btn.appendChild(relative);
     btn.addEventListener('click', () => { curYear = y; renderYearTabs(); renderDetail(); });
     wrap.appendChild(btn);
   });
