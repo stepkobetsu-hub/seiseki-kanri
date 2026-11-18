@@ -3,7 +3,6 @@ package jp.stepkobetsu.pastexamscanner
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.widget.TextView
-import android.webkit.WebView
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
@@ -111,29 +110,37 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showScanHelp() {
-        val posterBase64 = assets.open("scan_help_poster.jpg").use { stream ->
-            Base64.encodeToString(stream.readBytes(), Base64.NO_WRAP)
+        val bitmap = assets.open("scan_help_poster.jpg").use { stream ->
+            android.graphics.BitmapFactory.decodeStream(stream)
+        } ?: run {
+            Toast.makeText(this, "使い方のイラストを読み込めませんでした", Toast.LENGTH_LONG).show()
+            return
         }
-        val helpHtml = assets.open("scan_help.html").bufferedReader(Charsets.UTF_8).use { it.readText() }
-            .replace("__POSTER_DATA__", posterBase64)
-        val dialogHeight = (resources.displayMetrics.heightPixels * 0.70f).toInt()
-        val help = WebView(this).apply {
-            settings.javaScriptEnabled = false
-            settings.allowFileAccess = false
-            settings.allowContentAccess = false
-            settings.setSupportZoom(true)
-            settings.builtInZoomControls = true
-            settings.displayZoomControls = false
-            settings.useWideViewPort = true
+        val density = resources.displayMetrics.density
+        val padding = (8 * density).toInt()
+        val guideLayout = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(padding, 0, padding, 0)
+        }
+        val instruction = TextView(this).apply {
+            text = "2本指で広げると拡大、つまむと縮小。拡大後は指で移動できます。"
+            textSize = 13f
+            setTextColor(0xFF334155.toInt())
+            setPadding(padding, padding, padding, padding)
+        }
+        val poster = ZoomableScanGuideView(this).apply {
+            setImageBitmap(bitmap)
             layoutParams = android.widget.LinearLayout.LayoutParams(
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT, dialogHeight
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                (resources.displayMetrics.heightPixels * 0.68f).toInt()
             )
-            setBackgroundColor(android.graphics.Color.WHITE)
-            loadDataWithBaseURL(null, helpHtml, "text/html", "UTF-8", null)
+            contentDescription = "過去問スキャンの使い方のイラスト。2本指で拡大できます"
         }
+        guideLayout.addView(instruction)
+        guideLayout.addView(poster)
         AlertDialog.Builder(this)
-            .setTitle("スキャンの使い方")
-            .setView(help)
+            .setTitle("使い方")
+            .setView(guideLayout)
             .setPositiveButton("閉じる", null)
             .show()
     }
@@ -562,5 +569,115 @@ class MainActivity : AppCompatActivity() {
 
     private fun showMessage(message: String) {
         binding.message.text = message
+    }
+}
+
+
+// Native image gestures: independent of Android WebView viewport/zoom settings.
+private class ZoomableScanGuideView(context: android.content.Context) :
+    androidx.appcompat.widget.AppCompatImageView(context) {
+    private val imageTransform = android.graphics.Matrix()
+    private val visibleBounds = android.graphics.RectF()
+    private var previousX = 0f
+    private var previousY = 0f
+    private var zoom = 1f
+    private var baseWidth = 0f
+    private var baseHeight = 0f
+    private var dragging = false
+
+    private val pincher = android.view.ScaleGestureDetector(
+        context,
+        object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: android.view.ScaleGestureDetector): Boolean {
+                val nextZoom = (zoom * detector.scaleFactor).coerceIn(1f, 6f)
+                val change = nextZoom / zoom
+                zoom = nextZoom
+                imageTransform.postScale(change, change, detector.focusX, detector.focusY)
+                constrainImage()
+                imageMatrix = imageTransform
+                return true
+            }
+        }
+    )
+
+    init {
+        scaleType = ScaleType.MATRIX
+        setBackgroundColor(android.graphics.Color.WHITE)
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        val current = drawable ?: return
+        if (w <= 0 || h <= 0 || current.intrinsicWidth <= 0 || current.intrinsicHeight <= 0) return
+        baseWidth = current.intrinsicWidth.toFloat()
+        baseHeight = current.intrinsicHeight.toFloat()
+        imageTransform.setRectToRect(
+            android.graphics.RectF(0f, 0f, baseWidth, baseHeight),
+            android.graphics.RectF(0f, 0f, w.toFloat(), h.toFloat()),
+            android.graphics.Matrix.ScaleToFit.CENTER
+        )
+        zoom = 1f
+        imageMatrix = imageTransform
+    }
+
+    private fun constrainImage() {
+        if (baseWidth <= 0f || baseHeight <= 0f) return
+        visibleBounds.set(0f, 0f, baseWidth, baseHeight)
+        imageTransform.mapRect(visibleBounds)
+        val dx = if (visibleBounds.width() <= width) width / 2f - visibleBounds.centerX()
+                 else when {
+                     visibleBounds.left > 0f -> -visibleBounds.left
+                     visibleBounds.right < width -> width - visibleBounds.right
+                     else -> 0f
+                 }
+        val dy = if (visibleBounds.height() <= height) height / 2f - visibleBounds.centerY()
+                 else when {
+                     visibleBounds.top > 0f -> -visibleBounds.top
+                     visibleBounds.bottom < height -> height - visibleBounds.bottom
+                     else -> 0f
+                 }
+        imageTransform.postTranslate(dx, dy)
+    }
+
+    override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+        pincher.onTouchEvent(event)
+        when (event.actionMasked) {
+            android.view.MotionEvent.ACTION_DOWN -> {
+                previousX = event.x
+                previousY = event.y
+                dragging = true
+            }
+            android.view.MotionEvent.ACTION_POINTER_DOWN -> dragging = false
+            android.view.MotionEvent.ACTION_POINTER_UP -> {
+                dragging = false
+                val remaining = if (event.actionIndex == 0) 1 else 0
+                if (remaining < event.pointerCount) {
+                    previousX = event.getX(remaining)
+                    previousY = event.getY(remaining)
+                }
+            }
+            android.view.MotionEvent.ACTION_MOVE -> {
+                if (event.pointerCount == 1 && !pincher.isInProgress) {
+                    if (dragging && zoom > 1f) {
+                        imageTransform.postTranslate(event.x - previousX, event.y - previousY)
+                        constrainImage()
+                        imageMatrix = imageTransform
+                    }
+                    previousX = event.x
+                    previousY = event.y
+                    dragging = true
+                }
+            }
+            android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                dragging = false
+                performClick()
+            }
+        }
+        return true
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
     }
 }
