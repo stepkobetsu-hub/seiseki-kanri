@@ -33,7 +33,7 @@ function name(){
 }
 function showSchools(loaded){
   const selected=$('school').value,exam=$('exam').value;
-  schools=loaded;$('school').replaceChildren(new Option('選択',''),...schools.map(s=>new Option(s.name,s.id)));
+  schools=loaded;$('school').replaceChildren(new Option('選択',''),...schools.map(s=>new Option(s.name.replace(/\s*[（(]\s*年\s*[0-9０-９]+\s*回\s*[）)]\s*$/u,''),s.id)));
   if(schools.some(s=>s.id===selected))$('school').value=selected;
   exams();if([...$('exam').options].some(o=>o.value===exam))$('exam').value=exam;
   name();ready=true;
