@@ -821,7 +821,7 @@ function renderTop() {
     );
     hd.innerHTML = `<div class="school-card-name">${esc(school.name)}${schoolHasNew ? '<span class="card-new-badge">NEW</span>' : ''}</div>
       <div class="school-card-meta">
-        <div class="school-card-total">全 ${filledAll}/${totalAll}件　年${school.examCount}回</div>
+        <div class="school-card-total">全 ${filledAll}/${totalAll}件</div>
         ${isAdmin ? '<button class="setting-btn" title="設定">⚙</button>' : ''}
       </div>`;
     if (isAdmin) hd.querySelector('.setting-btn').addEventListener('click', e => { e.stopPropagation(); openEditSchool(school.id); });
