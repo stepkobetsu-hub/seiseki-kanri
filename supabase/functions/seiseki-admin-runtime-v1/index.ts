@@ -17,6 +17,7 @@ const ADMIN_ACTIONS = new Set([
   'getMeetingBootstrap', 'getMeetingMemos', 'saveMeetingMemo', 'deleteMeetingMemo', 'saveMeetingAttachment', 'getMeetingAttachment',
   'getStaffMembers', 'addStaffMember', 'deleteStaffMember',
   'reconcileLegacy', 'persistAdminSession', 'logoutAdmin',
+  'verifyStudentDirectoryMasterEdit',
   'getEntrySheetData', 'saveEntrySheetInfo', 'importMissingEntryGrades', 'syncStudentDirectory', 'getStudentSyncStatus', 'getStudentDirectoryDetail', 'saveStudentDirectory', 'enableStudentDirectoryAutoSync',
 ]);
 const WRITE_ACTIONS = new Set(['saveMeetingAttachment','saveEntrySheetInfo', 'importMissingEntryGrades', 'saveScore', 'deleteScore', 'saveReport', 'deleteReport', 'saveWish', 'saveWishResult', 'addSchool', 'updateSchool', 'deleteSchool', 'saveMeetingMemo', 'deleteMeetingMemo', 'addStaffMember', 'deleteStaffMember', 'saveStudentDirectory', 'syncStudentDirectory']);
@@ -86,7 +87,7 @@ async function verifyAdmin(token: unknown): Promise<JsonObject> {
   return result;
 }
 
-function requireActionPermission(session: JsonObject, token: unknown, action: string): void {
+function requireActionPermission(session: JsonObject, token: unknown, action: string, centralVerdict:JsonObject|null=null): void {
   if (String(token).startsWith(GRADE_SESSION_PREFIX) && !GRADE_ACTIONS.has(action)) {
     throw new ResponseError(403, 'APP_FORBIDDEN', 'このアプリには権限2以上が必要です。');
   }
@@ -94,10 +95,12 @@ function requireActionPermission(session: JsonObject, token: unknown, action: st
   if (action === 'syncStudentDirectory' && !ADMIN_PERMISSION_LEVELS.has(level)) {
     throw new ResponseError(403, 'ADMIN_FORBIDDEN', '生徒マスタの同期には権限2以上が必要です。');
   }
-  if (['saveStudentDirectory','saveEntrySheetInfo'].includes(action) && level !== '4') {
+  const masterEdit=['verifyStudentDirectoryMasterEdit','saveStudentDirectory','saveEntrySheetInfo'].includes(action);
+  const featurePolicyApplied=centralVerdict?.allowed===true&&centralVerdict?.evaluatedPermissionKey==='student-directory.master-edit';
+  if (masterEdit && level !== '4' && !featurePolicyApplied) {
     throw new ResponseError(403, 'DIRECTORY_EDITOR_REQUIRED', '生徒マスタの保存には権限4でログインしてください。');
   }
-  const allowed = GRADE_ACTIONS.has(action) ? STAFF_PERMISSION_LEVELS : ADMIN_PERMISSION_LEVELS;
+  const allowed = featurePolicyApplied || GRADE_ACTIONS.has(action) ? STAFF_PERMISSION_LEVELS : ADMIN_PERMISSION_LEVELS;
   if (!allowed.has(level)) throw new ResponseError(403, 'APP_FORBIDDEN', 'このアプリを利用する権限がありません。');
 }
 
@@ -1097,19 +1100,20 @@ async function dispatch(payload: JsonObject): Promise<JsonObject> {
   }
 }
 
-async function enforceCentralPermission(session:JsonObject,payload:JsonObject):Promise<void>{
+async function enforceCentralPermission(session:JsonObject,payload:JsonObject):Promise<JsonObject|null>{
  const campuses:string[]=[];
  if(payload.studentId){const rows=await pg(query('students',{select:'campus',student_code:`eq.${String(payload.studentId)}`,limit:1})) as JsonObject[];if(rows[0])campuses.push(String(rows[0].campus||''));}
  if(payload.id&&['saveMeetingMemo','deleteMeetingMemo','saveMeetingAttachment','getMeetingAttachment'].includes(String(payload.action))){const rows=await pg(query('meeting_memos',{select:'campus',id:`eq.${String(payload.id)}`,limit:1})) as JsonObject[];if(rows[0])campuses.push(String(rows[0].campus||''));}
  let verdict:Record<string,unknown>|null;
  try{verdict=await checkPermissionBridge(session,payload,async path=>await pg(path),campuses);}catch{throw new ResponseError(503,'PERMISSION_UNAVAILABLE','共通権限を確認できません。時間をおいて再度お試しください。');}
- if(!verdict)return;
+ if(!verdict)return null;
  if(verdict.allowed!==true)throw new ResponseError(403,'CENTRAL_PERMISSION_DENIED',String(verdict.reason||'この操作を行う権限がありません。'));
  if(verdict.level){session.permission_level=String(verdict.level);session.permissionLevel=String(verdict.level);}
  if(verdict.scope&&verdict.scope!=='all'){
   if(campuses.some(x=>!x))throw new ResponseError(403,'CAMPUS_REQUIRED','校舎を確認できないデータは操作できません。');
   payload.campus=String(verdict.scope);
  }
+ return verdict as JsonObject;
 }
 
 Deno.serve(async request => {
@@ -1130,12 +1134,19 @@ Deno.serve(async request => {
     if (!ADMIN_ACTIONS.has(action) && action !== 'verifyStaffSession') throw new ResponseError(400, 'UNSUPPORTED_ACTION', 'Unsupported action');
     const session = await verifyAdmin(payload.token);
     if(/^[a-zA-Z0-9-]{8,64}$/.test(trace))console.info(JSON.stringify({event:'session_checked',trace,action}));
-    await enforceCentralPermission(session, payload);
+    const centralVerdict=await enforceCentralPermission(session, payload);
     if(/^[a-zA-Z0-9-]{8,64}$/.test(trace))console.info(JSON.stringify({event:'permission_checked',trace,action}));
-    requireActionPermission(session, payload.token, action);
+    requireActionPermission(session, payload.token, action, centralVerdict);
     if (action === 'verifyStaffSession') return json({ success: true,
       code: session.staff_code ?? session.code,
       permissionLevel: session.permission_level ?? session.permissionLevel,
+    });
+    if (action === 'verifyStudentDirectoryMasterEdit') return json({ success: true,
+      code: session.staff_code ?? session.code,
+      permissionLevel: session.permission_level ?? session.permissionLevel,
+      permissionKey:'student-directory.master-edit',
+      requiredLevel:centralVerdict?.requiredLevel ?? 4,
+      source:centralVerdict?.evaluatedPermissionKey==='student-directory.master-edit'?'permission-center':'legacy-default',
     });
     EdgeRuntime.waitUntil(retryFailedMirrors().catch(error => console.error('Mirror retry failed', error)));
     if (WRITE_ACTIONS.has(action) && !String(payload.mutationId ?? '').trim()) throw new ResponseError(400, 'MUTATION_ID_REQUIRED', 'mutationId is required');

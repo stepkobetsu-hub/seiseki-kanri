@@ -2,11 +2,18 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const ts = require('typescript');
-function fixture({ level = '4', centralLevel = level, denied = false, failedLogin = false, mismatch = false, invalidExpiry = false } = {}) {
+let compile;
+try {
+  const ts = require('typescript');
+  compile = source => ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+} catch {
+  const { stripTypeScriptTypes } = require('node:module');
+  compile = source => stripTypeScriptTypes(source.replace(/^import\s+\{([^}]+)\}\s+from\s+'([^']+)'\s*;/gm, "const {$1}=require('$2');"), { mode:'transform' });
+}
+function fixture({ level = '4', centralLevel = level, denied = false, featureApplied = false, failedLogin = false, mismatch = false, invalidExpiry = false } = {}) {
   let handler; const rows = new Map(); const calls = [];
   const m = { exports: {} };
-  const source = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../index.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const source = compile(fs.readFileSync(path.join(__dirname, '../index.ts'), 'utf8'));
   const fetch = async (url, init) => {
     calls.push({ url: String(url), action: init.body ? JSON.parse(init.body).action : null });
     if (String(url).startsWith('https://script.google.com/')) {
@@ -20,8 +27,12 @@ function fixture({ level = '4', centralLevel = level, denied = false, failedLogi
     return Response.json(rows.has(key) ? [rows.get(key)] : []);
   };
   const mocks = {
+    './meeting-files.mjs': { uploadMeetingFile() {}, resolveMeetingFiles() {}, openMeetingFile() {} },
+    './entry-grade-import.ts': { entryGradeRows() {}, missingEntryRows() {} },
+    './entry-info-edit.ts': { cleanEntryEdit(value) { return value; }, mergeEntryEdit(_old, value) { return value; } },
     './storage.ts': { CORS_HEADERS: {}, preflightResponse: () => null },
-    './permission-bridge.ts': { checkPermissionBridge: async () => ({ allowed: !denied, level: centralLevel }) },
+    './permission-bridge.ts': { checkPermissionBridge: async (_session, payload) => ({ allowed: !denied, level: centralLevel, ...(featureApplied && ['verifyStudentDirectoryMasterEdit','saveStudentDirectory','saveEntrySheetInfo'].includes(payload.action) ? {permissionKey:'student-directory.master-edit',evaluatedPermissionKey:'student-directory.master-edit',requiredLevel:3} : {}) }) },
+    './student-enrollment-sync.mjs': { studentIndexRowFromDirectoryDetail(value) { return value; }, summarizeStudentIndexSync() { return {}; } },
   };
   new Function('require', 'module', 'exports', 'Deno', 'fetch', 'EdgeRuntime', source)(
     n => mocks[n], m, m.exports,
@@ -70,4 +81,13 @@ test('directory saves require verified level 4 even with a valid level 2 or 3 se
   const f=fixture();const login=await f.call({action:'staffLogin',code:'7001',password:'fixture'});
   const r=await f.call({action:'saveStudentDirectory',token:login.body.systemPortalSessionToken,permissionAppId:'student-directory'});
   assert.equal(r.status,400);assert.equal(r.body.code,'MUTATION_ID_REQUIRED','level 4 passes role check');
+});
+
+test('master edit feature policy changes are rechecked for an existing session', async () => {
+  const legacy=fixture({level:'3',centralLevel:'3'});const oldLogin=await legacy.call({action:'staffLogin',code:'7001',password:'fixture'});
+  const denied=await legacy.call({action:'verifyStudentDirectoryMasterEdit',token:oldLogin.body.systemPortalSessionToken,permissionAppId:'student-directory'});
+  assert.equal(denied.status,403);assert.equal(denied.body.code,'DIRECTORY_EDITOR_REQUIRED');
+  const changed=fixture({level:'3',centralLevel:'3',featureApplied:true});const login=await changed.call({action:'staffLogin',code:'7001',password:'fixture'});
+  const allowed=await changed.call({action:'verifyStudentDirectoryMasterEdit',token:login.body.systemPortalSessionToken,permissionAppId:'student-directory'});
+  assert.equal(allowed.status,200);assert.equal(allowed.body.permissionKey,'student-directory.master-edit');assert.equal(allowed.body.requiredLevel,3);assert.equal(allowed.body.source,'permission-center');
 });
