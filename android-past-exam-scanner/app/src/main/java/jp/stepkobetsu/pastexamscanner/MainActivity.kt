@@ -216,7 +216,7 @@ class MainActivity : AppCompatActivity() {
         val selectedId = selectedSchool()?.id
         val selectedExam = binding.exam.selectedItemPosition
         schools = loaded
-        setSpinner(binding.school, schools.map { "${it.name}（年${it.examCount}回）" })
+        setSpinner(binding.school, schools.map { it.name })
         val index = schools.indexOfFirst { it.id == selectedId }
         if (index >= 0) binding.school.setSelection(index)
         updateExamSpinner()
